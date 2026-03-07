@@ -36,7 +36,7 @@ info "Updating system packages..."
 sudo apt-get update -qq
 
 info "Installing required packages..."
-sudo apt-get install -y -qq git curl chromium-browser xdotool unclutter
+sudo apt-get install -y -qq git curl chromium xdotool unclutter
 
 # --- Step 2: Node.js ---
 if command -v node &>/dev/null; then
@@ -106,17 +106,16 @@ if [ ! -f .env.local ]; then
     sed -i "s|GOOGLE_CLIENT_SECRET=.*|GOOGLE_CLIENT_SECRET=${GSEC}|" .env.local
   fi
 
-  # Set NEXTAUTH_URL to this Pi's hostname
-  PI_IP=$(hostname -I | awk '{print $1}')
-  sed -i "s|NEXTAUTH_URL=.*|NEXTAUTH_URL=http://${PI_IP}:3000|" .env.local
-  info "Set NEXTAUTH_URL to http://${PI_IP}:3000"
+  # Set NEXTAUTH_URL to localhost (Google OAuth callback)
+  sed -i "s|NEXTAUTH_URL=.*|NEXTAUTH_URL=http://localhost:3000|" .env.local
+  info "Set NEXTAUTH_URL to http://localhost:3000"
 else
   info ".env.local already exists, skipping configuration."
 fi
 
 # --- Step 5: Install dependencies and build ---
 info "Installing npm dependencies..."
-npm install --omit=dev
+npm install
 
 info "Building Next.js app (this may take a few minutes on a Pi)..."
 npm run build
@@ -159,7 +158,7 @@ Type=simple
 User=${USER}
 Environment=DISPLAY=:0
 ExecStartPre=/bin/sleep 10
-ExecStart=/usr/bin/chromium-browser --kiosk --noerrdialogs --disable-infobars --no-first-run --disable-session-crashed-bubble --disable-translate --check-for-update-interval=31536000 http://localhost:3000/display
+ExecStart=/usr/bin/chromium --kiosk --noerrdialogs --disable-infobars --no-first-run --disable-session-crashed-bubble --disable-translate --check-for-update-interval=31536000 http://localhost:3000/display
 Restart=on-failure
 RestartSec=5
 
