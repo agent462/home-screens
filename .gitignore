@@ -23,6 +23,7 @@
 # misc
 .DS_Store
 *.pem
+.c*
 
 # debug
 npm-debug.log*
@@ -32,6 +33,17 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.local.example
+
+# runtime config
+data/config.json
+data/google-tokens.json
+data/client*
+
+# user-uploaded backgrounds
+public/backgrounds/*
+!public/backgrounds/default.svg
+!public/backgrounds/themes/
 
 # vercel
 .vercel

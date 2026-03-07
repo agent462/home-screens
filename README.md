@@ -1,36 +1,142 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Home Screens
+
+A custom smart display system built with Next.js. Designed to run on a Raspberry Pi in Chromium kiosk mode, replacing Dakboard/MagicMirror with a fully web-based, drag-and-drop configurable display.
+
+## Features
+
+- **Drag-and-drop editor** — visually arrange modules on a 1080x1920 portrait canvas
+- **Multi-screen rotation** — configure multiple screens that cycle automatically
+- **17 built-in modules** — clock, calendar, weather (hourly + forecast), countdown, dad jokes, text, image, quote, todo, sticky note, greeting, news, stock ticker, crypto, word of the day, and this day in history
+- **Dual weather providers** — OpenWeatherMap and WeatherAPI with a shared interface
+- **Google Calendar integration** — display upcoming events from one or more calendars
+- **Background images** — upload custom backgrounds or rotate via Unsplash
+- **Per-module styling** — opacity, blur, colors, fonts, border radius, padding
+- **Raspberry Pi kiosk scripts** — one-command setup for a dedicated display
+
+## Tech Stack
+
+- Next.js 16 / React 19 (App Router)
+- Tailwind CSS v4
+- @dnd-kit (drag-and-drop)
+- Zustand (editor state)
+- Framer Motion (screen transitions)
+- Zod (config validation)
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
+# Install dependencies
+npm install
+
+# Copy environment variables
+cp .env.local.example .env.local
+# Edit .env.local with your API keys
+
+# Run development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Then visit:
+- `http://localhost:3000/editor` — configure your screens
+- `http://localhost:3000/display` — fullscreen display view
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment Variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Variable | Description | Required |
+|---|---|---|
+| `NEXTAUTH_URL` | App URL for OAuth redirect (default `http://localhost:3000`) | For calendar |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID (for calendar) | For calendar |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | For calendar |
+| `OPENWEATHERMAP_API_KEY` | OpenWeatherMap API key (fallback if not set in editor) | Optional |
+| `WEATHERAPI_KEY` | WeatherAPI.com API key (fallback if not set in editor) | Optional |
 
-## Learn More
+Weather API keys can be configured either in `.env.local` or through the editor UI (Settings > Weather). The editor config takes priority.
 
-To learn more about Next.js, take a look at the following resources:
+## Raspberry Pi Install
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Run the install script on a fresh Raspberry Pi OS:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+git clone <repo-url> ~/home-screens
+cd ~/home-screens
+bash scripts/install.sh
+```
 
-## Deploy on Vercel
+The script handles everything:
+- Installs Node.js 20, Chromium, and system dependencies
+- Prompts for API keys and writes `.env.local`
+- Installs npm packages and builds the app
+- Creates systemd services (`home-screens`, `home-screens-kiosk`)
+- Disables screen blanking and configures autologin
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+After install, reboot to start the kiosk:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+sudo reboot
+```
+
+### Manual Start
+
+To run without the systemd services:
+
+```bash
+bash scripts/start-display.sh
+```
+
+### Managing the Services
+
+```bash
+sudo systemctl start home-screens     # start the server
+sudo systemctl stop home-screens      # stop server + kiosk
+sudo systemctl status home-screens    # check status
+journalctl -u home-screens -f         # view logs
+```
+
+## Project Structure
+
+```
+src/
+  app/
+    (display)/display/   # Fullscreen kiosk view
+    (editor)/editor/     # Configuration editor
+    api/                 # Config, calendar, weather, jokes, backgrounds, and more
+  components/
+    modules/             # Clock, Calendar, Weather, Countdown, Quote, News, etc.
+    display/             # Screen rotator, screen renderer
+    editor/              # Canvas, module palette, property panel, settings, backgrounds
+  lib/                   # Config I/O, weather providers, Google Calendar
+  stores/                # Zustand editor store
+  types/                 # TypeScript config types
+data/
+  config.json            # Screen configuration (file-based, no database)
+scripts/
+  install.sh             # Full Raspberry Pi install script
+  setup-kiosk.sh         # Kiosk-only setup (used by install.sh)
+  start-display.sh       # Manual start script
+```
+
+## API Routes
+
+| Route | Methods | Description |
+|---|---|---|
+| `/api/config` | GET, PUT | Read/write screen configuration |
+| `/api/calendar` | GET | Google Calendar event proxy |
+| `/api/calendars` | GET | List available Google Calendars |
+| `/api/weather` | GET | Weather data (dual provider) |
+| `/api/geocode` | GET | Location geocoding for weather |
+| `/api/jokes` | GET | Dad jokes proxy |
+| `/api/quote` | GET | ZenQuotes daily quote proxy |
+| `/api/news` | GET | RSS feed parser |
+| `/api/stocks` | GET | Yahoo Finance stock prices |
+| `/api/crypto` | GET | CoinGecko crypto prices |
+| `/api/history` | GET | This day in history |
+| `/api/backgrounds` | GET, POST | List/upload background images |
+| `/api/unsplash` | GET | Unsplash background photos |
+
+## Adding a Module
+
+1. Create a component in `src/components/modules/`
+2. Add the type to `ModuleType` in `src/types/config.ts`
+3. Define its config interface in `src/types/config.ts`
+4. Register it in `src/lib/module-registry.ts`
+5. Export it from `src/components/modules/index.tsx`

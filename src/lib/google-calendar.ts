@@ -1,0 +1,76 @@
+import { google } from 'googleapis';
+import { getAuthenticatedClient } from '@/lib/google-auth';
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  start: string;
+  end: string;
+  location?: string;
+  description?: string;
+  allDay: boolean;
+  calendarColor?: string;
+}
+
+export async function fetchCalendarEvents(
+  calendarIds: string[],
+  timeMin: string,
+  timeMax: string,
+): Promise<CalendarEvent[]> {
+  const auth = await getAuthenticatedClient();
+  if (!auth) {
+    throw new Error('Not authenticated with Google. Sign in from the editor settings.');
+  }
+
+  const calendar = google.calendar({ version: 'v3', auth });
+
+  // Fetch calendar colors and event color definitions in parallel
+  const [calListRes, colorsRes] = await Promise.all([
+    calendar.calendarList.list(),
+    calendar.colors.get(),
+  ]);
+
+  const calendarColorMap = new Map<string, string>();
+  for (const cal of calListRes.data.items ?? []) {
+    if (cal.id) calendarColorMap.set(cal.id, cal.backgroundColor ?? '#3b82f6');
+  }
+
+  // Map event colorId values to their actual hex colors
+  const eventColorMap = new Map<string, string>();
+  for (const [id, color] of Object.entries(colorsRes.data.event ?? {})) {
+    eventColorMap.set(id, color.background ?? '#3b82f6');
+  }
+
+  // Fetch events from all selected calendars in parallel
+  const results = await Promise.all(
+    calendarIds.map(async (calendarId) => {
+      const response = await calendar.events.list({
+        calendarId,
+        timeMin,
+        timeMax,
+        singleEvents: true,
+        orderBy: 'startTime',
+      });
+
+      const calColor = calendarColorMap.get(calendarId) ?? '#3b82f6';
+      const items = response.data.items ?? [];
+      return items.map((event) => ({
+        id: event.id ?? '',
+        title: event.summary ?? '(No title)',
+        start: event.start?.dateTime ?? event.start?.date ?? '',
+        end: event.end?.dateTime ?? event.end?.date ?? '',
+        location: event.location ?? undefined,
+        description: event.description ?? undefined,
+        allDay: !event.start?.dateTime,
+        calendarColor: event.colorId
+          ? eventColorMap.get(event.colorId) ?? calColor
+          : calColor,
+      }));
+    }),
+  );
+
+  // Merge and sort by start time
+  return results
+    .flat()
+    .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+}
