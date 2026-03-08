@@ -258,7 +258,36 @@ case "${action}" in
       changed="${changed}packages,"
     fi
 
-    # 1. Ensure systemd services are current
+    # 1. Ensure fontconfig prioritises emoji font for Chromium
+    EMOJI_CONF="/etc/fonts/conf.d/01-emoji.conf"
+    DESIRED_EMOJI_CONF='<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
+<fontconfig>
+  <description>Add Noto Color Emoji as fallback for all families</description>
+  <match target="pattern">
+    <test qual="any" name="family"><string>sans-serif</string></test>
+    <edit name="family" mode="append"><string>Noto Color Emoji</string></edit>
+  </match>
+  <match target="pattern">
+    <test qual="any" name="family"><string>serif</string></test>
+    <edit name="family" mode="append"><string>Noto Color Emoji</string></edit>
+  </match>
+  <match target="pattern">
+    <test qual="any" name="family"><string>monospace</string></test>
+    <edit name="family" mode="append"><string>Noto Color Emoji</string></edit>
+  </match>
+  <alias>
+    <family>emoji</family>
+    <prefer><family>Noto Color Emoji</family></prefer>
+  </alias>
+</fontconfig>'
+    if [ ! -f "${EMOJI_CONF}" ] || [ "$(cat "${EMOJI_CONF}")" != "${DESIRED_EMOJI_CONF}" ]; then
+      echo "${DESIRED_EMOJI_CONF}" | sudo tee "${EMOJI_CONF}" > /dev/null
+      sudo fc-cache -f
+      changed="${changed}emoji-font,"
+    fi
+
+    # 2. Ensure systemd services are current
     NPM_PATH=$(which npm 2>/dev/null || echo "/usr/bin/npm")
     SERVICE_FILE="/etc/systemd/system/home-screens.service"
     DESIRED_SERVICE="[Unit]
@@ -286,14 +315,14 @@ WantedBy=multi-user.target"
       changed="${changed}service,"
     fi
 
-    # 2. Boot to console (required for cage kiosk)
+    # 3. Boot to console (required for cage kiosk)
     CURRENT_DEFAULT=$(systemctl get-default 2>/dev/null || echo "unknown")
     if [ "${CURRENT_DEFAULT}" != "multi-user.target" ]; then
       sudo systemctl set-default multi-user.target
       changed="${changed}boot-target,"
     fi
 
-    # 3. Disable display managers
+    # 4. Disable display managers
     for dm in lightdm gdm3 sddm; do
       if systemctl is-enabled "${dm}" &>/dev/null; then
         sudo systemctl disable "${dm}"
@@ -301,13 +330,13 @@ WantedBy=multi-user.target"
       fi
     done
 
-    # 4. Disable legacy kiosk service
+    # 5. Disable legacy kiosk service
     if systemctl is-enabled home-screens-kiosk &>/dev/null; then
       sudo systemctl disable home-screens-kiosk
       changed="${changed}legacy-kiosk,"
     fi
 
-    # 5. Autologin on TTY1
+    # 6. Autologin on TTY1
     AUTOLOGIN_DIR="/etc/systemd/system/getty@tty1.service.d"
     AUTOLOGIN_CONF="${AUTOLOGIN_DIR}/autologin.conf"
     DESIRED_AUTOLOGIN="[Service]
@@ -320,7 +349,7 @@ ExecStart=-/sbin/agetty --autologin ${USER} --noclear %I \$TERM"
       changed="${changed}autologin,"
     fi
 
-    # 6. Generate kiosk.conf from config.json
+    # 7. Generate kiosk.conf from config.json
     KIOSK_CONF="${APP_DIR}/data/kiosk.conf"
     if [ -f "${CONFIG_FILE}" ]; then
       DESIRED_KIOSK=$(node <<GENEOF
@@ -343,7 +372,7 @@ GENEOF
       fi
     fi
 
-    # 7. Kiosk launcher script
+    # 8. Kiosk launcher script
     LAUNCHER="${APP_DIR}/scripts/kiosk-launcher.sh"
     DESIRED_LAUNCHER='#!/usr/bin/env bash
 # Launched inside cage — applies resolution, rotation, then starts Chromium.
@@ -387,7 +416,7 @@ exec chromium --kiosk \
       changed="${changed}launcher,"
     fi
 
-    # 8. Cage auto-launch in .bash_profile
+    # 9. Cage auto-launch in .bash_profile
     PROFILE="${HOME}/.bash_profile"
     KIOSK_BLOCK="# --- Home Screens Kiosk ---
 if [ \"\$(tty)\" = \"/dev/tty1\" ]; then
