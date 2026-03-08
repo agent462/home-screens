@@ -24,7 +24,7 @@ APP_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BACKUP_DIR="${APP_DIR}/data/backups"
 CONFIG_FILE="${APP_DIR}/data/config.json"
 SERVICE_NAME="home-screens"
-MAX_BACKUPS=20
+MAX_BACKUPS=6
 
 cd "${APP_DIR}"
 
@@ -92,7 +92,7 @@ case "${action}" in
       echo "{\"ok\":false,\"error\":\"No target tag specified\"}"
       exit 1
     fi
-    git checkout "${target}" 2>&1
+    git checkout -f "${target}" 2>&1
     echo "{\"ok\":true,\"target\":\"${target}\"}"
     ;;
 
@@ -161,7 +161,7 @@ case "${action}" in
       echo "{\"ok\":false,\"error\":\"No target tag specified\"}"
       exit 1
     fi
-    git checkout "${target}" 2>&1
+    git checkout -f "${target}" 2>&1
     echo "{\"ok\":true,\"target\":\"${target}\"}"
     ;;
 
