@@ -6,7 +6,7 @@ A custom smart display system built with Next.js. Designed to run on a Raspberry
 
 - **Drag-and-drop editor** — visually arrange modules on a 1080x1920 portrait canvas
 - **Multi-screen rotation** — configure multiple screens that cycle automatically
-- **17 built-in modules** — clock, calendar, weather (hourly + forecast), countdown, dad jokes, text, image, quote, todo, sticky note, greeting, news, stock ticker, crypto, word of the day, and this day in history
+- **25 built-in modules** — clock, calendar, weather (hourly + forecast), countdown, dad jokes, text, image, quote, todo, sticky note, greeting, news, stock ticker, crypto, word of the day, this day in history, moon phase, sunrise/sunset, photo slideshow, QR code, year progress, traffic/commute, sports scores, and air quality
 - **Dual weather providers** — OpenWeatherMap and WeatherAPI with a shared interface
 - **Google Calendar integration** — display upcoming events from one or more calendars
 - **Background images** — upload custom backgrounds or rotate via Unsplash
@@ -48,6 +48,8 @@ Then visit:
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | For calendar |
 | `OPENWEATHERMAP_API_KEY` | OpenWeatherMap API key (fallback if not set in editor) | Optional |
 | `WEATHERAPI_KEY` | WeatherAPI.com API key (fallback if not set in editor) | Optional |
+| `GOOGLE_MAPS_API_KEY` | Google Routes API key (for traffic module) | For traffic |
+| `TOMTOM_API_KEY` | TomTom Routing API key (traffic fallback) | For traffic |
 
 Weather API keys can be configured either in `.env.local` or through the editor UI (Settings > Weather). The editor config takes priority.
 
@@ -144,11 +146,17 @@ scripts/
 | `/api/history` | GET | This day in history |
 | `/api/backgrounds` | GET, POST | List/upload background images |
 | `/api/unsplash` | GET | Unsplash background photos |
+| `/api/traffic` | GET | Traffic/commute times (Google Routes or TomTom) |
+| `/api/sports` | GET | Live sports scores (ESPN) |
+| `/api/air-quality` | GET | Air quality index and UV (OpenWeatherMap) |
 
 ## Adding a Module
 
 1. Create a component in `src/components/modules/`
 2. Add the type to `ModuleType` in `src/types/config.ts`
 3. Define its config interface in `src/types/config.ts`
-4. Register it in `src/lib/module-registry.ts`
-5. Export it from `src/components/modules/index.tsx`
+4. Add a default size in `src/lib/constants.ts`
+5. Register it in `src/lib/module-registry.ts`
+6. Add a dynamic import in `src/lib/module-components.ts`
+7. Add an editor config section in `src/components/editor/PropertyPanel.tsx`
+8. (Optional) Create an API route in `src/app/api/` if external data is needed
