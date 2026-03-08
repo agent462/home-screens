@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useEditorStore } from '@/stores/editor-store';
 import Button from '@/components/ui/Button';
 import Slider from '@/components/ui/Slider';
-import { DISPLAY_PRESETS } from '@/lib/constants';
+import { DISPLAY_PRESETS, DISPLAY_TRANSFORMS } from '@/lib/constants';
 
 interface GoogleCalendar {
   id: string;
@@ -37,6 +37,7 @@ export default function SettingsPanel({ onClose }: { onClose: () => void }) {
   );
   const [displayWidth, setDisplayWidth] = useState(settings?.displayWidth ?? 1080);
   const [displayHeight, setDisplayHeight] = useState(settings?.displayHeight ?? 1920);
+  const [displayTransform, setDisplayTransform] = useState(settings?.displayTransform ?? 'normal');
 
   const [testStatus, setTestStatus] = useState<string | null>(null);
 
@@ -219,6 +220,7 @@ export default function SettingsPanel({ onClose }: { onClose: () => void }) {
       rotationIntervalMs: rotationInterval * 1000,
       displayWidth,
       displayHeight,
+      displayTransform: displayTransform as 'normal' | '90' | '180' | '270',
       unsplashAccessKey: unsplashKey,
       weather: {
         provider: provider as 'openweathermap' | 'weatherapi',
@@ -318,6 +320,21 @@ export default function SettingsPanel({ onClose }: { onClose: () => void }) {
               </select>
               <p className="text-xs text-neutral-500 mt-1">
                 Match this to your physical display. Changing resolution affects the module canvas size.
+              </p>
+            </label>
+            <label className="block mb-3">
+              <span className="text-xs text-neutral-400">Display Orientation</span>
+              <select
+                value={displayTransform}
+                onChange={(e) => setDisplayTransform(e.target.value as 'normal' | '90' | '180' | '270')}
+                className="mt-1 block w-full rounded-md bg-neutral-800 border border-neutral-600 text-sm text-neutral-200 px-3 py-2 focus:outline-none focus:border-blue-500"
+              >
+                {DISPLAY_TRANSFORMS.map((t) => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+              <p className="text-xs text-neutral-500 mt-1">
+                Physical rotation applied via wlr-randr on the kiosk. Takes effect on next boot.
               </p>
             </label>
             <Slider

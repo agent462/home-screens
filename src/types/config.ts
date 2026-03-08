@@ -81,6 +81,7 @@ export interface GlobalSettings {
   rotationIntervalMs: number;
   displayWidth: number;
   displayHeight: number;
+  displayTransform?: 'normal' | '90' | '180' | '270';
   weather: WeatherSettings;
   calendar: CalendarSettings;
   unsplashAccessKey?: string;

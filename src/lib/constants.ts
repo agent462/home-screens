@@ -13,6 +13,14 @@ export const DISPLAY_PRESETS = [
   { label: 'Landscape 4K (3840 x 2160)', width: 3840, height: 2160 },
 ] as const;
 
+// Display orientation presets (wlr-randr transform values)
+export const DISPLAY_TRANSFORMS = [
+  { label: 'Landscape (no rotation)', value: 'normal' },
+  { label: 'Portrait (90° clockwise)', value: '90' },
+  { label: 'Inverted Landscape (180°)', value: '180' },
+  { label: 'Portrait (270° clockwise)', value: '270' },
+] as const;
+
 // Config file path
 export const CONFIG_FILE_PATH = 'data/config.json';
 
