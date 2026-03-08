@@ -246,9 +246,32 @@ export default function EditorCanvas({ onScaleChange }: { onScaleChange?: (scale
   const displayWidth = config?.settings.displayWidth || DEFAULT_DISPLAY_WIDTH;
   const displayHeight = config?.settings.displayHeight || DEFAULT_DISPLAY_HEIGHT;
   const currentScreen = config?.screens.find((s) => s.id === selectedScreenId);
-  // Editor always shows the static background image from config.
-  // The display handles live rotation separately — the editor just needs
-  // to show the configured fallback so users see what's actually on the TV.
+  // Poll the server-side background cache so the editor shows the same
+  // rotating background that the display is using.
+  const [activeBackground, setActiveBackground] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!currentScreen?.backgroundRotation?.enabled) {
+      setActiveBackground(null);
+      return;
+    }
+
+    async function fetchActive() {
+      try {
+        const res = await fetch(`/api/backgrounds/rotate?screenId=${encodeURIComponent(currentScreen!.id)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.path) setActiveBackground(data.path);
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    fetchActive();
+    const id = setInterval(fetchActive, 30_000);
+    return () => clearInterval(id);
+  }, [currentScreen?.id, currentScreen?.backgroundRotation?.enabled]);
 
   // Fetch live data for previews
   useEffect(() => {
@@ -318,9 +341,9 @@ export default function EditorCanvas({ onScaleChange }: { onScaleChange?: (scale
         }}
         onClick={() => selectModule(null)}
       >
-        {currentScreen.backgroundImage && (
+        {(activeBackground || currentScreen.backgroundImage) && (
           <img
-            src={currentScreen.backgroundImage}
+            src={activeBackground || currentScreen.backgroundImage}
             alt=""
             className="absolute inset-0 w-full h-full object-cover"
           />
