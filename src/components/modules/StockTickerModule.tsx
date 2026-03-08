@@ -10,9 +10,9 @@ interface StockTickerModuleProps {
 
 interface StockData {
   symbol: string;
-  price: number;
-  change: number;
-  changePercent: number;
+  price: number | null;
+  change: number | null;
+  changePercent: number | null;
 }
 
 export default function StockTickerModule({ config, style }: StockTickerModuleProps) {
@@ -39,7 +39,7 @@ export default function StockTickerModule({ config, style }: StockTickerModulePr
       <div className="flex flex-wrap items-center justify-center h-full gap-3 w-full">
         {stocks.length === 0 && <p className="text-center">Loading stocks...</p>}
         {stocks.map((stock) => {
-          const positive = stock.change >= 0;
+          const positive = (stock.change ?? 0) >= 0;
           const sign = positive ? '+' : '';
           const scale = config.cardScale ?? 1;
           return (
@@ -53,9 +53,9 @@ export default function StockTickerModule({ config, style }: StockTickerModulePr
               }}
             >
               <span className="font-semibold tracking-wider opacity-70" style={{ fontSize: `${0.75 * scale}rem` }}>{stock.symbol}</span>
-              <span className="font-bold whitespace-nowrap" style={{ fontSize: `${1.25 * scale}rem` }}>${stock.price.toFixed(2)}</span>
+              <span className="font-bold whitespace-nowrap" style={{ fontSize: `${1.25 * scale}rem` }}>${(stock.price ?? 0).toFixed(2)}</span>
               <span className={`whitespace-nowrap ${positive ? 'text-green-400' : 'text-red-400'}`} style={{ fontSize: `${0.75 * scale}rem` }}>
-                {sign}{stock.change.toFixed(2)} ({sign}{stock.changePercent.toFixed(2)}%)
+                {sign}{(stock.change ?? 0).toFixed(2)} ({sign}{(stock.changePercent ?? 0).toFixed(2)}%)
               </span>
             </div>
           );
