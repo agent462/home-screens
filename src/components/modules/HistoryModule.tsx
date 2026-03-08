@@ -44,7 +44,7 @@ export default function HistoryModule({ config, style }: HistoryModuleProps) {
   return (
     <ModuleWrapper style={style}>
       <div className="flex flex-col items-center justify-center h-full gap-2">
-        <span className="text-xs uppercase tracking-widest opacity-50">On This Day</span>
+        <span className="uppercase tracking-widest opacity-50" style={{ fontSize: '0.65em' }}>On This Day</span>
         {events.length > 0 ? (
           <p className="text-center leading-relaxed">
             <span className="font-bold">{events[index % events.length].year}</span>

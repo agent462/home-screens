@@ -55,7 +55,7 @@ export default function WordOfDayModule({ config: _config, style }: WordOfDayMod
   return (
     <ModuleWrapper style={style}>
       <div className="flex flex-col items-center justify-center h-full gap-2">
-        <p className="text-2xl font-bold">{entry.word}</p>
+        <p className="font-bold" style={{ fontSize: '1.5em' }}>{entry.word}</p>
         <p className="text-center italic">{entry.definition}</p>
       </div>
     </ModuleWrapper>
