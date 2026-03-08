@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useEditorStore } from '@/stores/editor-store';
 import Button from '@/components/ui/Button';
 import Slider from '@/components/ui/Slider';
+import { DISPLAY_PRESETS } from '@/lib/constants';
 
 interface GoogleCalendar {
   id: string;
@@ -34,6 +35,8 @@ export default function SettingsPanel({ onClose }: { onClose: () => void }) {
   const [rotationInterval, setRotationInterval] = useState(
     (settings?.rotationIntervalMs ?? 30000) / 1000
   );
+  const [displayWidth, setDisplayWidth] = useState(settings?.displayWidth ?? 1080);
+  const [displayHeight, setDisplayHeight] = useState(settings?.displayHeight ?? 1920);
 
   const [testStatus, setTestStatus] = useState<string | null>(null);
 
@@ -148,6 +151,8 @@ export default function SettingsPanel({ onClose }: { onClose: () => void }) {
   async function handleSave() {
     updateSettings({
       rotationIntervalMs: rotationInterval * 1000,
+      displayWidth,
+      displayHeight,
       unsplashAccessKey: unsplashKey,
       weather: {
         provider: provider as 'openweathermap' | 'weatherapi',
@@ -222,6 +227,33 @@ export default function SettingsPanel({ onClose }: { onClose: () => void }) {
             <h3 className="text-sm font-medium text-neutral-300 mb-3 uppercase tracking-wider">
               Display
             </h3>
+            <label className="block mb-3">
+              <span className="text-xs text-neutral-400">Display Resolution</span>
+              <select
+                value={`${displayWidth}x${displayHeight}`}
+                onChange={(e) => {
+                  if (e.target.value === 'custom') return;
+                  const [w, h] = e.target.value.split('x').map(Number);
+                  setDisplayWidth(w);
+                  setDisplayHeight(h);
+                }}
+                className="mt-1 block w-full rounded-md bg-neutral-800 border border-neutral-600 text-sm text-neutral-200 px-3 py-2 focus:outline-none focus:border-blue-500"
+              >
+                {DISPLAY_PRESETS.map((p) => (
+                  <option key={`${p.width}x${p.height}`} value={`${p.width}x${p.height}`}>
+                    {p.label}
+                  </option>
+                ))}
+                {!DISPLAY_PRESETS.some((p) => p.width === displayWidth && p.height === displayHeight) && (
+                  <option value={`${displayWidth}x${displayHeight}`}>
+                    Custom ({displayWidth} x {displayHeight})
+                  </option>
+                )}
+              </select>
+              <p className="text-xs text-neutral-500 mt-1">
+                Match this to your physical display. Changing resolution affects the module canvas size.
+              </p>
+            </label>
             <Slider
               label="Screen Rotation (seconds)"
               value={rotationInterval}

@@ -11,6 +11,8 @@ const DEFAULT_CONFIG: ScreenConfiguration = {
   version: 1,
   settings: {
     rotationIntervalMs: 30000,
+    displayWidth: 1080,
+    displayHeight: 1920,
     weather: {
       provider: 'weatherapi',
       apiKey: '',

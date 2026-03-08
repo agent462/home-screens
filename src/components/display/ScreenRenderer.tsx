@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { Screen, GlobalSettings } from '@/types/config';
-import { DISPLAY_WIDTH, DISPLAY_HEIGHT, WEATHER_REFRESH_MS, CALENDAR_REFRESH_MS } from '@/lib/constants';
+import { DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT, WEATHER_REFRESH_MS, CALENDAR_REFRESH_MS } from '@/lib/constants';
 import { moduleComponents } from '@/lib/module-components';
 
 function useFetchData<T>(url: string, refreshMs: number): T | null {
@@ -63,16 +63,19 @@ export default function ScreenRenderer({ screen, settings, rotatingBackground }:
   const rotation = screen.backgroundRotation;
   const backgroundImage = rotation?.enabled ? (rotatingBackground || screen.backgroundImage) : screen.backgroundImage;
 
-  // Scale the 1080x1920 canvas to fit the viewport
+  const displayW = settings.displayWidth || DEFAULT_DISPLAY_WIDTH;
+  const displayH = settings.displayHeight || DEFAULT_DISPLAY_HEIGHT;
+
+  // Scale the canvas to fit the viewport
   const scale = viewportSize.w > 0
-    ? Math.min(viewportSize.w / DISPLAY_WIDTH, viewportSize.h / DISPLAY_HEIGHT)
+    ? Math.min(viewportSize.w / displayW, viewportSize.h / displayH)
     : 1;
 
   return (
     <div
       style={{
-        width: DISPLAY_WIDTH,
-        height: DISPLAY_HEIGHT,
+        width: displayW,
+        height: displayH,
         position: 'relative',
         overflow: 'hidden',
         backgroundColor: '#000',

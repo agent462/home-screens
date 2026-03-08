@@ -36,7 +36,7 @@ info "Updating system packages..."
 sudo apt-get update -qq
 
 info "Installing required packages..."
-sudo apt-get install -y -qq git curl chromium xdotool unclutter
+sudo apt-get install -y -qq git curl chromium xdotool unclutter wlr-randr
 
 # --- Step 2: Node.js ---
 if command -v node &>/dev/null; then
@@ -146,29 +146,44 @@ Environment=PORT=3000
 WantedBy=multi-user.target
 EOF
 
-sudo tee /etc/systemd/system/home-screens-kiosk.service > /dev/null <<EOF
-[Unit]
-Description=Home Screens Chromium Kiosk
-After=home-screens.service graphical.target
-Requires=home-screens.service
-PartOf=home-screens.service
-
-[Service]
-Type=simple
-User=${USER}
-Environment=DISPLAY=:0
-ExecStartPre=/bin/sleep 10
-ExecStart=/usr/bin/chromium --kiosk --noerrdialogs --disable-infobars --no-first-run --disable-session-crashed-bubble --disable-translate --check-for-update-interval=31536000 http://localhost:3000/display
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=graphical.target
-EOF
-
 sudo systemctl daemon-reload
 sudo systemctl enable home-screens.service
-sudo systemctl enable home-screens-kiosk.service
+
+# --- Step 7b: Display orientation ---
+echo ""
+echo "  How is your display oriented?"
+echo "  1) Landscape (default, no rotation)"
+echo "  2) Portrait (rotated 90° clockwise)"
+echo "  3) Portrait (rotated 90° counter-clockwise)"
+echo "  4) Inverted (rotated 180°)"
+echo ""
+read -rp "  Display orientation [1]: " ORIENT_CHOICE
+ORIENT_CHOICE="${ORIENT_CHOICE:-1}"
+
+case "${ORIENT_CHOICE}" in
+  2) WLR_TRANSFORM="90"  ;;
+  3) WLR_TRANSFORM="270" ;;
+  4) WLR_TRANSFORM="180" ;;
+  *) WLR_TRANSFORM=""     ;;
+esac
+
+# --- Step 7c: Kiosk autostart (labwc / Wayland) ---
+info "Setting up kiosk autostart..."
+mkdir -p "${HOME}/.config/labwc"
+
+if [ -n "${WLR_TRANSFORM}" ]; then
+  cat > "${HOME}/.config/labwc/autostart" <<EOF
+# Home Screens Kiosk - rotate display and launch Chromium fullscreen
+(sleep 2 && wlr-randr --output "$(wlr-randr 2>/dev/null | head -1 | awk '{print $1}' || echo 'HDMI-A-1')" --transform ${WLR_TRANSFORM}) &
+(sleep 10 && chromium --kiosk --noerrdialogs --disable-infobars --no-first-run --disable-session-crashed-bubble --disable-translate --check-for-update-interval=31536000 --password-store=basic --ozone-platform=wayland http://localhost:3000/display) &
+EOF
+  info "Display will be rotated ${WLR_TRANSFORM}° on boot."
+else
+  cat > "${HOME}/.config/labwc/autostart" <<'EOF'
+# Home Screens Kiosk - launch Chromium fullscreen after server is ready
+(sleep 10 && chromium --kiosk --noerrdialogs --disable-infobars --no-first-run --disable-session-crashed-bubble --disable-translate --check-for-update-interval=31536000 --password-store=basic --ozone-platform=wayland http://localhost:3000/display) &
+EOF
+fi
 
 # --- Step 8: Disable screen blanking ---
 info "Disabling screen blanking..."

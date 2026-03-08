@@ -9,7 +9,7 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { useEditorStore } from '@/stores/editor-store';
-import { DISPLAY_WIDTH, DISPLAY_HEIGHT, snapToGrid } from '@/lib/constants';
+import { DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT, snapToGrid } from '@/lib/constants';
 import type { ModuleType } from '@/types/config';
 
 import ScreenTabs from '@/components/editor/ScreenTabs';
@@ -67,12 +67,15 @@ export default function EditorPage() {
 
       const data = active.data.current;
 
+      const displayW = config?.settings.displayWidth || DEFAULT_DISPLAY_WIDTH;
+      const displayH = config?.settings.displayHeight || DEFAULT_DISPLAY_HEIGHT;
+
       if (data?.source === 'palette' && over.id === 'canvas-drop') {
         const scale = canvasScaleRef.current;
         const rawX = delta.x / scale;
         const rawY = delta.y / scale;
-        const dropX = snapToGrid(Math.max(0, Math.min(DISPLAY_WIDTH - 200, rawX + 100)));
-        const dropY = snapToGrid(Math.max(0, Math.min(DISPLAY_HEIGHT - 200, rawY + 100)));
+        const dropX = snapToGrid(Math.max(0, Math.min(displayW - 200, rawX + 100)));
+        const dropY = snapToGrid(Math.max(0, Math.min(displayH - 200, rawY + 100)));
         addModule(selectedScreenId, data.moduleType as ModuleType, { x: dropX, y: dropY });
       } else if (data?.source === 'canvas') {
         const moduleId = data.moduleId as string;
@@ -84,8 +87,8 @@ export default function EditorPage() {
 
         const rawX = mod.position.x + delta.x / scale;
         const rawY = mod.position.y + delta.y / scale;
-        const newX = snapToGrid(Math.max(0, Math.min(DISPLAY_WIDTH - mod.size.w, rawX)));
-        const newY = snapToGrid(Math.max(0, Math.min(DISPLAY_HEIGHT - mod.size.h, rawY)));
+        const newX = snapToGrid(Math.max(0, Math.min(displayW - mod.size.w, rawX)));
+        const newY = snapToGrid(Math.max(0, Math.min(displayH - mod.size.h, rawY)));
         moveModule(selectedScreenId, moduleId, { x: newX, y: newY });
       }
     },

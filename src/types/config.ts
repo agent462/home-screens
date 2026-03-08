@@ -79,6 +79,8 @@ export interface CalendarSettings {
 
 export interface GlobalSettings {
   rotationIntervalMs: number;
+  displayWidth: number;
+  displayHeight: number;
   weather: WeatherSettings;
   calendar: CalendarSettings;
   unsplashAccessKey?: string;

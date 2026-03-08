@@ -3,7 +3,7 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { useDroppable, useDraggable, useDndMonitor } from '@dnd-kit/core';
 import { useEditorStore } from '@/stores/editor-store';
-import { DISPLAY_WIDTH, DISPLAY_HEIGHT, GRID_SIZE, snapToGrid } from '@/lib/constants';
+import { DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT, GRID_SIZE, snapToGrid } from '@/lib/constants';
 import { getModuleDefinition } from '@/lib/module-registry';
 import { moduleComponents } from '@/lib/module-components';
 import type { ModuleInstance } from '@/types/config';
@@ -167,16 +167,20 @@ function DragGhost({
   scale,
   deltaX,
   deltaY,
+  displayWidth,
+  displayHeight,
 }: {
   mod: ModuleInstance;
   scale: number;
   deltaX: number;
   deltaY: number;
+  displayWidth: number;
+  displayHeight: number;
 }) {
   const rawX = mod.position.x + deltaX / scale;
   const rawY = mod.position.y + deltaY / scale;
-  const snappedX = snapToGrid(Math.max(0, Math.min(DISPLAY_WIDTH - mod.size.w, rawX)));
-  const snappedY = snapToGrid(Math.max(0, Math.min(DISPLAY_HEIGHT - mod.size.h, rawY)));
+  const snappedX = snapToGrid(Math.max(0, Math.min(displayWidth - mod.size.w, rawX)));
+  const snappedY = snapToGrid(Math.max(0, Math.min(displayHeight - mod.size.h, rawY)));
 
   return (
     <div
@@ -239,6 +243,8 @@ export default function EditorCanvas({ onScaleChange }: { onScaleChange?: (scale
     },
   });
 
+  const displayWidth = config?.settings.displayWidth || DEFAULT_DISPLAY_WIDTH;
+  const displayHeight = config?.settings.displayHeight || DEFAULT_DISPLAY_HEIGHT;
   const currentScreen = config?.screens.find((s) => s.id === selectedScreenId);
   const [rotatingBg, setRotatingBg] = useState<string | null>(null);
 
@@ -303,8 +309,8 @@ export default function EditorCanvas({ onScaleChange }: { onScaleChange?: (scale
     const updateScale = () => {
       if (!containerRef.current) return;
       const { clientWidth, clientHeight } = containerRef.current;
-      const scaleX = (clientWidth - 32) / DISPLAY_WIDTH;
-      const scaleY = (clientHeight - 32) / DISPLAY_HEIGHT;
+      const scaleX = (clientWidth - 32) / displayWidth;
+      const scaleY = (clientHeight - 32) / displayHeight;
       const newScale = Math.min(scaleX, scaleY, 1);
       setScale(newScale);
       onScaleChange?.(newScale);
@@ -312,7 +318,7 @@ export default function EditorCanvas({ onScaleChange }: { onScaleChange?: (scale
     updateScale();
     window.addEventListener('resize', updateScale);
     return () => window.removeEventListener('resize', updateScale);
-  }, []);
+  }, [displayWidth, displayHeight, onScaleChange]);
 
   if (!currentScreen) {
     return (
@@ -328,8 +334,8 @@ export default function EditorCanvas({ onScaleChange }: { onScaleChange?: (scale
         ref={setNodeRef}
         className="relative bg-neutral-900 border border-neutral-700 overflow-hidden"
         style={{
-          width: DISPLAY_WIDTH * scale,
-          height: DISPLAY_HEIGHT * scale,
+          width: displayWidth * scale,
+          height: displayHeight * scale,
           borderRadius: 8,
         }}
         onClick={() => selectModule(null)}
@@ -361,6 +367,8 @@ export default function EditorCanvas({ onScaleChange }: { onScaleChange?: (scale
               scale={scale}
               deltaX={dragState.deltaX}
               deltaY={dragState.deltaY}
+              displayWidth={displayWidth}
+              displayHeight={displayHeight}
             />
           ) : null;
         })()}

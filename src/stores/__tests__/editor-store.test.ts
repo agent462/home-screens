@@ -13,6 +13,8 @@ function makeConfig(overrides?: Partial<ScreenConfiguration>): ScreenConfigurati
     version: 1,
     settings: {
       rotationIntervalMs: 30000,
+      displayWidth: 1080,
+      displayHeight: 1920,
       weather: { provider: 'weatherapi', apiKey: '', latitude: 0, longitude: 0, units: 'imperial' },
       calendar: { googleCalendarId: '', googleCalendarIds: [], maxEvents: 10, daysAhead: 7 },
     },
