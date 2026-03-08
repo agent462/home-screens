@@ -17,6 +17,7 @@ import ModulePalette from '@/components/editor/ModulePalette';
 import EditorCanvas from '@/components/editor/EditorCanvas';
 import PropertyPanel from '@/components/editor/PropertyPanel';
 import SettingsPanel from '@/components/editor/SettingsPanel';
+import SystemPanel from '@/components/editor/SystemPanel';
 import Button from '@/components/ui/Button';
 
 export default function EditorPage() {
@@ -34,6 +35,7 @@ export default function EditorPage() {
   } = useEditorStore();
 
   const [showSettings, setShowSettings] = useState(false);
+  const [showSystem, setShowSystem] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasScaleRef = useRef(0.4);
 
@@ -134,6 +136,12 @@ export default function EditorPage() {
             </Button>
             <Button
               variant="secondary"
+              onClick={() => setShowSystem(true)}
+            >
+              System
+            </Button>
+            <Button
+              variant="secondary"
               onClick={() => window.open('/display', '_blank')}
             >
               Preview
@@ -156,6 +164,7 @@ export default function EditorPage() {
         </div>
       </div>
       {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
+      {showSystem && <SystemPanel onClose={() => setShowSystem(false)} />}
     </DndContext>
   );
 }

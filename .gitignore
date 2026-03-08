@@ -39,6 +39,7 @@ yarn-error.log*
 data/config.json
 data/google-tokens.json
 data/client*
+data/backups/
 
 # user-uploaded backgrounds
 public/backgrounds/*
