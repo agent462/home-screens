@@ -92,6 +92,7 @@ case "${action}" in
       echo "{\"ok\":false,\"error\":\"No target tag specified\"}"
       exit 1
     fi
+    git clean -fd -e data/ -e public/backgrounds/ -e .env* 2>&1
     git checkout -f "${target}" 2>&1
     echo "{\"ok\":true,\"target\":\"${target}\"}"
     ;;
@@ -161,6 +162,7 @@ case "${action}" in
       echo "{\"ok\":false,\"error\":\"No target tag specified\"}"
       exit 1
     fi
+    git clean -fd -e data/ -e public/backgrounds/ -e .env* 2>&1
     git checkout -f "${target}" 2>&1
     echo "{\"ok\":true,\"target\":\"${target}\"}"
     ;;
