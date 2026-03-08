@@ -122,6 +122,14 @@ export default function UpgradeModal({ targetTag, isRollback, onComplete, onClos
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Auto-reload the page after upgrade completes so the browser
+  // fetches new chunks from the rebuilt .next/ directory.
+  useEffect(() => {
+    if (!done) return;
+    const timer = setTimeout(() => window.location.reload(), 2000);
+    return () => clearTimeout(timer);
+  }, [done]);
+
   const currentStepIndex = STEP_ORDER.indexOf(progress.step);
 
   return (
@@ -210,10 +218,10 @@ export default function UpgradeModal({ targetTag, isRollback, onComplete, onClos
             </p>
           )}
 
-          {/* Success */}
+          {/* Success — reload after a short delay so the user sees completion */}
           {done && (
             <p className="text-xs text-green-400 text-center">
-              The page will reload automatically...
+              Reloading page...
             </p>
           )}
         </div>
