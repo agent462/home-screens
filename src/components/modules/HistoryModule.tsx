@@ -33,13 +33,15 @@ export default function HistoryModule({ config, style }: HistoryModuleProps) {
     return () => clearInterval(interval);
   }, [fetchHistory, config.refreshIntervalMs]);
 
+  const rotationMs = (config.rotationIntervalSec ?? 10) * 1000;
+
   useEffect(() => {
     if (events.length <= 1) return;
     const interval = setInterval(() => {
       setIndex((prev) => (prev + 1) % events.length);
-    }, 10000);
+    }, rotationMs);
     return () => clearInterval(interval);
-  }, [events.length]);
+  }, [events.length, rotationMs]);
 
   return (
     <ModuleWrapper style={style}>

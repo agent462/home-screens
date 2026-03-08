@@ -589,18 +589,29 @@ function CryptoConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId:
 
 function HistoryConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
   const { updateModule } = useEditorStore();
-  const c = mod.config as { refreshIntervalMs?: number };
+  const c = mod.config as { refreshIntervalMs?: number; rotationIntervalSec?: number };
   const set = (updates: Record<string, unknown>) =>
     updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
 
   return (
-    <Slider
-      label="Refresh (hours)"
-      value={(c.refreshIntervalMs ?? 86400000) / 3600000}
-      min={1}
-      max={24}
-      onChange={(v) => set({ refreshIntervalMs: v * 3600000 })}
-    />
+    <>
+      <Slider
+        label="Cycle Events (seconds)"
+        value={c.rotationIntervalSec ?? 10}
+        min={5}
+        max={120}
+        step={5}
+        onChange={(v) => set({ rotationIntervalSec: v })}
+      />
+      <Slider
+        label="Reload Data (minutes)"
+        value={(c.refreshIntervalMs ?? 3600000) / 60000}
+        min={5}
+        max={1440}
+        step={5}
+        onChange={(v) => set({ refreshIntervalMs: v * 60000 })}
+      />
+    </>
   );
 }
 

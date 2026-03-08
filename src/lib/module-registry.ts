@@ -220,7 +220,8 @@ registerModule({
   label: 'This Day in History',
   icon: History,
   defaultConfig: {
-    refreshIntervalMs: 86400000,
+    refreshIntervalMs: 3600000,
+    rotationIntervalSec: 10,
   },
   defaultSize: DEFAULT_MODULE_SIZES.history,
 });

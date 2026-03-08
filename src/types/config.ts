@@ -227,5 +227,6 @@ export interface WordOfDayConfig {}
 // This day in history module config
 export interface HistoryConfig {
   refreshIntervalMs: number;
+  rotationIntervalSec: number;
 }
 

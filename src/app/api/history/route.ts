@@ -1,6 +1,13 @@
 import { NextResponse } from 'next/server';
 
+let cache: { date: string; events: Array<{ year: string; text: string }> } | null = null;
+
 export async function GET() {
+  const today = new Date().toISOString().slice(0, 10);
+  if (cache && cache.date === today) {
+    return NextResponse.json({ events: cache.events });
+  }
+
   try {
     const res = await fetch('https://history.muffinlabs.com/date', {
       headers: { Accept: 'application/json' },
@@ -14,6 +21,7 @@ export async function GET() {
       text: e.text,
     }));
 
+    cache = { date: today, events };
     return NextResponse.json({ events });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to fetch historical events';
