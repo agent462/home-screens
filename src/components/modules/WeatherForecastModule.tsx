@@ -2,7 +2,7 @@
 
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { format, isToday, isTomorrow } from 'date-fns';
-import { Droplets, Wind } from 'lucide-react';
+import { CloudRain, Droplets, Wind } from 'lucide-react';
 import type { WeatherForecastConfig, ModuleStyle } from '@/types/config';
 import { getWeatherIcon } from '@/lib/weather-icons';
 import ModuleWrapper from './ModuleWrapper';
@@ -67,6 +67,7 @@ export default function WeatherForecastModule({ config, style, data, units = 'im
             <div className="flex items-center gap-5 flex-1 min-h-0">
               {/* Today - large */}
               <div className="flex flex-col items-center shrink-0">
+                <span className="opacity-60 font-medium" style={{ fontSize: '0.85em' }}>{dayLabel(days[0].date)}</span>
                 <div className="flex items-center gap-2">
                   {(() => { const Icon = getWeatherIcon(days[0].icon); return <Icon size="2.5em" strokeWidth={1.5} />; })()}
                   {showHighLow && (
@@ -79,7 +80,7 @@ export default function WeatherForecastModule({ config, style, data, units = 'im
                 <div className="flex flex-col items-center gap-0.5">
                   {config.showPrecipitation && days[0].precipProbability != null && (
                     <span className="opacity-60 flex items-center gap-0.5" style={{ fontSize: '0.85em' }}>
-                      <Droplets size="1em" /> {Math.round(days[0].precipProbability)}%
+                      <CloudRain size="1em" /> {Math.round(days[0].precipProbability)}%
                     </span>
                   )}
                   {config.showHumidity && days[0].humidity != null && (
@@ -110,7 +111,7 @@ export default function WeatherForecastModule({ config, style, data, units = 'im
                       <Icon size="1.8em" strokeWidth={1.5} />
                       {config.showPrecipitation && day.precipProbability != null && (
                         <span className="opacity-50 flex items-center gap-0.5" style={{ fontSize: '0.7em' }}>
-                          <Droplets size="1em" />{Math.round(day.precipProbability)}%
+                          <CloudRain size="1em" />{Math.round(day.precipProbability)}%
                         </span>
                       )}
                       {config.showPrecipAmount && day.precipAmount != null && day.precipAmount > 0 && (

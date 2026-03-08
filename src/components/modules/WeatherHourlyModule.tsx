@@ -2,7 +2,7 @@
 
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { format } from 'date-fns';
-import { Droplets, Wind } from 'lucide-react';
+import { CloudRain, Droplets, Wind } from 'lucide-react';
 import type { WeatherHourlyConfig, ModuleStyle } from '@/types/config';
 import { getWeatherIcon } from '@/lib/weather-icons';
 import ModuleWrapper from './ModuleWrapper';
@@ -99,7 +99,7 @@ export default function WeatherHourlyModule({ config, style, data, todayHigh, to
                     <Icon size="1.8em" strokeWidth={1.5} />
                     {config.showPrecipitation !== false && hour.precipProbability != null && (
                       <span className="opacity-50 flex items-center gap-0.5" style={{ fontSize: '0.7em' }}>
-                        <Droplets size="1em" />{Math.round(hour.precipProbability)}%
+                        <CloudRain size="1em" />{Math.round(hour.precipProbability)}%
                       </span>
                     )}
                     <span className="font-medium" style={{ fontSize: '0.875em' }}>{Math.round(hour.temp)}&deg;</span>
