@@ -4,12 +4,15 @@ import { useEffect, useCallback, useRef, useState } from 'react';
 import {
   DndContext,
   DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
   PointerSensor,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
 import { useEditorStore } from '@/stores/editor-store';
-import { DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT, snapToGrid } from '@/lib/constants';
+import { DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT, DEFAULT_MODULE_SIZES, snapToGrid } from '@/lib/constants';
+import { getModuleDefinition } from '@/lib/module-registry';
 import type { ModuleType } from '@/types/config';
 
 import ScreenTabs from '@/components/editor/ScreenTabs';
@@ -36,6 +39,7 @@ export default function EditorPage() {
 
   const [showSettings, setShowSettings] = useState(false);
   const [showSystem, setShowSystem] = useState(false);
+  const [activePaletteType, setActivePaletteType] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasScaleRef = useRef(0.4);
 
@@ -62,9 +66,17 @@ export default function EditorPage() {
     loadConfig();
   }, [loadConfig]);
 
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    const data = event.active.data.current;
+    if (data?.source === 'palette') {
+      setActivePaletteType(data.moduleType as string);
+    }
+  }, []);
+
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
-      const { active, over, delta } = event;
+      setActivePaletteType(null);
+      const { active, over, delta, activatorEvent } = event;
       if (!selectedScreenId || !over) return;
 
       const data = active.data.current;
@@ -74,10 +86,17 @@ export default function EditorPage() {
 
       if (data?.source === 'palette' && over.id === 'canvas-drop') {
         const scale = canvasScaleRef.current;
-        const rawX = delta.x / scale;
-        const rawY = delta.y / scale;
-        const dropX = snapToGrid(Math.max(0, Math.min(displayW - 200, rawX + 100)));
-        const dropY = snapToGrid(Math.max(0, Math.min(displayH - 200, rawY + 100)));
+        const moduleType = data.moduleType as string;
+        const defaultSize = DEFAULT_MODULE_SIZES[moduleType] || { w: 200, h: 200 };
+        // Compute pointer position relative to the canvas droppable
+        const pointerEvent = activatorEvent as PointerEvent;
+        const pointerX = pointerEvent.clientX + delta.x;
+        const pointerY = pointerEvent.clientY + delta.y;
+        const canvasRect = over.rect;
+        const rawX = (pointerX - canvasRect.left) / scale - defaultSize.w / 2;
+        const rawY = (pointerY - canvasRect.top) / scale - defaultSize.h / 2;
+        const dropX = snapToGrid(Math.max(0, Math.min(displayW - defaultSize.w, rawX)));
+        const dropY = snapToGrid(Math.max(0, Math.min(displayH - defaultSize.h, rawY)));
         addModule(selectedScreenId, data.moduleType as ModuleType, { x: dropX, y: dropY });
       } else if (data?.source === 'canvas') {
         const moduleId = data.moduleId as string;
@@ -106,7 +125,7 @@ export default function EditorPage() {
   }
 
   return (
-    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setActivePaletteType(null)}>
       <div className="h-screen flex flex-col">
         {/* Toolbar */}
         <div className="flex items-center justify-between border-b border-neutral-700 bg-neutral-900 px-3 py-2">
@@ -165,6 +184,18 @@ export default function EditorPage() {
       </div>
       {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
       {showSystem && <SystemPanel onClose={() => setShowSystem(false)} />}
+      <DragOverlay dropAnimation={null}>
+        {activePaletteType && (() => {
+          const def = getModuleDefinition(activePaletteType as ModuleType);
+          if (!def) return null;
+          return (
+            <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-neutral-800 border border-blue-500 shadow-lg shadow-blue-500/20 cursor-grabbing">
+              <def.icon className="w-5 h-5 text-blue-400" />
+              <span className="text-sm text-neutral-200">{def.label}</span>
+            </div>
+          );
+        })()}
+      </DragOverlay>
     </DndContext>
   );
 }
