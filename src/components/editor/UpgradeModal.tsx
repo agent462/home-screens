@@ -1,44 +1,43 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Button from '@/components/ui/Button';
 
-interface UpgradeProgress {
+interface ProgressData {
   step: string;
   progress: number;
   message: string;
   error?: string;
 }
 
-const STEP_ORDER = [
+/** Steps shown in the accordion (stash/cleanup are internal) */
+const VISIBLE_STEPS = [
   'preflight',
   'backup',
   'fetch',
-  'stash',
   'checkout',
   'install',
   'build',
   'migrate',
-  'cleanup',
+  'setup-system',
   'restart',
   'health-check',
-  'complete',
-];
+] as const;
 
 const STEP_LABELS: Record<string, string> = {
   preflight: 'Pre-flight checks',
   backup: 'Back up configuration',
   fetch: 'Download latest code',
-  stash: 'Stash local changes',
   checkout: 'Switch to new version',
   install: 'Install dependencies',
   build: 'Build application',
   migrate: 'Migrate configuration',
-  cleanup: 'Restore local changes',
+  'setup-system': 'Apply system configuration',
   restart: 'Restart service',
   'health-check': 'Verify server health',
-  complete: 'Complete',
 };
+
+type StepState = 'done' | 'active' | 'pending' | 'error';
 
 interface Props {
   targetTag: string;
@@ -48,7 +47,7 @@ interface Props {
 }
 
 export default function UpgradeModal({ targetTag, isRollback, onComplete, onClose }: Props) {
-  const [progress, setProgress] = useState<UpgradeProgress>({
+  const [progress, setProgress] = useState<ProgressData>({
     step: 'preflight',
     progress: 0,
     message: 'Starting...',
@@ -56,47 +55,151 @@ export default function UpgradeModal({ targetTag, isRollback, onComplete, onClos
   const [started, setStarted] = useState(false);
   const [done, setDone] = useState(false);
   const [failed, setFailed] = useState(false);
-  const eventSourceRef = useRef<EventSource | null>(null);
-  const progressRef = useRef(progress);
-  progressRef.current = progress;
+  const [reloadStatus, setReloadStatus] = useState<string | null>(null);
 
+  // Track the last real step (not 'error' or 'complete')
+  const [activeStep, setActiveStep] = useState('preflight');
+  // Track which steps were actually visited (for rollback correctness)
+  const [visitedSteps, setVisitedSteps] = useState<Set<string>>(new Set(['preflight']));
+  // Per-step accumulated log output
+  const [stepLogs, setStepLogs] = useState<Record<string, string>>({});
+  // Which accordion panels are expanded
+  const [expanded, setExpanded] = useState<Set<string>>(new Set(['preflight']));
+
+  const activeLogRef = useRef<HTMLDivElement>(null);
+  const progressRef = useRef(progress);
+  const activeStepRef = useRef(activeStep);
+  progressRef.current = progress;
+  activeStepRef.current = activeStep;
+
+  // Auto-scroll the active step's output to the bottom
+  useEffect(() => {
+    if (activeLogRef.current) {
+      activeLogRef.current.scrollTop = activeLogRef.current.scrollHeight;
+    }
+  }, [stepLogs, activeStep]);
+
+  // Track visited steps + auto-expand active, collapse previous
+  const prevActiveRef = useRef(activeStep);
+  useEffect(() => {
+    setVisitedSteps((prev) => {
+      const next = new Set(prev);
+      next.add(activeStep);
+      return next;
+    });
+
+    if (activeStep !== prevActiveRef.current) {
+      setExpanded((prev) => {
+        const next = new Set(prev);
+        next.delete(prevActiveRef.current);
+        next.add(activeStep);
+        return next;
+      });
+      prevActiveRef.current = activeStep;
+    }
+  }, [activeStep]);
+
+  const toggleExpand = useCallback((step: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(step)) {
+        next.delete(step);
+      } else {
+        next.add(step);
+      }
+      return next;
+    });
+  }, []);
+
+  // Connect SSE and trigger upgrade
   useEffect(() => {
     if (started) return;
     setStarted(true);
 
-    // Connect SSE first, then trigger the upgrade
     const es = new EventSource('/api/system/status');
-    eventSourceRef.current = es;
 
-    es.onmessage = (event) => {
-      try {
-        const data: UpgradeProgress = JSON.parse(event.data);
-        setProgress(data);
+    // Progress events — step transitions
+    es.addEventListener(
+      'progress',
+      ((event: MessageEvent) => {
+        try {
+          const data = JSON.parse(event.data) as ProgressData & { type: string };
+          setProgress({
+            step: data.step,
+            progress: data.progress,
+            message: data.message,
+            error: data.error,
+          });
 
-        if (data.step === 'complete') {
-          setDone(true);
-          es.close();
-        } else if (data.step === 'error') {
-          setFailed(true);
-          es.close();
+          if (
+            data.step !== 'error' &&
+            data.step !== 'complete' &&
+            (VISIBLE_STEPS as readonly string[]).includes(data.step)
+          ) {
+            // Only update activeStep for visible steps — hidden steps like
+            // 'stash'/'cleanup' would make indexOf return -1 and break the
+            // accordion state.
+            setActiveStep(data.step);
+          }
+
+          if (data.step === 'complete') {
+            setDone(true);
+            es.close();
+          } else if (data.step === 'error') {
+            setFailed(true);
+            es.close();
+          }
+        } catch {
+          // ignore parse errors
         }
-      } catch {
-        // ignore parse errors
-      }
-    };
+      }) as EventListener,
+    );
+
+    // Output events — streaming log lines
+    es.addEventListener(
+      'output',
+      ((event: MessageEvent) => {
+        try {
+          const data = JSON.parse(event.data) as { step: string; line: string };
+          setStepLogs((prev) => ({
+            ...prev,
+            [data.step]: (prev[data.step] || '') + data.line + '\n',
+          }));
+        } catch {
+          // ignore parse errors
+        }
+      }) as EventListener,
+    );
 
     es.onerror = () => {
-      // SSE connection lost — might be because server restarted
       es.close();
-      // Use ref to read the latest progress value (not the stale closure)
       const current = progressRef.current;
-      if (current.step === 'restart' || current.step === 'health-check') {
+      const currentActive = activeStepRef.current;
+
+      if (
+        current.step === 'restart' ||
+        current.step === 'health-check' ||
+        currentActive === 'restart' ||
+        currentActive === 'health-check'
+      ) {
+        // SSE connection lost during restart — expected, the server is restarting
         setProgress({
           step: 'complete',
           progress: 100,
           message: 'Server restarted. Reconnecting...',
         });
         setDone(true);
+      } else if (current.step !== 'complete' && current.step !== 'error') {
+        // Unexpected disconnect — show error so the UI doesn't freeze
+        const stepLabel = STEP_LABELS[currentActive] || currentActive;
+        setFailed(true);
+        setProgress({
+          step: 'error',
+          progress: 0,
+          message: `Connection lost during "${stepLabel}"`,
+          error:
+            'The server connection was lost unexpectedly. The upgrade may still be running — check server logs and try refreshing the page.',
+        });
       }
     };
 
@@ -106,50 +209,110 @@ export default function UpgradeModal({ targetTag, isRollback, onComplete, onClos
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tag: targetTag }),
-    }).catch(() => {
-      setFailed(true);
-      setProgress({
-        step: 'error',
-        progress: 0,
-        message: 'Failed to start upgrade',
-        error: 'Could not connect to server',
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+          es.close();
+          setFailed(true);
+          setProgress({
+            step: 'error',
+            progress: 0,
+            message: 'Failed to start upgrade',
+            error: body.error || `Server returned ${res.status}`,
+          });
+        }
+      })
+      .catch(() => {
+        es.close();
+        setFailed(true);
+        setProgress({
+          step: 'error',
+          progress: 0,
+          message: 'Failed to start upgrade',
+          error: 'Could not connect to server',
+        });
       });
-    });
 
     return () => {
       es.close();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-reload the page after upgrade completes so the browser
-  // fetches new chunks from the rebuilt .next/ directory.
+  // After upgrade completes, poll for the server to be ready before reloading.
+  // The systemctl restart fires ~3s after the upgrade finishes, so we wait past
+  // that window then poll until the (new) server responds.
   useEffect(() => {
     if (!done) return;
-    const timer = setTimeout(() => window.location.reload(), 2000);
-    return () => clearTimeout(timer);
+    let cancelled = false;
+
+    async function waitForServer() {
+      setReloadStatus('Waiting for server to restart...');
+      // Wait past the nohup restart delay (3s) plus buffer
+      await new Promise((r) => setTimeout(r, 4000));
+
+      setReloadStatus('Waiting for new server...');
+      const deadline = Date.now() + 60000; // 60s max wait
+      while (!cancelled && Date.now() < deadline) {
+        try {
+          const res = await fetch('/api/config', { cache: 'no-store' });
+          if (res.ok) {
+            setReloadStatus('Reloading...');
+            window.location.reload();
+            return;
+          }
+        } catch {
+          // Server not ready yet
+        }
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+
+      // Fallback: reload anyway after timeout
+      if (!cancelled) {
+        window.location.reload();
+      }
+    }
+
+    waitForServer();
+    return () => {
+      cancelled = true;
+    };
   }, [done]);
 
-  const currentStepIndex = STEP_ORDER.indexOf(progress.step);
+  function getStepState(step: string): StepState {
+    const stepIdx = VISIBLE_STEPS.indexOf(step as (typeof VISIBLE_STEPS)[number]);
+    const activeIdx = VISIBLE_STEPS.indexOf(activeStep as (typeof VISIBLE_STEPS)[number]);
+
+    // Only mark steps as done if they were actually visited (fixes rollback
+    // showing all steps green even when preflight/fetch/migrate were skipped)
+    if (done) return visitedSteps.has(step) ? 'done' : 'pending';
+    if (failed && stepIdx === activeIdx) return 'error';
+    if (stepIdx < activeIdx) return 'done';
+    if (stepIdx === activeIdx && !failed) return 'active';
+    return 'pending';
+  }
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70">
-      <div className="bg-neutral-900 border border-neutral-700 rounded-xl w-full max-w-md shadow-2xl">
+      <div className="bg-neutral-900 border border-neutral-700 rounded-xl w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="px-5 py-4 border-b border-neutral-700">
+        <div className="px-5 py-4 border-b border-neutral-700 flex-shrink-0">
           <h2 className="text-lg font-semibold text-neutral-100">
             {isRollback ? 'Rolling back' : 'Upgrading'} to {targetTag}
           </h2>
         </div>
 
-        <div className="px-5 py-5 space-y-5">
-          {/* Progress bar */}
+        <div className="px-5 py-5 space-y-4 overflow-y-auto flex-1 min-h-0">
+          {/* Overall progress bar */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs text-neutral-400">{progress.message}</span>
-              <span className="text-xs text-neutral-500 font-mono">{progress.progress}%</span>
+              <span className="text-xs text-neutral-400 truncate mr-2">{progress.message}</span>
+              <span className="text-xs text-neutral-500 font-mono flex-shrink-0">
+                {progress.progress}%
+              </span>
             </div>
-            <div className="h-2 rounded-full bg-neutral-800 overflow-hidden">
+            <div className="h-1.5 rounded-full bg-neutral-800 overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-500 ease-out ${
                   failed ? 'bg-red-500' : done ? 'bg-green-500' : 'bg-blue-500'
@@ -159,46 +322,82 @@ export default function UpgradeModal({ targetTag, isRollback, onComplete, onClos
             </div>
           </div>
 
-          {/* Step list */}
+          {/* Accordion step list */}
           <div className="space-y-1">
-            {STEP_ORDER.filter((s) => s !== 'stash' && s !== 'cleanup').map((step) => {
-              const stepIndex = STEP_ORDER.indexOf(step);
-              const isActive = step === progress.step;
-              const isDone = stepIndex < currentStepIndex || done;
-              const isPending = stepIndex > currentStepIndex && !done;
-              const isError = failed && isActive;
+            {VISIBLE_STEPS.map((step) => {
+              const state = getStepState(step);
+              const isOpen = expanded.has(step);
+              const log = stepLogs[step] || '';
+              const hasLog = log.length > 0;
+              const canExpand = hasLog && state !== 'pending';
 
               return (
                 <div
                   key={step}
-                  className={`flex items-center gap-2.5 px-3 py-1.5 rounded text-sm ${
-                    isActive ? 'bg-neutral-800/50' : ''
+                  className={`rounded-lg overflow-hidden border transition-colors ${
+                    state === 'active'
+                      ? 'border-blue-500/30 bg-neutral-800/20'
+                      : state === 'error'
+                        ? 'border-red-500/30 bg-red-950/10'
+                        : 'border-neutral-800/50'
                   }`}
                 >
-                  <span className="w-4 text-center flex-shrink-0">
-                    {isError ? (
-                      <span className="text-red-400 text-xs">&#10005;</span>
-                    ) : isDone ? (
-                      <span className="text-green-400 text-xs">&#10003;</span>
-                    ) : isActive ? (
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
-                    ) : isPending ? (
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-neutral-600" />
-                    ) : null}
-                  </span>
-                  <span
-                    className={
-                      isError
-                        ? 'text-red-400'
-                        : isDone
-                          ? 'text-neutral-400'
-                          : isActive
-                            ? 'text-neutral-200'
-                            : 'text-neutral-600'
-                    }
+                  {/* Step header */}
+                  <button
+                    disabled={!canExpand}
+                    onClick={() => toggleExpand(step)}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left transition-colors ${
+                      canExpand ? 'cursor-pointer hover:bg-neutral-800/30' : 'cursor-default'
+                    }`}
                   >
-                    {STEP_LABELS[step] ?? step}
-                  </span>
+                    {/* Status icon */}
+                    <span className="w-4 flex-shrink-0 text-center">
+                      {state === 'error' && (
+                        <span className="text-red-400 text-xs font-bold">&#10005;</span>
+                      )}
+                      {state === 'done' && (
+                        <span className="text-green-400 text-xs">&#10003;</span>
+                      )}
+                      {state === 'active' && (
+                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+                      )}
+                      {state === 'pending' && (
+                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-neutral-700" />
+                      )}
+                    </span>
+
+                    {/* Label */}
+                    <span
+                      className={`flex-1 ${
+                        state === 'error'
+                          ? 'text-red-400'
+                          : state === 'done'
+                            ? 'text-neutral-500'
+                            : state === 'active'
+                              ? 'text-neutral-100'
+                              : 'text-neutral-600'
+                      }`}
+                    >
+                      {STEP_LABELS[step] ?? step}
+                    </span>
+
+                    {/* Expand chevron */}
+                    {canExpand && (
+                      <span className="text-neutral-600 text-[10px]">{isOpen ? '▾' : '▸'}</span>
+                    )}
+                  </button>
+
+                  {/* Output panel */}
+                  {isOpen && hasLog && (
+                    <div
+                      ref={state === 'active' || state === 'error' ? activeLogRef : undefined}
+                      className="border-t border-neutral-800/50 bg-black/40 max-h-48 overflow-y-auto"
+                    >
+                      <pre className="px-3 py-2 text-[11px] leading-relaxed font-mono text-neutral-500 whitespace-pre-wrap break-all">
+                        {log}
+                      </pre>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -218,16 +417,16 @@ export default function UpgradeModal({ targetTag, isRollback, onComplete, onClos
             </p>
           )}
 
-          {/* Success — reload after a short delay so the user sees completion */}
+          {/* Success — polling for server */}
           {done && (
             <p className="text-xs text-green-400 text-center">
-              Reloading page...
+              {reloadStatus || 'Upgrade complete!'}
             </p>
           )}
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end px-5 py-4 border-t border-neutral-700">
+        <div className="flex items-center justify-end px-5 py-4 border-t border-neutral-700 flex-shrink-0">
           {done && (
             <Button variant="primary" onClick={onComplete}>
               Done

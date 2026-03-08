@@ -52,6 +52,11 @@ case "${action}" in
       errors="${errors}Unresolved merge conflicts. "
     fi
 
+    # Check passwordless sudo (needed for restart and setup-system)
+    if ! sudo -n true 2>/dev/null; then
+      errors="${errors}Passwordless sudo not available (required for restart/setup-system). "
+    fi
+
     if [ -n "${errors}" ]; then
       echo "{\"ok\":false,\"error\":\"${errors}\"}"
     else
@@ -110,9 +115,13 @@ case "${action}" in
     ;;
 
   restart)
-    # Try systemctl first (production Pi), fall back gracefully
+    # Try systemctl first (production Pi), fall back gracefully.
+    # IMPORTANT: The Next.js server IS the home-screens service, so restarting
+    # it immediately would kill the process orchestrating this upgrade.
+    # We schedule the restart with a short delay so this script can exit
+    # cleanly and the API can respond before the process is terminated.
     if command -v systemctl &>/dev/null && systemctl is-active "${SERVICE_NAME}" &>/dev/null; then
-      sudo systemctl restart "${SERVICE_NAME}" 2>&1
+      nohup bash -c "sleep 3 && sudo systemctl restart ${SERVICE_NAME}" > /dev/null 2>&1 &
       echo "{\"ok\":true,\"method\":\"systemctl\"}"
     else
       echo "{\"ok\":true,\"method\":\"manual\",\"message\":\"Service not managed by systemd. Restart manually.\"}"
@@ -200,6 +209,7 @@ case "${action}" in
       attempt=$(( attempt + 1 ))
     done
     echo "{\"ok\":false,\"error\":\"Server did not respond within 60 seconds\"}"
+    exit 1
     ;;
 
   list-backups)

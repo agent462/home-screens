@@ -1,4 +1,4 @@
-import { subscribeToProgress, type UpgradeProgress } from '@/lib/upgrade';
+import { subscribeToEvents, type UpgradeEvent } from '@/lib/upgrade';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,12 +8,14 @@ export async function GET() {
 
   const stream = new ReadableStream({
     start(controller) {
-      function send(data: UpgradeProgress) {
+      function send(event: UpgradeEvent) {
         try {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+          // Use named SSE events so the client can handle progress and output independently
+          const sseType = event.type; // 'progress' or 'output'
+          controller.enqueue(encoder.encode(`event: ${sseType}\ndata: ${JSON.stringify(event)}\n\n`));
 
-          // Close stream when upgrade is done or errored
-          if (data.step === 'complete' || data.step === 'error') {
+          // Close stream when upgrade reaches a terminal state
+          if (event.type === 'progress' && (event.step === 'complete' || event.step === 'error')) {
             setTimeout(() => {
               unsubscribe?.();
               try {
@@ -28,7 +30,7 @@ export async function GET() {
         }
       }
 
-      unsubscribe = subscribeToProgress(send);
+      unsubscribe = subscribeToEvents(send);
     },
     cancel() {
       unsubscribe?.();
