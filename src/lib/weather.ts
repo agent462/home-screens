@@ -105,17 +105,17 @@ export class OpenWeatherMapProvider implements WeatherProvider {
 
   private mapIcon(owmIcon: string): string {
     const map: Record<string, string> = {
-      '01d': '☀️', '01n': '🌙',
-      '02d': '⛅', '02n': '☁️',
-      '03d': '☁️', '03n': '☁️',
-      '04d': '☁️', '04n': '☁️',
-      '09d': '🌧️', '09n': '🌧️',
-      '10d': '🌦️', '10n': '🌧️',
-      '11d': '⛈️', '11n': '⛈️',
-      '13d': '❄️', '13n': '❄️',
-      '50d': '🌫️', '50n': '🌫️',
+      '01d': 'sun', '01n': 'moon',
+      '02d': 'cloud-sun', '02n': 'cloud-moon',
+      '03d': 'cloud', '03n': 'cloud',
+      '04d': 'cloud', '04n': 'cloud',
+      '09d': 'cloud-rain', '09n': 'cloud-rain',
+      '10d': 'cloud-drizzle', '10n': 'cloud-rain',
+      '11d': 'cloud-lightning', '11n': 'cloud-lightning',
+      '13d': 'snowflake', '13n': 'snowflake',
+      '50d': 'cloud-fog', '50n': 'cloud-fog',
     };
-    return map[owmIcon] ?? '🌡️';
+    return map[owmIcon] ?? 'thermometer';
   }
 }
 
@@ -148,7 +148,7 @@ export class WeatherAPIProvider implements WeatherProvider {
       temp: isCelsius ? (h.temp_c as number) : (h.temp_f as number),
       feelsLike: isCelsius ? (h.feelslike_c as number) : (h.feelslike_f as number),
       humidity: h.humidity as number,
-      icon: this.mapConditionToEmoji((h.condition as Record<string, unknown>)?.code as number, isDay),
+      icon: this.mapConditionToIcon((h.condition as Record<string, unknown>)?.code as number, isDay),
       description: (h.condition as Record<string, unknown>)?.text as string ?? '',
       windSpeed: isCelsius ? (h.wind_kph as number) : (h.wind_mph as number),
       precipProbability: (h.chance_of_rain as number) ?? 0,
@@ -172,7 +172,7 @@ export class WeatherAPIProvider implements WeatherProvider {
         date: d.date as string,
         high: isCelsius ? (day.maxtemp_c as number) : (day.maxtemp_f as number),
         low: isCelsius ? (day.mintemp_c as number) : (day.mintemp_f as number),
-        icon: this.mapConditionToEmoji((day.condition as Record<string, unknown>)?.code as number, true),
+        icon: this.mapConditionToIcon((day.condition as Record<string, unknown>)?.code as number, true),
         description: ((day.condition as Record<string, unknown>)?.text as string) ?? '',
         precipProbability: (day.daily_chance_of_rain as number) ?? 0,
         precipAmount: isCelsius ? ((day.totalprecip_mm as number) ?? 0) : ((day.totalprecip_in as number) ?? 0),
@@ -182,19 +182,18 @@ export class WeatherAPIProvider implements WeatherProvider {
     });
   }
 
-  private mapConditionToEmoji(code: number, isDay: boolean): string {
-    // WeatherAPI condition codes → emoji
-    if (code === 1000) return isDay ? '☀️' : '🌙';
-    if (code === 1003) return isDay ? '⛅' : '☁️';
-    if ([1006, 1009].includes(code)) return '☁️';
-    if (code === 1030) return '🌫️';
-    if ([1063, 1150, 1153, 1180, 1183].includes(code)) return '🌦️';
-    if ([1186, 1189, 1192, 1195, 1240, 1243, 1246].includes(code)) return '🌧️';
-    if ([1066, 1114, 1210, 1213, 1216, 1219, 1222, 1225, 1255, 1258].includes(code)) return '❄️';
-    if ([1069, 1072, 1168, 1171, 1198, 1201, 1204, 1207, 1237, 1249, 1252].includes(code)) return '🌨️';
-    if ([1087, 1273, 1276, 1279, 1282].includes(code)) return '⛈️';
-    if ([1117, 1135, 1147].includes(code)) return '🌫️';
-    return '🌡️';
+  private mapConditionToIcon(code: number, isDay: boolean): string {
+    if (code === 1000) return isDay ? 'sun' : 'moon';
+    if (code === 1003) return isDay ? 'cloud-sun' : 'cloud-moon';
+    if ([1006, 1009].includes(code)) return 'cloud';
+    if (code === 1030) return 'cloud-fog';
+    if ([1063, 1150, 1153, 1180, 1183].includes(code)) return 'cloud-drizzle';
+    if ([1186, 1189, 1192, 1195, 1240, 1243, 1246].includes(code)) return 'cloud-rain';
+    if ([1066, 1114, 1210, 1213, 1216, 1219, 1222, 1225, 1255, 1258].includes(code)) return 'snowflake';
+    if ([1069, 1072, 1168, 1171, 1198, 1201, 1204, 1207, 1237, 1249, 1252].includes(code)) return 'cloud-hail';
+    if ([1087, 1273, 1276, 1279, 1282].includes(code)) return 'cloud-lightning';
+    if ([1117, 1135, 1147].includes(code)) return 'cloud-fog';
+    return 'thermometer';
   }
 }
 
