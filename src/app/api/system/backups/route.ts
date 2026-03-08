@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { execFile } from 'child_process';
+import { readFile } from 'fs/promises';
 import path from 'path';
 
 export const dynamic = 'force-dynamic';
 
 const SCRIPT_PATH = path.join(process.cwd(), 'scripts', 'upgrade.sh');
+const BACKUP_DIR = path.join(process.cwd(), 'data', 'backups');
+const BACKUP_NAME_RE = /^config-v[\d.]+-\d{8}-\d{6}\.json$/;
 
 function run(action: string, args: string[] = []): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -20,7 +24,27 @@ function run(action: string, args: string[] = []): Promise<string> {
   });
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const download = request.nextUrl.searchParams.get('download');
+
+  if (download) {
+    if (!BACKUP_NAME_RE.test(download)) {
+      return NextResponse.json({ error: 'Invalid backup filename' }, { status: 400 });
+    }
+    try {
+      const filePath = path.join(BACKUP_DIR, download);
+      const content = await readFile(filePath);
+      return new NextResponse(content, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Disposition': `attachment; filename="${download}"`,
+        },
+      });
+    } catch {
+      return NextResponse.json({ error: 'Backup not found' }, { status: 404 });
+    }
+  }
+
   try {
     const output = await run('list-backups');
     const backups = JSON.parse(output);
@@ -44,7 +68,7 @@ export async function POST(request: Request) {
   }
 
   // Validate filename to prevent path traversal
-  if (!/^config-v[\d.]+-\d{8}-\d{6}\.json$/.test(name)) {
+  if (!BACKUP_NAME_RE.test(name)) {
     return NextResponse.json({ error: 'Invalid backup filename' }, { status: 400 });
   }
 

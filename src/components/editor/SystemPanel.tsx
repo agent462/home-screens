@@ -333,12 +333,21 @@ export default function SystemPanel({ onClose }: { onClose: () => void }) {
                             {(b.size / 1024).toFixed(1)}KB
                           </span>
                         </div>
-                        <button
-                          onClick={() => handleRestoreBackup(b.name)}
-                          className="text-xs text-neutral-500 hover:text-blue-400 transition-colors"
-                        >
-                          Restore
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <a
+                            href={`/api/system/backups?download=${encodeURIComponent(b.name)}`}
+                            download={b.name}
+                            className="text-xs text-neutral-500 hover:text-blue-400 transition-colors"
+                          >
+                            Download
+                          </a>
+                          <button
+                            onClick={() => handleRestoreBackup(b.name)}
+                            className="text-xs text-neutral-500 hover:text-blue-400 transition-colors"
+                          >
+                            Restore
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
