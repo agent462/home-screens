@@ -13,7 +13,9 @@ interface ScreenRendererProps {
 }
 
 export default function ScreenRenderer({ screen, settings, rotatingBackground }: ScreenRendererProps) {
-  const weatherUrl = `/api/weather?lat=${settings.weather.latitude}&lon=${settings.weather.longitude}&units=${settings.weather.units}&provider=${settings.weather.provider}`;
+  const lat = settings.latitude ?? settings.weather.latitude;
+  const lon = settings.longitude ?? settings.weather.longitude;
+  const weatherUrl = `/api/weather?lat=${lat}&lon=${lon}&units=${settings.weather.units}&provider=${settings.weather.provider}`;
   const calendarIdList = settings.calendar.googleCalendarIds?.length
     ? settings.calendar.googleCalendarIds
     : settings.calendar.googleCalendarId ? [settings.calendar.googleCalendarId] : [];
@@ -76,6 +78,16 @@ export default function ScreenRenderer({ screen, settings, rotatingBackground }:
 
         // Build extra props based on module type
         const extraProps: Record<string, unknown> = {};
+
+        // Pass timezone to all modules (ignored by modules that don't accept it)
+        extraProps.timezone = settings.timezone;
+
+        // Pass global location to location-aware modules
+        if (['moon-phase', 'sunrise-sunset'].includes(mod.type)) {
+          extraProps.latitude = settings.latitude ?? settings.weather.latitude;
+          extraProps.longitude = settings.longitude ?? settings.weather.longitude;
+        }
+
         if (mod.type === 'calendar' && calendarData) {
           extraProps.events = Array.isArray(calendarData) ? calendarData : (calendarData as Record<string, unknown>).events ?? [];
         } else if (mod.type === 'weather-hourly' && weatherData) {

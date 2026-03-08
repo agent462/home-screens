@@ -15,7 +15,15 @@ export type ModuleType =
   | 'stock-ticker'
   | 'crypto'
   | 'word-of-day'
-  | 'history';
+  | 'history'
+  | 'moon-phase'
+  | 'sunrise-sunset'
+  | 'photo-slideshow'
+  | 'qr-code'
+  | 'year-progress'
+  | 'traffic'
+  | 'sports'
+  | 'air-quality';
 
 export interface ModuleStyle {
   opacity: number;
@@ -82,6 +90,10 @@ export interface GlobalSettings {
   displayWidth: number;
   displayHeight: number;
   displayTransform?: 'normal' | '90' | '180' | '270';
+  latitude: number;
+  longitude: number;
+  locationName?: string;
+  timezone?: string;
   weather: WeatherSettings;
   calendar: CalendarSettings;
   unsplashAccessKey?: string;
@@ -228,5 +240,68 @@ export interface WordOfDayConfig {}
 export interface HistoryConfig {
   refreshIntervalMs: number;
   rotationIntervalSec: number;
+}
+
+// Moon phase module config
+export interface MoonPhaseConfig {
+  showIllumination: boolean;
+  showMoonTimes: boolean;
+}
+
+// Sunrise / Sunset module config
+export interface SunriseSunsetConfig {
+  showDayLength: boolean;
+  showGoldenHour: boolean;
+}
+
+// Photo slideshow module config
+export interface PhotoSlideshowConfig {
+  directory: string;
+  intervalMs: number;
+  transition: 'fade' | 'none';
+  objectFit: 'cover' | 'contain' | 'fill';
+}
+
+// QR code module config
+export interface QRCodeConfig {
+  data: string;
+  label: string;
+  fgColor: string;
+  bgColor: string;
+}
+
+// Year progress module config
+export interface YearProgressConfig {
+  showYear: boolean;
+  showMonth: boolean;
+  showWeek: boolean;
+  showDay: boolean;
+  showPercentage: boolean;
+}
+
+// Traffic / Commute module config
+export interface TrafficRoute {
+  label: string;
+  origin: string;
+  destination: string;
+}
+
+export interface TrafficConfig {
+  routes: TrafficRoute[];
+  refreshIntervalMs: number;
+}
+
+// Sports scores module config
+export interface SportsConfig {
+  leagues: string[];
+  refreshIntervalMs: number;
+}
+
+// Air quality module config
+export interface AirQualityConfig {
+  showAQI: boolean;
+  showPollutants: boolean;
+  showUV: boolean;
+  refreshIntervalMs: number;
 }
 

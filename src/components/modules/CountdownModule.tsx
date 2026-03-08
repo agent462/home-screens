@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { parseDateInTZ } from '@/lib/timezone';
 import type { CountdownConfig, ModuleStyle } from '@/types/config';
 import ModuleWrapper from './ModuleWrapper';
 
-function getTimeRemaining(targetDate: string) {
-  const diff = new Date(targetDate).getTime() - Date.now();
+function getTimeRemaining(targetDate: string, timezone?: string) {
+  const diff = parseDateInTZ(targetDate, timezone).getTime() - Date.now();
   const absDiff = Math.abs(diff);
   const past = diff < 0;
 
@@ -63,9 +64,10 @@ function FlipSeparator() {
 interface CountdownModuleProps {
   config: CountdownConfig;
   style: ModuleStyle;
+  timezone?: string;
 }
 
-export default function CountdownModule({ config, style }: CountdownModuleProps) {
+export default function CountdownModule({ config, style, timezone }: CountdownModuleProps) {
   const [now, setNow] = useState(Date.now());
   const scale = config.scale ?? 1;
   const basePx = 28 * scale;
@@ -78,7 +80,7 @@ export default function CountdownModule({ config, style }: CountdownModuleProps)
   const events = config.events
     .map((event) => ({
       ...event,
-      time: getTimeRemaining(event.date),
+      time: getTimeRemaining(event.date, timezone),
     }))
     .filter((event) => config.showPastEvents || !event.time.past)
     .sort((a, b) => {

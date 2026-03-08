@@ -60,4 +60,12 @@ export const DEFAULT_MODULE_SIZES: Record<string, { w: number; h: number }> = {
   crypto: { w: 400, h: 250 },
   'word-of-day': { w: 450, h: 200 },
   history: { w: 500, h: 200 },
+  'moon-phase': { w: 300, h: 350 },
+  'sunrise-sunset': { w: 400, h: 200 },
+  'photo-slideshow': { w: 500, h: 400 },
+  'qr-code': { w: 300, h: 350 },
+  'year-progress': { w: 400, h: 300 },
+  traffic: { w: 450, h: 300 },
+  sports: { w: 500, h: 300 },
+  'air-quality': { w: 350, h: 250 },
 };

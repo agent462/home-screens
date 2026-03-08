@@ -9,6 +9,8 @@ function makeConfig(version: number): ScreenConfiguration {
       rotationIntervalMs: 30000,
       displayWidth: 1080,
       displayHeight: 1920,
+      latitude: 0,
+      longitude: 0,
       weather: {
         provider: 'weatherapi',
         apiKey: '',

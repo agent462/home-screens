@@ -1,6 +1,5 @@
 'use client';
 
-import { format } from 'date-fns';
 import { CloudRain, Droplets, Wind } from 'lucide-react';
 import type { WeatherHourlyConfig, ModuleStyle } from '@/types/config';
 import type { HourlyWeather } from '@/lib/weather';
@@ -14,9 +13,10 @@ interface WeatherHourlyModuleProps {
   data?: HourlyWeather[];
   todayHigh?: number;
   todayLow?: number;
+  timezone?: string;
 }
 
-export default function WeatherHourlyModule({ config, style, data, todayHigh, todayLow }: WeatherHourlyModuleProps) {
+export default function WeatherHourlyModule({ config, style, data, todayHigh, todayLow, timezone }: WeatherHourlyModuleProps) {
   const hours = (data ?? []).slice(0, config.hoursToShow);
   const { containerRef, scaledFontSize } = useScaledFontSize(style.fontSize, 0.09);
 
@@ -68,7 +68,11 @@ export default function WeatherHourlyModule({ config, style, data, todayHigh, to
                 return (
                   <div key={i} className="flex flex-col items-center justify-evenly min-h-0">
                     <span className="opacity-60" style={{ fontSize: '0.75em' }}>
-                      {format(new Date(hour.time), 'h a')}
+                      {new Date(hour.time).toLocaleTimeString('en-US', {
+                        hour: 'numeric',
+                        hour12: true,
+                        ...(timezone ? { timeZone: timezone } : {}),
+                      })}
                     </span>
                     <Icon size="1.8em" strokeWidth={1.5} />
                     {config.showPrecipitation !== false && hour.precipProbability != null && (

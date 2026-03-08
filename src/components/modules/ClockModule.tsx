@@ -2,21 +2,23 @@
 
 import { useState, useEffect } from 'react';
 import { format, getWeek, getDayOfYear } from 'date-fns';
+import { createTZDate } from '@/lib/timezone';
 import type { ClockConfig, ModuleStyle } from '@/types/config';
 import ModuleWrapper from './ModuleWrapper';
 
 interface ClockModuleProps {
   config: ClockConfig;
   style: ModuleStyle;
+  timezone?: string;
 }
 
-export default function ClockModule({ config, style }: ClockModuleProps) {
-  const [now, setNow] = useState(new Date());
+export default function ClockModule({ config, style, timezone }: ClockModuleProps) {
+  const [now, setNow] = useState(() => createTZDate(timezone));
 
   useEffect(() => {
-    const interval = setInterval(() => setNow(new Date()), 1000);
+    const interval = setInterval(() => setNow(createTZDate(timezone)), 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [timezone]);
 
   const timeFormat = config.format24h
     ? config.showSeconds ? 'HH:mm:ss' : 'HH:mm'

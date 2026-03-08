@@ -1,6 +1,7 @@
 'use client';
 
 import { format, isSameDay, startOfDay, addDays, differenceInMinutes } from 'date-fns';
+import { createTZDate } from '@/lib/timezone';
 import type { CalendarConfig, ModuleStyle } from '@/types/config';
 import ModuleWrapper from './ModuleWrapper';
 
@@ -18,6 +19,7 @@ interface CalendarModuleProps {
   config: CalendarConfig;
   style: ModuleStyle;
   events?: CalendarEvent[];
+  timezone?: string;
 }
 
 function formatDuration(start: Date, end: Date): string {
@@ -63,12 +65,12 @@ function EventCard({ event, textColor, showTime, showLocation }: { event: Calend
   );
 }
 
-export default function CalendarModule({ config, style, events }: CalendarModuleProps) {
+export default function CalendarModule({ config, style, events, timezone }: CalendarModuleProps) {
   const allEvents = events ?? [];
   const daysToShow = config.daysToShow ?? 3;
   const showTime = config.showTime !== false;
   const showLocation = config.showLocation !== false;
-  const today = startOfDay(new Date());
+  const today = startOfDay(createTZDate(timezone));
 
   // Build day columns
   const days = Array.from({ length: daysToShow }, (_, i) => {

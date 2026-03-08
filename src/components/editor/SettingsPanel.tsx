@@ -19,12 +19,16 @@ export default function SettingsPanel({ onClose }: { onClose: () => void }) {
 
   const [weatherApiKey, setWeatherApiKey] = useState(settings?.weather.apiKey ?? '');
   const [provider, setProvider] = useState<string>(settings?.weather.provider ?? 'weatherapi');
-  const [lat, setLat] = useState(settings?.weather.latitude?.toString() ?? '');
-  const [lon, setLon] = useState(settings?.weather.longitude?.toString() ?? '');
+  const [lat, setLat] = useState(
+    (settings?.latitude ?? settings?.weather.latitude)?.toString() ?? ''
+  );
+  const [lon, setLon] = useState(
+    (settings?.longitude ?? settings?.weather.longitude)?.toString() ?? ''
+  );
   const [units, setUnits] = useState<string>(settings?.weather.units ?? 'imperial');
   const [locationQuery, setLocationQuery] = useState('');
   const [locationStatus, setLocationStatus] = useState<string | null>(null);
-  const [locationName, setLocationName] = useState<string | null>(null);
+  const [locationName, setLocationName] = useState<string | null>(settings?.locationName ?? null);
   const [unsplashKey, setUnsplashKey] = useState(settings?.unsplashAccessKey ?? '');
   const [selectedCalendarIds, setSelectedCalendarIds] = useState<string[]>(
     settings?.calendar.googleCalendarIds ??
@@ -38,6 +42,7 @@ export default function SettingsPanel({ onClose }: { onClose: () => void }) {
   const [displayWidth, setDisplayWidth] = useState(settings?.displayWidth ?? 1080);
   const [displayHeight, setDisplayHeight] = useState(settings?.displayHeight ?? 1920);
   const [displayTransform, setDisplayTransform] = useState(settings?.displayTransform ?? 'normal');
+  const [timezone, setTimezone] = useState(settings?.timezone ?? '');
 
   const [testStatus, setTestStatus] = useState<string | null>(null);
 
@@ -45,6 +50,26 @@ export default function SettingsPanel({ onClose }: { onClose: () => void }) {
   const [googleConnected, setGoogleConnected] = useState(false);
   const [googleCalendars, setGoogleCalendars] = useState<GoogleCalendar[]>([]);
   const [googleLoading, setGoogleLoading] = useState(true);
+
+  // Time display state: browser ticks every second, server offset derived from single fetch
+  const [browserTime, setBrowserTime] = useState(() => new Date());
+  const [serverInfo, setServerInfo] = useState<{ offsetMs: number; timezone: string } | null>(null);
+
+  useEffect(() => {
+    const timer = setInterval(() => setBrowserTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const fetchedAt = Date.now();
+    fetch('/api/time')
+      .then((r) => r.json())
+      .then((data) => {
+        const serverMs = new Date(data.iso).getTime();
+        setServerInfo({ offsetMs: serverMs - fetchedAt, timezone: data.timezone });
+      })
+      .catch(() => {});
+  }, []);
 
   // Device flow state
   const [deviceCode, setDeviceCode] = useState<string | null>(null);
@@ -216,17 +241,23 @@ export default function SettingsPanel({ onClose }: { onClose: () => void }) {
   if (!settings) return null;
 
   async function handleSave() {
+    const parsedLat = parseFloat(lat) || 0;
+    const parsedLon = parseFloat(lon) || 0;
     updateSettings({
       rotationIntervalMs: rotationInterval * 1000,
       displayWidth,
       displayHeight,
       displayTransform: displayTransform as 'normal' | '90' | '180' | '270',
+      latitude: parsedLat,
+      longitude: parsedLon,
+      locationName: locationName ?? undefined,
+      timezone: timezone || undefined,
       unsplashAccessKey: unsplashKey,
       weather: {
         provider: provider as 'openweathermap' | 'weatherapi',
         apiKey: weatherApiKey,
-        latitude: parseFloat(lat) || 0,
-        longitude: parseFloat(lon) || 0,
+        latitude: parsedLat,
+        longitude: parsedLon,
         units: units as 'metric' | 'imperial',
       },
       calendar: {
@@ -244,12 +275,16 @@ export default function SettingsPanel({ onClose }: { onClose: () => void }) {
     setTestStatus('Testing...');
     try {
       // Save current settings first so the API can read them
+      const testLat = parseFloat(lat) || 0;
+      const testLon = parseFloat(lon) || 0;
       updateSettings({
+        latitude: testLat,
+        longitude: testLon,
         weather: {
           provider: provider as 'openweathermap' | 'weatherapi',
           apiKey: weatherApiKey,
-          latitude: parseFloat(lat) || 0,
-          longitude: parseFloat(lon) || 0,
+          latitude: testLat,
+          longitude: testLon,
           units: units as 'metric' | 'imperial',
         },
       });
@@ -347,50 +382,66 @@ export default function SettingsPanel({ onClose }: { onClose: () => void }) {
             />
           </section>
 
-          {/* Weather Settings */}
+          {/* Location Settings */}
           <section>
             <h3 className="text-sm font-medium text-neutral-300 mb-3 uppercase tracking-wider">
-              Weather
+              Location
             </h3>
             <div className="space-y-3">
+              <p className="text-xs text-neutral-500">
+                Used by weather, moon phase, sunrise/sunset, and air quality modules.
+              </p>
+
+              {/* Time display */}
+              <div className="rounded-md bg-neutral-800 border border-neutral-600 px-3 py-2.5 grid grid-cols-2 gap-x-4 gap-y-1">
+                <div>
+                  <span className="text-[10px] uppercase tracking-wider text-neutral-500">Browser</span>
+                  <p className="text-sm text-neutral-200 tabular-nums">
+                    {browserTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })}
+                  </p>
+                  <p className="text-[10px] text-neutral-500">{Intl.DateTimeFormat().resolvedOptions().timeZone}</p>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase tracking-wider text-neutral-500">Server</span>
+                  <p className="text-sm text-neutral-200 tabular-nums">
+                    {serverInfo
+                      ? new Date(browserTime.getTime() + serverInfo.offsetMs).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true, timeZone: serverInfo.timezone })
+                      : <span className="text-neutral-500">...</span>}
+                  </p>
+                  <p className="text-[10px] text-neutral-500">{serverInfo?.timezone ?? ''}</p>
+                </div>
+              </div>
+
               <label className="block">
-                <span className="text-xs text-neutral-400">Provider</span>
+                <span className="text-xs text-neutral-400">Timezone</span>
                 <select
-                  value={provider}
-                  onChange={(e) => setProvider(e.target.value)}
+                  value={timezone}
+                  onChange={(e) => setTimezone(e.target.value)}
                   className="mt-1 block w-full rounded-md bg-neutral-800 border border-neutral-600 text-sm text-neutral-200 px-3 py-2 focus:outline-none focus:border-blue-500"
                 >
-                  <option value="weatherapi">WeatherAPI.com (free, no credit card)</option>
-                  <option value="openweathermap">OpenWeatherMap (One Call 3.0)</option>
+                  <option value="">System default ({Intl.DateTimeFormat().resolvedOptions().timeZone})</option>
+                  {(() => {
+                    try {
+                      return Intl.supportedValuesOf('timeZone').map((tz: string) => (
+                        <option key={tz} value={tz}>{tz.replace(/_/g, ' ')}</option>
+                      ));
+                    } catch {
+                      // Fallback for older browsers
+                      return ['America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
+                        'America/Anchorage', 'Pacific/Honolulu', 'Europe/London', 'Europe/Paris',
+                        'Europe/Berlin', 'Asia/Tokyo', 'Asia/Shanghai', 'Australia/Sydney',
+                        'UTC'].map((tz) => (
+                        <option key={tz} value={tz}>{tz.replace(/_/g, ' ')}</option>
+                      ));
+                    }
+                  })()}
                 </select>
+                <p className="text-xs text-neutral-500 mt-1">
+                  Override the server&apos;s OS timezone for clock, greeting, and other time-based modules.
+                </p>
               </label>
 
-              <label className="block">
-                <span className="text-xs text-neutral-400">
-                  API Key
-                  {provider === 'weatherapi' && (
-                    <span className="text-neutral-500 ml-1">
-                      — get one free at weatherapi.com
-                    </span>
-                  )}
-                  {provider === 'openweathermap' && (
-                    <span className="text-neutral-500 ml-1">
-                      — requires One Call 3.0 subscription
-                    </span>
-                  )}
-                </span>
-                <input
-                  type="password"
-                  value={weatherApiKey}
-                  onChange={(e) => setWeatherApiKey(e.target.value)}
-                  placeholder="Paste your API key here"
-                  className="mt-1 block w-full rounded-md bg-neutral-800 border border-neutral-600 text-sm text-neutral-200 px-3 py-2 focus:outline-none focus:border-blue-500"
-                />
-              </label>
-
-              {/* Location picker */}
               <div className="space-y-2">
-                <span className="text-xs text-neutral-400">Location</span>
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -448,6 +499,49 @@ export default function SettingsPanel({ onClose }: { onClose: () => void }) {
                   </label>
                 </div>
               </details>
+            </div>
+          </section>
+
+          {/* Weather Settings */}
+          <section>
+            <h3 className="text-sm font-medium text-neutral-300 mb-3 uppercase tracking-wider">
+              Weather
+            </h3>
+            <div className="space-y-3">
+              <label className="block">
+                <span className="text-xs text-neutral-400">Provider</span>
+                <select
+                  value={provider}
+                  onChange={(e) => setProvider(e.target.value)}
+                  className="mt-1 block w-full rounded-md bg-neutral-800 border border-neutral-600 text-sm text-neutral-200 px-3 py-2 focus:outline-none focus:border-blue-500"
+                >
+                  <option value="weatherapi">WeatherAPI.com (free, no credit card)</option>
+                  <option value="openweathermap">OpenWeatherMap (One Call 3.0)</option>
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="text-xs text-neutral-400">
+                  API Key
+                  {provider === 'weatherapi' && (
+                    <span className="text-neutral-500 ml-1">
+                      — get one free at weatherapi.com
+                    </span>
+                  )}
+                  {provider === 'openweathermap' && (
+                    <span className="text-neutral-500 ml-1">
+                      — requires One Call 3.0 subscription
+                    </span>
+                  )}
+                </span>
+                <input
+                  type="password"
+                  value={weatherApiKey}
+                  onChange={(e) => setWeatherApiKey(e.target.value)}
+                  placeholder="Paste your API key here"
+                  className="mt-1 block w-full rounded-md bg-neutral-800 border border-neutral-600 text-sm text-neutral-200 px-3 py-2 focus:outline-none focus:border-blue-500"
+                />
+              </label>
 
               <label className="block">
                 <span className="text-xs text-neutral-400">Units</span>

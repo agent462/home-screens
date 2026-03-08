@@ -4,6 +4,7 @@ import {
   Clock, CalendarDays, CloudSun, Sun, Hourglass, Laugh, Type, ImageIcon,
   Quote, ListTodo, StickyNote, HandMetal,
   Newspaper, TrendingUp, Bitcoin, BookOpen, History,
+  Moon, Sunrise, Image, QrCode, BarChart3, Car, Trophy, Wind,
 } from 'lucide-react';
 import { DEFAULT_MODULE_SIZES } from './constants';
 
@@ -224,4 +225,101 @@ registerModule({
     rotationIntervalSec: 10,
   },
   defaultSize: DEFAULT_MODULE_SIZES.history,
+});
+
+registerModule({
+  type: 'moon-phase',
+  label: 'Moon Phase',
+  icon: Moon,
+  defaultConfig: {
+    showIllumination: true,
+    showMoonTimes: true,
+  },
+  defaultSize: DEFAULT_MODULE_SIZES['moon-phase'],
+});
+
+registerModule({
+  type: 'sunrise-sunset',
+  label: 'Sunrise / Sunset',
+  icon: Sunrise,
+  defaultConfig: {
+    showDayLength: true,
+    showGoldenHour: false,
+  },
+  defaultSize: DEFAULT_MODULE_SIZES['sunrise-sunset'],
+});
+
+registerModule({
+  type: 'photo-slideshow',
+  label: 'Photo Slideshow',
+  icon: Image,
+  defaultConfig: {
+    directory: '',
+    intervalMs: 30000,
+    transition: 'fade',
+    objectFit: 'cover',
+  },
+  defaultSize: DEFAULT_MODULE_SIZES['photo-slideshow'],
+});
+
+registerModule({
+  type: 'qr-code',
+  label: 'QR Code',
+  icon: QrCode,
+  defaultConfig: {
+    data: '',
+    label: '',
+    fgColor: '#ffffff',
+    bgColor: 'transparent',
+  },
+  defaultSize: DEFAULT_MODULE_SIZES['qr-code'],
+});
+
+registerModule({
+  type: 'year-progress',
+  label: 'Year Progress',
+  icon: BarChart3,
+  defaultConfig: {
+    showYear: true,
+    showMonth: true,
+    showWeek: true,
+    showDay: true,
+    showPercentage: true,
+  },
+  defaultSize: DEFAULT_MODULE_SIZES['year-progress'],
+});
+
+registerModule({
+  type: 'traffic',
+  label: 'Traffic / Commute',
+  icon: Car,
+  defaultConfig: {
+    routes: [],
+    refreshIntervalMs: 300000,
+  },
+  defaultSize: DEFAULT_MODULE_SIZES.traffic,
+});
+
+registerModule({
+  type: 'sports',
+  label: 'Sports Scores',
+  icon: Trophy,
+  defaultConfig: {
+    leagues: ['nba', 'nfl'],
+    refreshIntervalMs: 60000,
+  },
+  defaultSize: DEFAULT_MODULE_SIZES.sports,
+});
+
+registerModule({
+  type: 'air-quality',
+  label: 'Air Quality',
+  icon: Wind,
+  defaultConfig: {
+    showAQI: true,
+    showPollutants: false,
+    showUV: true,
+    refreshIntervalMs: 900000,
+  },
+  defaultSize: DEFAULT_MODULE_SIZES['air-quality'],
 });

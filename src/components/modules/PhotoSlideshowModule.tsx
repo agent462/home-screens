@@ -1,0 +1,95 @@
+'use client';
+
+import { useState, useEffect, useRef } from 'react';
+import type { PhotoSlideshowConfig, ModuleStyle } from '@/types/config';
+import ModuleWrapper from './ModuleWrapper';
+import { useFetchData } from '@/hooks/useFetchData';
+import { useRotatingIndex } from '@/hooks/useRotatingIndex';
+
+interface PhotoSlideshowModuleProps {
+  config: PhotoSlideshowConfig;
+  style: ModuleStyle;
+}
+
+export default function PhotoSlideshowModule({ config, style }: PhotoSlideshowModuleProps) {
+  const url = config.directory
+    ? `/api/backgrounds?directory=${encodeURIComponent(config.directory)}`
+    : '/api/backgrounds';
+  const data = useFetchData<string[]>(url, 600000);
+  const files = data ?? [];
+  const intervalMs = config.intervalMs ?? 30000;
+  const index = useRotatingIndex(files.length, intervalMs);
+
+  // Track the active layer (0 or 1) to alternate which img is on top
+  const [activeLayer, setActiveLayer] = useState(0);
+  const [sources, setSources] = useState<[string, string]>(['', '']);
+  const prevIndexRef = useRef(index);
+
+  useEffect(() => {
+    if (files.length === 0) return;
+    const src = files[index % files.length];
+
+    if (prevIndexRef.current !== index) {
+      // Switch to the other layer for the new image
+      const nextLayer = activeLayer === 0 ? 1 : 0;
+      setSources((prev) => {
+        const updated: [string, string] = [...prev] as [string, string];
+        updated[nextLayer] = src;
+        return updated;
+      });
+      setActiveLayer(nextLayer);
+      prevIndexRef.current = index;
+    } else {
+      // Initial load — set both layers to the same image
+      setSources([src, src]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index, files]);
+
+  if (files.length === 0) {
+    return (
+      <ModuleWrapper style={{ ...style, padding: 0 }}>
+        <div className="flex items-center justify-center h-full opacity-40" style={{ fontSize: '0.875em' }}>
+          No photos found
+        </div>
+      </ModuleWrapper>
+    );
+  }
+
+  const isFade = config.transition === 'fade';
+
+  return (
+    <ModuleWrapper style={{ ...style, padding: 0 }}>
+      <div className="relative w-full h-full" style={{ borderRadius: `${style.borderRadius}px`, overflow: 'hidden' }}>
+        {/* Layer 0 */}
+        {sources[0] && (
+          <img
+            src={sources[0]}
+            alt=""
+            className="absolute inset-0 w-full h-full"
+            style={{
+              objectFit: config.objectFit,
+              opacity: activeLayer === 0 ? 1 : 0,
+              ...(isFade ? { transition: 'opacity 800ms ease-in-out' } : {}),
+              zIndex: activeLayer === 0 ? 1 : 0,
+            }}
+          />
+        )}
+        {/* Layer 1 */}
+        {sources[1] && (
+          <img
+            src={sources[1]}
+            alt=""
+            className="absolute inset-0 w-full h-full"
+            style={{
+              objectFit: config.objectFit,
+              opacity: activeLayer === 1 ? 1 : 0,
+              ...(isFade ? { transition: 'opacity 800ms ease-in-out' } : {}),
+              zIndex: activeLayer === 1 ? 1 : 0,
+            }}
+          />
+        )}
+      </div>
+    </ModuleWrapper>
+  );
+}
