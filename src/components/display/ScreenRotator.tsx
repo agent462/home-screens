@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { Screen, GlobalSettings, ScreenConfiguration } from '@/types/config';
 import ScreenRenderer from './ScreenRenderer';
+import SleepOverlay from './SleepOverlay';
+import { useSleepManager } from '@/hooks/useSleepManager';
 
 /** How often the display polls for config changes (ms) */
 const CONFIG_POLL_MS = 3_000;
@@ -118,6 +120,7 @@ export default function ScreenRotator({ screens: initialScreens, settings: initi
   const { screens, settings } = useLiveConfig(initialScreens, initialSettings);
   const [currentIndex, setCurrentIndex] = useState(0);
   const rotatingBackgrounds = useBackgroundRotation(screens);
+  const { displayState, dimOpacity } = useSleepManager(settings.sleep, settings.screensaver);
 
   const advance = useCallback(() => {
     setCurrentIndex((prev) => (prev + 1) % screens.length);
@@ -128,11 +131,12 @@ export default function ScreenRotator({ screens: initialScreens, settings: initi
     setCurrentIndex((prev) => (prev >= screens.length ? 0 : prev));
   }, [screens.length]);
 
+  // Pause screen rotation when display is asleep (no point cycling invisible screens)
   useEffect(() => {
-    if (screens.length <= 1) return;
+    if (screens.length <= 1 || displayState === 'asleep') return;
     const interval = setInterval(advance, settings.rotationIntervalMs);
     return () => clearInterval(interval);
-  }, [advance, settings.rotationIntervalMs, screens.length]);
+  }, [advance, settings.rotationIntervalMs, screens.length, displayState]);
 
   if (screens.length === 0) {
     return (
@@ -185,6 +189,13 @@ export default function ScreenRotator({ screens: initialScreens, settings: initi
           ))}
         </div>
       )}
+
+      <SleepOverlay
+        displayState={displayState}
+        dimOpacity={dimOpacity}
+        screensaver={settings.screensaver}
+        timezone={settings.timezone}
+      />
     </div>
   );
 }

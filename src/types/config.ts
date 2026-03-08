@@ -85,6 +85,23 @@ export interface CalendarSettings {
   daysAhead: number;
 }
 
+export interface SleepSettings {
+  enabled: boolean;
+  dimAfterMinutes: number;
+  sleepAfterMinutes: number;
+  dimBrightness: number;
+  schedule?: {
+    startTime: string; // "23:00"
+    endTime: string;   // "06:00"
+  };
+}
+
+export type ScreensaverMode = 'clock' | 'blank' | 'off';
+
+export interface ScreensaverSettings {
+  mode: ScreensaverMode;
+}
+
 export interface GlobalSettings {
   rotationIntervalMs: number;
   displayWidth: number;
@@ -97,6 +114,8 @@ export interface GlobalSettings {
   weather: WeatherSettings;
   calendar: CalendarSettings;
   unsplashAccessKey?: string;
+  sleep?: SleepSettings;
+  screensaver?: ScreensaverSettings;
 }
 
 export interface ScreenConfiguration {
