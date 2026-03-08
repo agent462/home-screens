@@ -228,6 +228,7 @@ function CountdownConfigSection({ mod, screenId }: { mod: ModuleInstance; screen
 
   return (
     <div className="space-y-2">
+      <Toggle label="Show Past Events" checked={!!c.showPastEvents} onChange={(v) => set({ showPastEvents: v })} />
       <label className="flex flex-col gap-0.5">
         <span className="text-xs text-neutral-400">Scale ({((c.scale ?? 1) * 100).toFixed(0)}%)</span>
         <input
@@ -560,7 +561,7 @@ function StockTickerConfigSection({ mod, screenId }: { mod: ModuleInstance; scre
 
 function CryptoConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
   const { updateModule } = useEditorStore();
-  const c = mod.config as { ids?: string; refreshIntervalMs?: number };
+  const c = mod.config as { ids?: string; refreshIntervalMs?: number; cardScale?: number };
   const set = (updates: Record<string, unknown>) =>
     updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
 
@@ -575,6 +576,14 @@ function CryptoConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId:
           className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
         />
       </label>
+      <Slider
+        label="Card Scale"
+        value={c.cardScale ?? 1}
+        min={0.5}
+        max={3}
+        step={0.1}
+        onChange={(v) => set({ cardScale: v })}
+      />
       <Slider
         label="Refresh (seconds)"
         value={(c.refreshIntervalMs ?? 60000) / 1000}
@@ -615,6 +624,265 @@ function HistoryConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId
   );
 }
 
+function MoonPhaseConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
+  const { updateModule } = useEditorStore();
+  const c = mod.config as { showIllumination?: boolean; showMoonTimes?: boolean };
+  const set = (updates: Record<string, unknown>) =>
+    updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
+
+  return (
+    <>
+      <Toggle label="Show Illumination %" checked={c.showIllumination !== false} onChange={(v) => set({ showIllumination: v })} />
+      <Toggle label="Show Moon Times" checked={c.showMoonTimes !== false} onChange={(v) => set({ showMoonTimes: v })} />
+      <p className="text-xs text-neutral-500">Uses location from global settings.</p>
+    </>
+  );
+}
+
+function SunriseSunsetConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
+  const { updateModule } = useEditorStore();
+  const c = mod.config as { showDayLength?: boolean; showGoldenHour?: boolean };
+  const set = (updates: Record<string, unknown>) =>
+    updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
+
+  return (
+    <>
+      <Toggle label="Show Day Length" checked={c.showDayLength !== false} onChange={(v) => set({ showDayLength: v })} />
+      <Toggle label="Show Golden Hour" checked={!!c.showGoldenHour} onChange={(v) => set({ showGoldenHour: v })} />
+      <p className="text-xs text-neutral-500">Uses location from global settings.</p>
+    </>
+  );
+}
+
+function PhotoSlideshowConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
+  const { updateModule } = useEditorStore();
+  const c = mod.config as { directory?: string; intervalMs?: number; transition?: string; objectFit?: string };
+  const set = (updates: Record<string, unknown>) =>
+    updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
+
+  return (
+    <>
+      <label className="flex flex-col gap-0.5">
+        <span className="text-xs text-neutral-400">Directory (subfolder in backgrounds)</span>
+        <input
+          type="text"
+          value={(c.directory as string) || ''}
+          onChange={(e) => set({ directory: e.target.value })}
+          placeholder="Leave empty for all backgrounds"
+          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+        />
+      </label>
+      <Slider
+        label="Slide Interval (seconds)"
+        value={(c.intervalMs ?? 30000) / 1000}
+        min={5}
+        max={300}
+        step={5}
+        onChange={(v) => set({ intervalMs: v * 1000 })}
+      />
+      <label className="flex flex-col gap-0.5">
+        <span className="text-xs text-neutral-400">Transition</span>
+        <select
+          value={(c.transition as string) || 'fade'}
+          onChange={(e) => set({ transition: e.target.value })}
+          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+        >
+          <option value="fade">Fade</option>
+          <option value="none">None</option>
+        </select>
+      </label>
+      <label className="flex flex-col gap-0.5">
+        <span className="text-xs text-neutral-400">Object Fit</span>
+        <select
+          value={(c.objectFit as string) || 'cover'}
+          onChange={(e) => set({ objectFit: e.target.value })}
+          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+        >
+          <option value="cover">Cover</option>
+          <option value="contain">Contain</option>
+          <option value="fill">Fill</option>
+        </select>
+      </label>
+    </>
+  );
+}
+
+function QRCodeConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
+  const { updateModule } = useEditorStore();
+  const c = mod.config as { data?: string; label?: string; fgColor?: string; bgColor?: string };
+  const set = (updates: Record<string, unknown>) =>
+    updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
+
+  return (
+    <>
+      <label className="flex flex-col gap-0.5">
+        <span className="text-xs text-neutral-400">Data (URL or text)</span>
+        <input
+          type="text"
+          value={(c.data as string) || ''}
+          onChange={(e) => set({ data: e.target.value })}
+          placeholder="https://example.com"
+          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+        />
+      </label>
+      <label className="flex flex-col gap-0.5">
+        <span className="text-xs text-neutral-400">Label</span>
+        <input
+          type="text"
+          value={(c.label as string) || ''}
+          onChange={(e) => set({ label: e.target.value })}
+          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+        />
+      </label>
+      <ColorPicker label="QR Color" value={(c.fgColor as string) || '#ffffff'} onChange={(v) => set({ fgColor: v })} />
+      <ColorPicker label="Background" value={(c.bgColor as string) || 'transparent'} onChange={(v) => set({ bgColor: v })} />
+    </>
+  );
+}
+
+function YearProgressConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
+  const { updateModule } = useEditorStore();
+  const c = mod.config as { showYear?: boolean; showMonth?: boolean; showWeek?: boolean; showDay?: boolean; showPercentage?: boolean };
+  const set = (updates: Record<string, unknown>) =>
+    updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
+
+  return (
+    <>
+      <Toggle label="Show Year" checked={c.showYear !== false} onChange={(v) => set({ showYear: v })} />
+      <Toggle label="Show Month" checked={c.showMonth !== false} onChange={(v) => set({ showMonth: v })} />
+      <Toggle label="Show Week" checked={c.showWeek !== false} onChange={(v) => set({ showWeek: v })} />
+      <Toggle label="Show Day" checked={c.showDay !== false} onChange={(v) => set({ showDay: v })} />
+      <Toggle label="Show Percentage" checked={c.showPercentage !== false} onChange={(v) => set({ showPercentage: v })} />
+    </>
+  );
+}
+
+function TrafficConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
+  const { updateModule } = useEditorStore();
+  const c = mod.config as { routes?: { label: string; origin: string; destination: string }[]; refreshIntervalMs?: number };
+  const routes = c.routes ?? [];
+  const set = (updates: Record<string, unknown>) =>
+    updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
+
+  const addRoute = () => {
+    set({ routes: [...routes, { label: 'Work', origin: '', destination: '' }] });
+  };
+
+  const removeRoute = (idx: number) => {
+    set({ routes: routes.filter((_, i) => i !== idx) });
+  };
+
+  const updateRoute = (idx: number, updates: Partial<{ label: string; origin: string; destination: string }>) => {
+    set({ routes: routes.map((r, i) => (i === idx ? { ...r, ...updates } : r)) });
+  };
+
+  return (
+    <div className="space-y-2">
+      <Slider
+        label="Refresh (minutes)"
+        value={(c.refreshIntervalMs ?? 300000) / 60000}
+        min={1}
+        max={30}
+        onChange={(v) => set({ refreshIntervalMs: v * 60000 })}
+      />
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-neutral-400">Routes</span>
+        <Button size="sm" onClick={addRoute}>Add</Button>
+      </div>
+      {routes.map((r, idx) => (
+        <div key={idx} className="p-2 bg-neutral-800 rounded space-y-1">
+          <div className="flex items-center gap-1">
+            <input
+              type="text"
+              value={r.label}
+              onChange={(e) => updateRoute(idx, { label: e.target.value })}
+              placeholder="Label"
+              className="flex-1 px-2 py-0.5 text-xs bg-neutral-700 border border-neutral-600 rounded text-neutral-200"
+            />
+            <button onClick={() => removeRoute(idx)} className="text-red-400 text-xs px-1">x</button>
+          </div>
+          <input
+            type="text"
+            value={r.origin}
+            onChange={(e) => updateRoute(idx, { origin: e.target.value })}
+            placeholder="Origin address"
+            className="w-full px-2 py-0.5 text-xs bg-neutral-700 border border-neutral-600 rounded text-neutral-200"
+          />
+          <input
+            type="text"
+            value={r.destination}
+            onChange={(e) => updateRoute(idx, { destination: e.target.value })}
+            placeholder="Destination address"
+            className="w-full px-2 py-0.5 text-xs bg-neutral-700 border border-neutral-600 rounded text-neutral-200"
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SportsConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
+  const { updateModule } = useEditorStore();
+  const c = mod.config as { leagues?: string[]; refreshIntervalMs?: number };
+  const set = (updates: Record<string, unknown>) =>
+    updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
+
+  const leagueOptions = ['nfl', 'nba', 'mlb', 'nhl', 'mls', 'epl'];
+  const selectedLeagues = c.leagues ?? ['nba', 'nfl'];
+
+  return (
+    <>
+      <div className="space-y-1">
+        <span className="text-xs text-neutral-400">Leagues</span>
+        {leagueOptions.map((league) => (
+          <Toggle
+            key={league}
+            label={league.toUpperCase()}
+            checked={selectedLeagues.includes(league)}
+            onChange={(checked) => {
+              const next = checked
+                ? [...selectedLeagues, league]
+                : selectedLeagues.filter((l) => l !== league);
+              set({ leagues: next });
+            }}
+          />
+        ))}
+      </div>
+      <Slider
+        label="Refresh (seconds)"
+        value={(c.refreshIntervalMs ?? 60000) / 1000}
+        min={30}
+        max={600}
+        step={30}
+        onChange={(v) => set({ refreshIntervalMs: v * 1000 })}
+      />
+    </>
+  );
+}
+
+function AirQualityConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
+  const { updateModule } = useEditorStore();
+  const c = mod.config as { showAQI?: boolean; showPollutants?: boolean; showUV?: boolean; refreshIntervalMs?: number };
+  const set = (updates: Record<string, unknown>) =>
+    updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
+
+  return (
+    <>
+      <Toggle label="Show AQI" checked={c.showAQI !== false} onChange={(v) => set({ showAQI: v })} />
+      <Toggle label="Show Pollutants" checked={!!c.showPollutants} onChange={(v) => set({ showPollutants: v })} />
+      <Toggle label="Show UV Index" checked={c.showUV !== false} onChange={(v) => set({ showUV: v })} />
+      <Slider
+        label="Refresh (minutes)"
+        value={(c.refreshIntervalMs ?? 900000) / 60000}
+        min={5}
+        max={120}
+        step={5}
+        onChange={(v) => set({ refreshIntervalMs: v * 60000 })}
+      />
+    </>
+  );
+}
+
 const CONFIG_SECTIONS: Record<string, React.FC<{ mod: ModuleInstance; screenId: string }>> = {
   clock: ClockConfigSection,
   calendar: CalendarConfigSection,
@@ -632,6 +900,14 @@ const CONFIG_SECTIONS: Record<string, React.FC<{ mod: ModuleInstance; screenId: 
   'stock-ticker': StockTickerConfigSection,
   crypto: CryptoConfigSection,
   history: HistoryConfigSection,
+  'moon-phase': MoonPhaseConfigSection,
+  'sunrise-sunset': SunriseSunsetConfigSection,
+  'photo-slideshow': PhotoSlideshowConfigSection,
+  'qr-code': QRCodeConfigSection,
+  'year-progress': YearProgressConfigSection,
+  traffic: TrafficConfigSection,
+  sports: SportsConfigSection,
+  'air-quality': AirQualityConfigSection,
 };
 
 export default function PropertyPanel() {
