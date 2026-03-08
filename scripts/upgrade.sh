@@ -98,7 +98,9 @@ case "${action}" in
     ;;
 
   install)
-    npm install 2>&1
+    # Force include devDependencies (TypeScript etc.) even when
+    # NODE_ENV=production is inherited from the systemd service.
+    npm install --include=dev 2>&1
     echo "{\"ok\":true}"
     ;;
 
