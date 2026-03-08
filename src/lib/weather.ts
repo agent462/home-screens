@@ -36,16 +36,35 @@ export class OpenWeatherMapProvider implements WeatherProvider {
   }
 
   async getHourly(lat: number, lon: number, units: string): Promise<HourlyWeather[]> {
-    // Use free 2.5 forecast endpoint (5-day/3-hour forecast)
-    const url = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&units=${units}&cnt=8&appid=${this.apiKey}`;
-    const res = await fetch(url);
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`OpenWeatherMap API error ${res.status}: ${body}`);
+    // Fetch current weather and 3-hour forecast in parallel
+    const [currentRes, forecastRes] = await Promise.all([
+      fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=${units}&appid=${this.apiKey}`),
+      fetch(`https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&units=${units}&cnt=8&appid=${this.apiKey}`),
+    ]);
+    if (!currentRes.ok) {
+      const body = await currentRes.text();
+      throw new Error(`OpenWeatherMap API error ${currentRes.status}: ${body}`);
     }
-    const data = await res.json();
+    if (!forecastRes.ok) {
+      const body = await forecastRes.text();
+      throw new Error(`OpenWeatherMap API error ${forecastRes.status}: ${body}`);
+    }
+    const [currentData, forecastData] = await Promise.all([currentRes.json(), forecastRes.json()]);
 
-    return (data.list ?? []).map((h: Record<string, unknown>) => ({
+    // Current conditions as the first entry
+    const current: HourlyWeather = {
+      time: new Date((currentData.dt as number) * 1000).toISOString(),
+      temp: (currentData.main as Record<string, number>)?.temp ?? 0,
+      feelsLike: (currentData.main as Record<string, number>)?.feels_like ?? 0,
+      humidity: (currentData.main as Record<string, number>)?.humidity ?? 0,
+      icon: this.mapIcon((currentData.weather as Array<Record<string, unknown>>)?.[0]?.icon as string ?? ''),
+      description: (currentData.weather as Array<Record<string, unknown>>)?.[0]?.description as string ?? '',
+      windSpeed: (currentData.wind as Record<string, number>)?.speed ?? 0,
+      precipProbability: 0,
+    };
+
+    // 3-hour forecast entries
+    const forecast = (forecastData.list ?? []).map((h: Record<string, unknown>) => ({
       time: new Date((h.dt as number) * 1000).toISOString(),
       temp: (h.main as Record<string, number>)?.temp ?? 0,
       feelsLike: (h.main as Record<string, number>)?.feels_like ?? 0,
@@ -55,6 +74,8 @@ export class OpenWeatherMapProvider implements WeatherProvider {
       windSpeed: (h.wind as Record<string, number>)?.speed ?? 0,
       precipProbability: ((h.pop as number) ?? 0) * 100,
     }));
+
+    return [current, ...forecast];
   }
 
   async getForecast(lat: number, lon: number, units: string): Promise<ForecastDay[]> {
@@ -141,8 +162,8 @@ export class WeatherAPIProvider implements WeatherProvider {
 
     const allDays = data.forecast?.forecastday ?? [];
     const allHours = allDays.flatMap((d: Record<string, unknown>) => (d as Record<string, unknown[]>).hour ?? []);
-    const now = new Date();
-    const hours = allHours.filter((h: Record<string, unknown>) => new Date(h.time as string) >= now);
+    const nowEpoch = Math.floor(Date.now() / 1000);
+    const hours = allHours.filter((h: Record<string, unknown>) => (h.time_epoch as number) >= nowEpoch);
     return hours.map((h: Record<string, unknown>) => ({
       time: h.time as string,
       temp: isCelsius ? (h.temp_c as number) : (h.temp_f as number),

@@ -34,7 +34,7 @@ export default function WeatherHourlyModule({ config, style, data, todayHigh, to
   const updateFontSize = useCallback(() => {
     if (containerRef.current) {
       const h = containerRef.current.clientHeight;
-      setScaledFontSize(Math.max(style.fontSize, h * 0.12));
+      setScaledFontSize(Math.max(style.fontSize, h * 0.09));
     }
   }, [style.fontSize]);
 
@@ -48,7 +48,7 @@ export default function WeatherHourlyModule({ config, style, data, todayHigh, to
 
   return (
     <ModuleWrapper style={style}>
-      <div ref={containerRef} className="w-full h-full flex flex-col overflow-visible" style={{ fontSize: `${scaledFontSize}px` }}>
+      <div ref={containerRef} className="w-full h-full flex flex-col" style={{ fontSize: `${scaledFontSize}px` }}>
         <h2 className="font-semibold mb-3 opacity-80 shrink-0" style={{ fontSize: '1.125em' }}>Hourly Forecast</h2>
         {hours.length === 0 ? (
           <p className="opacity-50" style={{ fontSize: '0.875em' }}>No weather data</p>
@@ -88,16 +88,16 @@ export default function WeatherHourlyModule({ config, style, data, todayHigh, to
             <div className="self-stretch w-px opacity-30 bg-current shrink-0" />
 
             {/* Upcoming hours - fill remaining space */}
-            <div className="flex flex-1 min-w-0 items-center justify-around">
+            <div className="flex flex-1 min-w-0 min-h-0 items-stretch justify-around">
               {hours.slice(1).map((hour, i) => {
                 const Icon = getWeatherIcon(hour.icon);
                 return (
-                  <div key={i} className="flex flex-col items-center gap-1">
+                  <div key={i} className="flex flex-col items-center justify-evenly min-h-0">
                     <span className="opacity-60" style={{ fontSize: '0.75em' }}>
                       {format(new Date(hour.time), 'h a')}
                     </span>
                     <Icon size="1.8em" strokeWidth={1.5} />
-                    {config.showPrecipitation !== false && hour.precipProbability != null && hour.precipProbability > 0 && (
+                    {config.showPrecipitation !== false && hour.precipProbability != null && (
                       <span className="opacity-50 flex items-center gap-0.5" style={{ fontSize: '0.7em' }}>
                         <Droplets size="1em" />{Math.round(hour.precipProbability)}%
                       </span>

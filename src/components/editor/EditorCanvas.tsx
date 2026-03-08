@@ -15,6 +15,11 @@ function ModulePreview({ mod, previewData }: { mod: ModuleInstance; previewData:
   const extraProps: Record<string, unknown> = {};
   if (mod.type === 'weather-hourly') {
     extraProps.data = previewData.weatherHourly;
+    if (previewData.weatherForecast && Array.isArray(previewData.weatherForecast) && previewData.weatherForecast.length > 0) {
+      const today = previewData.weatherForecast[0] as Record<string, unknown>;
+      extraProps.todayHigh = today.high;
+      extraProps.todayLow = today.low;
+    }
   } else if (mod.type === 'weather-forecast') {
     extraProps.data = previewData.weatherForecast;
   } else if (mod.type === 'calendar') {

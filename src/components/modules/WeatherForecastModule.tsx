@@ -77,7 +77,7 @@ export default function WeatherForecastModule({ config, style, data, units = 'im
                   )}
                 </div>
                 <div className="flex flex-col items-center gap-0.5">
-                  {config.showPrecipitation && days[0].precipProbability != null && days[0].precipProbability > 0 && (
+                  {config.showPrecipitation && days[0].precipProbability != null && (
                     <span className="opacity-60 flex items-center gap-0.5" style={{ fontSize: '0.85em' }}>
                       <Droplets size="1em" /> {Math.round(days[0].precipProbability)}%
                     </span>
@@ -99,7 +99,7 @@ export default function WeatherForecastModule({ config, style, data, units = 'im
               <div className="self-stretch w-px opacity-30 bg-current shrink-0" />
 
               {/* Upcoming days */}
-              <div className="flex flex-1 min-w-0 items-center justify-around">
+              <div className="flex flex-1 min-w-0 items-center justify-around flex-wrap gap-y-3">
                 {days.slice(1).map((day, i) => {
                   const Icon = getWeatherIcon(day.icon);
                   return (
@@ -108,7 +108,7 @@ export default function WeatherForecastModule({ config, style, data, units = 'im
                         {dayLabel(day.date)}
                       </span>
                       <Icon size="1.8em" strokeWidth={1.5} />
-                      {config.showPrecipitation && day.precipProbability != null && day.precipProbability > 0 && (
+                      {config.showPrecipitation && day.precipProbability != null && (
                         <span className="opacity-50 flex items-center gap-0.5" style={{ fontSize: '0.7em' }}>
                           <Droplets size="1em" />{Math.round(day.precipProbability)}%
                         </span>
