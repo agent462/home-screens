@@ -246,31 +246,9 @@ export default function EditorCanvas({ onScaleChange }: { onScaleChange?: (scale
   const displayWidth = config?.settings.displayWidth || DEFAULT_DISPLAY_WIDTH;
   const displayHeight = config?.settings.displayHeight || DEFAULT_DISPLAY_HEIGHT;
   const currentScreen = config?.screens.find((s) => s.id === selectedScreenId);
-  const [rotatingBg, setRotatingBg] = useState<string | null>(null);
-
-  // Fetch background rotation preview
-  useEffect(() => {
-    const rotation = currentScreen?.backgroundRotation;
-    if (!rotation?.enabled || !rotation.query) {
-      setRotatingBg(null);
-      return;
-    }
-
-    let mounted = true;
-    async function fetchBg() {
-      try {
-        const res = await fetch(`/api/unsplash/random?query=${encodeURIComponent(rotation!.query)}`);
-        if (res.ok && mounted) {
-          const data = await res.json();
-          if (data.url) setRotatingBg(data.url);
-        }
-      } catch {
-        // ignore
-      }
-    }
-    fetchBg();
-    return () => { mounted = false; };
-  }, [currentScreen?.id, currentScreen?.backgroundRotation?.enabled, currentScreen?.backgroundRotation?.query]);
+  // Editor always shows the static background image from config.
+  // The display handles live rotation separately — the editor just needs
+  // to show the configured fallback so users see what's actually on the TV.
 
   // Fetch live data for previews
   useEffect(() => {
@@ -340,9 +318,9 @@ export default function EditorCanvas({ onScaleChange }: { onScaleChange?: (scale
         }}
         onClick={() => selectModule(null)}
       >
-        {(currentScreen.backgroundImage || rotatingBg) && (
+        {currentScreen.backgroundImage && (
           <img
-            src={currentScreen.backgroundRotation?.enabled ? (rotatingBg || currentScreen.backgroundImage) : currentScreen.backgroundImage || ''}
+            src={currentScreen.backgroundImage}
             alt=""
             className="absolute inset-0 w-full h-full object-cover"
           />
