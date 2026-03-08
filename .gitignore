@@ -40,6 +40,8 @@ data/config.json
 data/google-tokens.json
 data/client*
 data/backups/
+data/background-cache.json
+data/kiosk.conf
 
 # user-uploaded backgrounds
 public/backgrounds/*

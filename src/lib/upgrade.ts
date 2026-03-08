@@ -12,6 +12,7 @@ export type UpgradeStep =
   | 'install'
   | 'build'
   | 'migrate'
+  | 'setup-system'
   | 'restart'
   | 'health-check'
   | 'cleanup'
@@ -168,12 +169,16 @@ export async function runUpgrade(targetTag: string): Promise<void> {
 
     // Step 9: Pop stash if we stashed
     if (stashed) {
-      emit({ step: 'cleanup', progress: 87, message: 'Restoring local changes...' });
+      emit({ step: 'cleanup', progress: 85, message: 'Restoring local changes...' });
       await runUpgradeScript('stash-pop');
     }
 
-    // Step 10: Restart service
-    emit({ step: 'restart', progress: 90, message: 'Restarting service...' });
+    // Step 10: Apply system-level configuration
+    emit({ step: 'setup-system', progress: 88, message: 'Applying system configuration...' });
+    await runUpgradeScript('setup-system');
+
+    // Step 11: Restart service
+    emit({ step: 'restart', progress: 92, message: 'Restarting service...' });
     const restartOut = await runUpgradeScript('restart');
     const restart = parseResult(restartOut);
 
@@ -183,7 +188,7 @@ export async function runUpgrade(targetTag: string): Promise<void> {
       await runUpgradeScript('health-check');
     }
 
-    // Done
+    // Done — the kiosk browser auto-reloads when it detects the new build ID
     emit({ step: 'complete', progress: 100, message: `Upgrade to ${targetTag} complete!` });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -224,6 +229,9 @@ export async function runRollback(targetTag: string): Promise<void> {
     emit({ step: 'build', progress: 60, message: 'Building application...' });
     await runUpgradeScript('build');
 
+    emit({ step: 'setup-system', progress: 78, message: 'Applying system configuration...' });
+    await runUpgradeScript('setup-system');
+
     emit({ step: 'restart', progress: 85, message: 'Restarting service...' });
     const restartOut = await runUpgradeScript('restart');
     const restart = parseResult(restartOut);
@@ -233,6 +241,7 @@ export async function runRollback(targetTag: string): Promise<void> {
       await runUpgradeScript('health-check');
     }
 
+    // Kiosk browser auto-reloads when it detects the new build ID
     emit({ step: 'complete', progress: 100, message: `Rolled back to ${targetTag} successfully!` });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

@@ -31,12 +31,10 @@ if [ "$(id -u)" -eq 0 ]; then
   error "Don't run this script as root. It will use sudo when needed."
 fi
 
-# --- Step 1: System packages ---
-info "Updating system packages..."
+# --- Step 1: Bootstrap packages (git/curl needed before clone) ---
+info "Installing bootstrap packages..."
 sudo apt-get update -qq
-
-info "Installing required packages..."
-sudo apt-get install -y -qq git curl chromium xdotool unclutter wlr-randr
+sudo apt-get install -y -qq git curl
 
 # --- Step 2: Node.js ---
 if command -v node &>/dev/null; then
@@ -123,33 +121,7 @@ npm run build
 # --- Step 6: Create data directory ---
 mkdir -p data
 
-# --- Step 7: Systemd services ---
-info "Setting up systemd services..."
-
-sudo tee /etc/systemd/system/home-screens.service > /dev/null <<EOF
-[Unit]
-Description=Home Screens Next.js Server
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=${USER}
-WorkingDirectory=${APP_DIR}
-ExecStart=$(which npm) start
-Restart=on-failure
-RestartSec=5
-Environment=NODE_ENV=production
-Environment=PORT=3000
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo systemctl daemon-reload
-sudo systemctl enable home-screens.service
-
-# --- Step 7b: Display orientation ---
+# --- Step 7: Display configuration ---
 echo ""
 echo "  How is your display oriented?"
 echo "  1) Landscape (default, no rotation)"
@@ -167,48 +139,30 @@ case "${ORIENT_CHOICE}" in
   *) WLR_TRANSFORM=""     ;;
 esac
 
-# --- Step 7c: Kiosk autostart (labwc / Wayland) ---
-info "Setting up kiosk autostart..."
-mkdir -p "${HOME}/.config/labwc"
+echo ""
+echo "  Enter display resolution (e.g. 1920x1080, 2560x1440)"
+echo "  Leave blank to use the display's preferred resolution."
+echo ""
+read -rp "  Resolution [auto]: " DISPLAY_RES
 
+DISPLAY_MODE=""
+if [ -n "${DISPLAY_RES}" ]; then
+  # wlr-randr mode format: WxH (it picks the best refresh rate)
+  DISPLAY_MODE="${DISPLAY_RES}"
+  info "Display resolution set to ${DISPLAY_MODE}."
+fi
+
+# Save display config
+KIOSK_CONF="${APP_DIR}/data/kiosk.conf"
+echo "DISPLAY_TRANSFORM=${WLR_TRANSFORM}" > "${KIOSK_CONF}"
+echo "DISPLAY_MODE=${DISPLAY_MODE}" >> "${KIOSK_CONF}"
 if [ -n "${WLR_TRANSFORM}" ]; then
-  cat > "${HOME}/.config/labwc/autostart" <<EOF
-# Home Screens Kiosk - rotate display and launch Chromium fullscreen
-(sleep 2 && wlr-randr --output "$(wlr-randr 2>/dev/null | head -1 | awk '{print $1}' || echo 'HDMI-A-1')" --transform ${WLR_TRANSFORM}) &
-(sleep 10 && chromium --kiosk --noerrdialogs --disable-infobars --no-first-run --disable-session-crashed-bubble --disable-translate --check-for-update-interval=31536000 --password-store=basic --ozone-platform=wayland http://localhost:3000/display) &
-EOF
   info "Display will be rotated ${WLR_TRANSFORM}° on boot."
-else
-  cat > "${HOME}/.config/labwc/autostart" <<'EOF'
-# Home Screens Kiosk - launch Chromium fullscreen after server is ready
-(sleep 10 && chromium --kiosk --noerrdialogs --disable-infobars --no-first-run --disable-session-crashed-bubble --disable-translate --check-for-update-interval=31536000 --password-store=basic --ozone-platform=wayland http://localhost:3000/display) &
-EOF
 fi
 
-# --- Step 8: Disable screen blanking ---
-info "Disabling screen blanking..."
-if [ -f /etc/lightdm/lightdm.conf ]; then
-  sudo sed -i 's/^#xserver-command=.*/xserver-command=X -s 0 -dpms/' /etc/lightdm/lightdm.conf
-fi
-
-sudo mkdir -p /etc/xdg/autostart
-sudo tee /etc/xdg/autostart/disable-screensaver.desktop > /dev/null <<EOF
-[Desktop Entry]
-Type=Application
-Name=Disable Screensaver
-Exec=sh -c "xset s off; xset -dpms; xset s noblank"
-Hidden=false
-NoDisplay=true
-EOF
-
-# --- Step 9: Autologin ---
-info "Configuring autologin..."
-sudo mkdir -p /etc/systemd/system/getty@tty1.service.d
-sudo tee /etc/systemd/system/getty@tty1.service.d/autologin.conf > /dev/null <<EOF
-[Service]
-ExecStart=
-ExecStart=-/sbin/agetty --autologin ${USER} --noclear %I \$TERM
-EOF
+# --- Step 8: System setup (services, kiosk, boot target, autologin) ---
+info "Configuring system..."
+bash "${APP_DIR}/scripts/upgrade.sh" setup-system
 
 # --- Done ---
 echo ""
@@ -219,7 +173,8 @@ echo ""
 echo "  Display URL:  http://$(hostname -I | awk '{print $1}'):3000/display"
 echo "  Editor URL:   http://$(hostname -I | awk '{print $1}'):3000/editor"
 echo ""
-echo "  Services:     home-screens, home-screens-kiosk"
+echo "  Service:      home-screens (Next.js server)"
+echo "  Kiosk:        cage (launches automatically on TTY1)"
 echo "  Config:       ${APP_DIR}/.env.local"
 echo "  Data:         ${APP_DIR}/data/config.json"
 echo ""

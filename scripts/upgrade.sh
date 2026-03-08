@@ -18,6 +18,7 @@ set -euo pipefail
 #   upgrade.sh health-check           - Verify server is responding
 #   upgrade.sh list-backups           - List config backups
 #   upgrade.sh restore-backup <file>  - Restore a config backup
+#   upgrade.sh setup-system            - Apply system config (services, kiosk, boot target)
 
 APP_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BACKUP_DIR="${APP_DIR}/data/backups"
@@ -115,6 +116,44 @@ case "${action}" in
     fi
     ;;
 
+  reload-browser)
+    # Reload the kiosk browser page via Chrome DevTools Protocol.
+    # Requires Chromium to be started with --remote-debugging-port=9222.
+    # Falls back to killing and relaunching Chromium if CDP is not available.
+    CDP_URL="http://localhost:9222"
+    reloaded=false
+
+    # Try CDP reload first (no flicker, instant)
+    if tab_id=$(curl -sf "${CDP_URL}/json" 2>/dev/null \
+        | python3 -c "import sys,json; tabs=json.load(sys.stdin); [print(t['id']) for t in tabs if '/display' in t.get('url','')]" 2>/dev/null \
+        | head -1) && [ -n "${tab_id}" ]; then
+      curl -sf "${CDP_URL}/json/reload/${tab_id}" > /dev/null 2>&1
+      reloaded=true
+      echo "{\"ok\":true,\"method\":\"cdp\"}"
+    fi
+
+    # Fallback: kill and relaunch Chromium
+    if [ "${reloaded}" = false ]; then
+      # Find the Wayland display for the running Chromium
+      WAYLAND_DISPLAY=""
+      CHROMIUM_PID=$(pgrep -f 'chromium.*kiosk' | head -1)
+      if [ -n "${CHROMIUM_PID}" ]; then
+        WAYLAND_DISPLAY=$(tr '\0' '\n' < "/proc/${CHROMIUM_PID}/environ" 2>/dev/null | grep '^WAYLAND_DISPLAY=' | cut -d= -f2)
+      fi
+      WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"
+
+      pkill chromium 2>/dev/null || true
+      sleep 2
+      WAYLAND_DISPLAY="${WAYLAND_DISPLAY}" XDG_RUNTIME_DIR="/run/user/$(id -u)" \
+        nohup chromium --kiosk --noerrdialogs --disable-infobars --no-first-run \
+          --disable-session-crashed-bubble --disable-translate \
+          --check-for-update-interval=31536000 --password-store=basic \
+          --ozone-platform=wayland --remote-debugging-port=9222 \
+          http://localhost:3000/display > /dev/null 2>&1 &
+      echo "{\"ok\":true,\"method\":\"relaunch\"}"
+    fi
+    ;;
+
   rollback)
     # Same as checkout - alias for clarity
     target="${1:-}"
@@ -196,6 +235,153 @@ case "${action}" in
     fi
     cp "${backup_path}" "${CONFIG_FILE}"
     echo "{\"ok\":true,\"restored\":\"${backup_name}\"}"
+    ;;
+
+  setup-system)
+    # Idempotent system-level configuration for the kiosk.
+    # Safe to run on every deploy/upgrade — only changes what's needed.
+    changed=""
+
+    # 0. Ensure required system packages are installed
+    REQUIRED_PACKAGES="chromium cage xdotool unclutter wlr-randr fonts-noto-color-emoji"
+    missing=""
+    for pkg in ${REQUIRED_PACKAGES}; do
+      if ! dpkg -s "${pkg}" &>/dev/null; then
+        missing="${missing} ${pkg}"
+      fi
+    done
+    if [ -n "${missing}" ]; then
+      sudo apt-get update -qq
+      sudo apt-get install -y -qq ${missing}
+      changed="${changed}packages,"
+    fi
+
+    # 1. Ensure systemd services are current
+    NPM_PATH=$(which npm 2>/dev/null || echo "/usr/bin/npm")
+    SERVICE_FILE="/etc/systemd/system/home-screens.service"
+    DESIRED_SERVICE="[Unit]
+Description=Home Screens Next.js Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=${USER}
+WorkingDirectory=${APP_DIR}
+ExecStart=${NPM_PATH} start
+Restart=on-failure
+RestartSec=5
+Environment=NODE_ENV=production
+Environment=PORT=3000
+
+[Install]
+WantedBy=multi-user.target"
+
+    if [ ! -f "${SERVICE_FILE}" ] || [ "$(cat "${SERVICE_FILE}")" != "${DESIRED_SERVICE}" ]; then
+      echo "${DESIRED_SERVICE}" | sudo tee "${SERVICE_FILE}" > /dev/null
+      sudo systemctl daemon-reload
+      sudo systemctl enable home-screens.service
+      changed="${changed}service,"
+    fi
+
+    # 2. Boot to console (required for cage kiosk)
+    CURRENT_DEFAULT=$(systemctl get-default 2>/dev/null || echo "unknown")
+    if [ "${CURRENT_DEFAULT}" != "multi-user.target" ]; then
+      sudo systemctl set-default multi-user.target
+      changed="${changed}boot-target,"
+    fi
+
+    # 3. Disable display managers
+    for dm in lightdm gdm3 sddm; do
+      if systemctl is-enabled "${dm}" &>/dev/null; then
+        sudo systemctl disable "${dm}"
+        changed="${changed}${dm},"
+      fi
+    done
+
+    # 4. Disable legacy kiosk service
+    if systemctl is-enabled home-screens-kiosk &>/dev/null; then
+      sudo systemctl disable home-screens-kiosk
+      changed="${changed}legacy-kiosk,"
+    fi
+
+    # 5. Autologin on TTY1
+    AUTOLOGIN_DIR="/etc/systemd/system/getty@tty1.service.d"
+    AUTOLOGIN_CONF="${AUTOLOGIN_DIR}/autologin.conf"
+    DESIRED_AUTOLOGIN="[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin ${USER} --noclear %I \$TERM"
+
+    if [ ! -f "${AUTOLOGIN_CONF}" ] || [ "$(cat "${AUTOLOGIN_CONF}")" != "${DESIRED_AUTOLOGIN}" ]; then
+      sudo mkdir -p "${AUTOLOGIN_DIR}"
+      echo "${DESIRED_AUTOLOGIN}" | sudo tee "${AUTOLOGIN_CONF}" > /dev/null
+      changed="${changed}autologin,"
+    fi
+
+    # 6. Kiosk launcher script
+    LAUNCHER="${APP_DIR}/scripts/kiosk-launcher.sh"
+    DESIRED_LAUNCHER='#!/usr/bin/env bash
+# Launched inside cage — applies resolution, rotation, then starts Chromium.
+APP_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+KIOSK_CONF="${APP_DIR}/data/kiosk.conf"
+
+# Load display config
+DISPLAY_TRANSFORM=""
+DISPLAY_MODE=""
+[ -f "${KIOSK_CONF}" ] && source "${KIOSK_CONF}"
+
+# Apply resolution and rotation in the background
+if [ -n "${DISPLAY_MODE}" ] || [ -n "${DISPLAY_TRANSFORM}" ]; then
+  OUTPUT=$(wlr-randr 2>/dev/null | head -1 | awk '"'"'{print $1}'"'"' || echo '"'"'HDMI-A-1'"'"')
+  (
+    sleep 1
+    WLR_ARGS="--output ${OUTPUT}"
+    [ -n "${DISPLAY_MODE}" ] && WLR_ARGS="${WLR_ARGS} --mode ${DISPLAY_MODE}"
+    [ -n "${DISPLAY_TRANSFORM}" ] && WLR_ARGS="${WLR_ARGS} --transform ${DISPLAY_TRANSFORM}"
+    wlr-randr ${WLR_ARGS}
+  ) &
+fi
+
+# Launch Chromium (exec replaces this script)
+# --remote-debugging-port enables programmatic page reload after deploys/upgrades
+exec chromium --kiosk \
+  --noerrdialogs \
+  --disable-infobars \
+  --no-first-run \
+  --disable-session-crashed-bubble \
+  --disable-translate \
+  --check-for-update-interval=31536000 \
+  --password-store=basic \
+  --ozone-platform=wayland \
+  --remote-debugging-port=9222 \
+  http://localhost:3000/display'
+
+    if [ ! -f "${LAUNCHER}" ] || [ "$(cat "${LAUNCHER}")" != "${DESIRED_LAUNCHER}" ]; then
+      echo "${DESIRED_LAUNCHER}" > "${LAUNCHER}"
+      chmod +x "${LAUNCHER}"
+      changed="${changed}launcher,"
+    fi
+
+    # 7. Cage auto-launch in .bash_profile
+    PROFILE="${HOME}/.bash_profile"
+    KIOSK_BLOCK="# --- Home Screens Kiosk ---
+if [ \"\$(tty)\" = \"/dev/tty1\" ]; then
+  exec cage -s -- ${APP_DIR}/scripts/kiosk-launcher.sh
+fi
+# --- End Kiosk ---"
+
+    if ! grep -q "Home Screens Kiosk" "${PROFILE}" 2>/dev/null; then
+      echo "${KIOSK_BLOCK}" >> "${PROFILE}"
+      changed="${changed}bash-profile,"
+    fi
+
+    # Remove trailing comma
+    changed="${changed%,}"
+    if [ -n "${changed}" ]; then
+      echo "{\"ok\":true,\"changed\":\"${changed}\"}"
+    else
+      echo "{\"ok\":true,\"changed\":null}"
+    fi
     ;;
 
   *)

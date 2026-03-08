@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Rotate the display on Raspberry Pi (Wayland/labwc).
+# Rotate the display on Raspberry Pi (Wayland/cage or labwc).
 #
 # Usage:
 #   bash scripts/rotate-display.sh          # interactive
@@ -41,17 +41,23 @@ else
   info "Display rotated ${ANGLE}°."
 fi
 
-# Persist in labwc autostart
+# Persist in kiosk.conf (used by cage kiosk launcher)
+APP_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+KIOSK_CONF="${APP_DIR}/data/kiosk.conf"
+
+if [ "${ANGLE}" = "0" ]; then
+  echo "DISPLAY_TRANSFORM=" > "${KIOSK_CONF}"
+  info "Rotation cleared. Will take effect on next reboot."
+else
+  echo "DISPLAY_TRANSFORM=${ANGLE}" > "${KIOSK_CONF}"
+  info "Rotation persisted. Will take effect on next reboot."
+fi
+
+# Also update labwc autostart if it exists (legacy support)
 AUTOSTART="${HOME}/.config/labwc/autostart"
 if [ -f "${AUTOSTART}" ]; then
-  # Remove any existing wlr-randr lines
   sed -i '/wlr-randr/d' "${AUTOSTART}"
-
   if [ "${ANGLE}" != "0" ]; then
-    # Insert rotation before the chromium line
     sed -i "/chromium/i (sleep 2 && wlr-randr --output \"${OUTPUT}\" --transform ${ANGLE}) &" "${AUTOSTART}"
-    info "Rotation persisted in ${AUTOSTART}."
-  else
-    info "Rotation removed from ${AUTOSTART}."
   fi
 fi
