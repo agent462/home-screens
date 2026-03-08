@@ -1,9 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import type { Screen, GlobalSettings } from '@/types/config';
+import type { Screen, GlobalSettings, ScreenConfiguration } from '@/types/config';
 import ScreenRenderer from './ScreenRenderer';
+
+/** How often the display polls for config changes (ms) */
+const CONFIG_POLL_MS = 3_000;
 
 interface ScreenRotatorProps {
   screens: Screen[];
@@ -48,7 +51,50 @@ function useBackgroundRotation(screens: Screen[]) {
   return backgrounds;
 }
 
-export default function ScreenRotator({ screens, settings }: ScreenRotatorProps) {
+/**
+ * Poll /api/config and return live screens + settings, falling back to
+ * the server-rendered props until the first successful fetch.
+ */
+function useLiveConfig(initialScreens: Screen[], initialSettings: GlobalSettings) {
+  const [screens, setScreens] = useState(initialScreens);
+  const [settings, setSettings] = useState(initialSettings);
+  const configJsonRef = useRef<string>('');
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function poll() {
+      try {
+        const res = await fetch('/api/config');
+        if (!res.ok || !mounted) return;
+        const text = await res.text();
+        // Only update state when the JSON actually changed
+        if (text !== configJsonRef.current) {
+          configJsonRef.current = text;
+          const cfg: ScreenConfiguration = JSON.parse(text);
+          if (cfg.screens && cfg.settings) {
+            setScreens(cfg.screens);
+            setSettings(cfg.settings);
+          }
+        }
+      } catch {
+        // keep current config on failure
+      }
+    }
+
+    poll();
+    const id = setInterval(poll, CONFIG_POLL_MS);
+    return () => {
+      mounted = false;
+      clearInterval(id);
+    };
+  }, []);
+
+  return { screens, settings };
+}
+
+export default function ScreenRotator({ screens: initialScreens, settings: initialSettings }: ScreenRotatorProps) {
+  const { screens, settings } = useLiveConfig(initialScreens, initialSettings);
   const [currentIndex, setCurrentIndex] = useState(0);
   const rotatingBackgrounds = useBackgroundRotation(screens);
 

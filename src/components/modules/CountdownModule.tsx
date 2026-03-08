@@ -90,7 +90,7 @@ export default function CountdownModule({ config, style }: CountdownModuleProps)
 
   return (
     <ModuleWrapper style={style}>
-      <div className="flex flex-col h-full overflow-y-auto" style={{ gap: `${1.2 * scale}em` }}>
+      <div className="flex flex-col h-full overflow-hidden" style={{ gap: `${1.2 * scale}em` }}>
         {events.length === 0 ? (
           <p className="opacity-50" style={{ fontSize: '0.875em' }}>No upcoming events</p>
         ) : (

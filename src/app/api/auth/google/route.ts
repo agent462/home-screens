@@ -1,9 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUrl } from '@/lib/google-auth';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const url = getAuthUrl();
+    const url = getAuthUrl(request.url);
     return NextResponse.redirect(url);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to start auth';

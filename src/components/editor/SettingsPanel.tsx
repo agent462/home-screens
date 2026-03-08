@@ -45,6 +45,13 @@ export default function SettingsPanel({ onClose }: { onClose: () => void }) {
   const [googleCalendars, setGoogleCalendars] = useState<GoogleCalendar[]>([]);
   const [googleLoading, setGoogleLoading] = useState(true);
 
+  // Device flow state
+  const [deviceCode, setDeviceCode] = useState<string | null>(null);
+  const [userCode, setUserCode] = useState<string | null>(null);
+  const [verificationUrl, setVerificationUrl] = useState<string | null>(null);
+  const [deviceFlowError, setDeviceFlowError] = useState<string | null>(null);
+  const [deviceFlowPolling, setDeviceFlowPolling] = useState(false);
+
   const fetchCalendars = useCallback(async () => {
     try {
       const res = await fetch('/api/calendars');
@@ -89,6 +96,65 @@ export default function SettingsPanel({ onClose }: { onClose: () => void }) {
     setGoogleConnected(false);
     setGoogleCalendars([]);
     setSelectedCalendarIds([]);
+  }
+
+  async function startDeviceFlow() {
+    setDeviceFlowError(null);
+    setUserCode(null);
+    try {
+      const res = await fetch('/api/auth/google/device', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to start device flow');
+      setDeviceCode(data.device_code);
+      setUserCode(data.user_code);
+      setVerificationUrl(data.verification_url);
+      setDeviceFlowPolling(true);
+      pollForToken(data.device_code, data.interval || 5, data.expires_in || 1800);
+    } catch (err) {
+      setDeviceFlowError(err instanceof Error ? err.message : 'Failed to start sign-in');
+    }
+  }
+
+  async function pollForToken(code: string, interval: number, expiresIn: number) {
+    const deadline = Date.now() + expiresIn * 1000;
+    const pollInterval = Math.max(interval, 5) * 1000; // respect Google's minimum
+
+    const poll = async () => {
+      if (Date.now() > deadline) {
+        setDeviceFlowPolling(false);
+        setDeviceFlowError('Code expired. Please try again.');
+        setUserCode(null);
+        return;
+      }
+      try {
+        const res = await fetch('/api/auth/google/device', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ device_code: code }),
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+          setDeviceFlowPolling(false);
+          setUserCode(null);
+          setDeviceCode(null);
+          setGoogleConnected(true);
+          await fetchCalendars();
+          return;
+        }
+        if (data.status === 'pending') {
+          setTimeout(poll, pollInterval);
+          return;
+        }
+        // expired or denied
+        setDeviceFlowPolling(false);
+        setDeviceFlowError(data.error || 'Authorization failed');
+        setUserCode(null);
+      } catch {
+        setTimeout(poll, pollInterval);
+      }
+    };
+
+    setTimeout(poll, pollInterval);
   }
 
   async function lookupLocation() {
@@ -476,16 +542,49 @@ export default function SettingsPanel({ onClose }: { onClose: () => void }) {
                   )}
                 </>
               ) : (
-                <div className="space-y-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => window.open('/api/auth/google', '_self')}
-                  >
-                    Sign in with Google
-                  </Button>
+                <div className="space-y-3">
+                  {userCode && verificationUrl ? (
+                    <div className="space-y-3">
+                      <p className="text-xs text-neutral-400">
+                        Open the link below on your phone or computer, then enter the code:
+                      </p>
+                      <div className="flex items-center gap-3">
+                        <a
+                          href={verificationUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-400 hover:text-blue-300 underline"
+                        >
+                          {verificationUrl}
+                        </a>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <code className="text-2xl font-bold tracking-widest text-neutral-100 bg-neutral-800 border border-neutral-600 rounded-lg px-4 py-2">
+                          {userCode}
+                        </code>
+                        {deviceFlowPolling && (
+                          <span className="text-xs text-neutral-500 animate-pulse">
+                            Waiting for authorization...
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={startDeviceFlow}
+                      disabled={deviceFlowPolling}
+                    >
+                      Sign in with Google
+                    </Button>
+                  )}
+                  {deviceFlowError && (
+                    <p className="text-xs text-red-400">{deviceFlowError}</p>
+                  )}
                   <p className="text-xs text-neutral-500">
-                    Sign in to automatically see your calendars. No API keys or calendar IDs needed.
+                    Sign in to automatically see your calendars. Requires a Google OAuth client
+                    of type &quot;TVs and Limited Input devices&quot; in the Cloud Console.
                   </p>
                 </div>
               )}

@@ -5,22 +5,104 @@ import path from 'path';
 const TOKENS_PATH = path.join(process.cwd(), 'data', 'google-tokens.json');
 const SCOPES = ['https://www.googleapis.com/auth/calendar.readonly'];
 
-function getRedirectUri() {
+// ── Device Flow ──────────────────────────────────────────────────────
+// Google's device authorization endpoint (no redirect URI needed)
+const DEVICE_CODE_URL = 'https://oauth2.googleapis.com/device/code';
+const TOKEN_URL = 'https://oauth2.googleapis.com/token';
+
+export interface DeviceCodeResponse {
+  device_code: string;
+  user_code: string;
+  verification_url: string;
+  expires_in: number;
+  interval: number;
+}
+
+/** Request a device code + user code from Google. */
+export async function requestDeviceCode(): Promise<DeviceCodeResponse> {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  if (!clientId) throw new Error('GOOGLE_CLIENT_ID must be set');
+
+  const res = await fetch(DEVICE_CODE_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: clientId,
+      scope: SCOPES.join(' '),
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error_description || err.error || 'Failed to request device code');
+  }
+
+  return res.json();
+}
+
+/** Poll Google's token endpoint for a device code grant. */
+export async function pollDeviceToken(
+  deviceCode: string,
+): Promise<{ status: 'pending' | 'success' | 'expired' | 'denied'; error?: string }> {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  if (!clientId || !clientSecret) throw new Error('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set');
+
+  const res = await fetch(TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      device_code: deviceCode,
+      grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+    }),
+  });
+
+  const data = await res.json();
+
+  if (res.ok && data.access_token) {
+    // Success — save tokens
+    await writeFile(TOKENS_PATH, JSON.stringify(data, null, 2));
+    return { status: 'success' };
+  }
+
+  // Handle known polling states
+  if (data.error === 'authorization_pending' || data.error === 'slow_down') {
+    return { status: 'pending' };
+  }
+  if (data.error === 'expired_token') {
+    return { status: 'expired', error: 'Code expired. Please try again.' };
+  }
+  if (data.error === 'access_denied') {
+    return { status: 'denied', error: 'Access was denied.' };
+  }
+
+  return { status: 'denied', error: data.error_description || data.error || 'Unknown error' };
+}
+
+function getRedirectUri(requestUrl?: string) {
+  // Derive base URL from the incoming request so OAuth works regardless
+  // of whether the user accesses via localhost, LAN IP, or hostname.
+  if (requestUrl) {
+    const url = new URL(requestUrl);
+    return `${url.protocol}//${url.host}/api/auth/google/callback`;
+  }
   const base = process.env.NEXTAUTH_URL || 'http://localhost:3000';
   return `${base}/api/auth/google/callback`;
 }
 
-function createOAuth2Client() {
+function createOAuth2Client(requestUrl?: string) {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
     throw new Error('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set');
   }
-  return new google.auth.OAuth2(clientId, clientSecret, getRedirectUri());
+  return new google.auth.OAuth2(clientId, clientSecret, getRedirectUri(requestUrl));
 }
 
-export function getAuthUrl(): string {
-  const client = createOAuth2Client();
+export function getAuthUrl(requestUrl?: string): string {
+  const client = createOAuth2Client(requestUrl);
   return client.generateAuthUrl({
     access_type: 'offline',
     prompt: 'consent',
@@ -28,8 +110,8 @@ export function getAuthUrl(): string {
   });
 }
 
-export async function handleCallback(code: string) {
-  const client = createOAuth2Client();
+export async function handleCallback(code: string, requestUrl?: string) {
+  const client = createOAuth2Client(requestUrl);
   const { tokens } = await client.getToken(code);
   await writeFile(TOKENS_PATH, JSON.stringify(tokens, null, 2));
   return tokens;

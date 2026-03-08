@@ -118,7 +118,7 @@ export default function CalendarModule({ config, style, events }: CalendarModule
               </div>
 
               {/* Event list */}
-              <div className="flex flex-col gap-1.5 overflow-y-auto flex-1">
+              <div className="flex flex-col gap-1.5 overflow-hidden flex-1">
                 {dayEvents.length === 0 ? (
                   <div
                     className="flex items-center justify-center rounded-lg px-2.5 py-3"

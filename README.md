@@ -44,13 +44,25 @@ Then visit:
 
 | Variable | Description | Required |
 |---|---|---|
-| `NEXTAUTH_URL` | App URL for OAuth redirect (default `http://localhost:3000`) | For calendar |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID (for calendar) | For calendar |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | For calendar |
 | `OPENWEATHERMAP_API_KEY` | OpenWeatherMap API key (fallback if not set in editor) | Optional |
 | `WEATHERAPI_KEY` | WeatherAPI.com API key (fallback if not set in editor) | Optional |
 
 Weather API keys can be configured either in `.env.local` or through the editor UI (Settings > Weather). The editor config takes priority.
+
+## Google Calendar Setup
+
+Google Calendar uses the **OAuth 2.0 Device Flow**, which means you can authorize from any device on your network — no redirect URI or public domain required. This is ideal for a kiosk display.
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com) → **APIs & Services → Credentials**
+2. Click **Create Credentials → OAuth Client ID**
+3. Application type: **TVs and Limited Input devices**
+4. Name it anything (e.g. "Home Screen Display")
+5. Copy the **Client ID** and **Client Secret** into your `.env.local`
+6. Enable the **Google Calendar API** at APIs & Services → Library → search "Google Calendar API" → Enable
+7. In the editor, go to Settings → Google Calendar → **Sign in with Google**
+8. You'll see a code and a link to `google.com/device` — open that link on your phone or computer, enter the code, and grant access
 
 ## Raspberry Pi Install
 
