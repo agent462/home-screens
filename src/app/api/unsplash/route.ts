@@ -1,21 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readConfig } from '@/lib/config';
+import path from 'path';
+import { BACKGROUNDS_DIR } from '@/lib/constants';
+import { UNSPLASH_API, getUnsplashAccessKey, trackDownload } from '@/lib/unsplash';
 
-const UNSPLASH_API = 'https://api.unsplash.com';
-
-async function getAccessKey(): Promise<string | null> {
-  // Check env first, then config
-  if (process.env.UNSPLASH_ACCESS_KEY) return process.env.UNSPLASH_ACCESS_KEY;
-  try {
-    const config = await readConfig();
-    return config.settings.unsplashAccessKey || null;
-  } catch {
-    return null;
-  }
-}
+const BGS = path.join(process.cwd(), BACKGROUNDS_DIR);
 
 export async function GET(request: NextRequest) {
-  const accessKey = await getAccessKey();
+  const accessKey = await getUnsplashAccessKey();
   if (!accessKey) {
     return NextResponse.json(
       { error: 'Unsplash API key not configured. Add it in Settings.' },
@@ -75,7 +66,7 @@ export async function GET(request: NextRequest) {
 
 // POST to download an image and save it locally as a background
 export async function POST(request: NextRequest) {
-  const accessKey = await getAccessKey();
+  const accessKey = await getUnsplashAccessKey();
 
   const body = await request.json();
   const { imageUrl, downloadUrl, filename } = body as {
@@ -90,9 +81,7 @@ export async function POST(request: NextRequest) {
 
   // Trigger Unsplash download tracking (required by their API guidelines)
   if (downloadUrl && accessKey) {
-    fetch(downloadUrl, {
-      headers: { Authorization: `Client-ID ${accessKey}` },
-    }).catch(() => {});
+    trackDownload(downloadUrl, accessKey);
   }
 
   try {
@@ -105,12 +94,10 @@ export async function POST(request: NextRequest) {
     const ext = contentType.includes('png') ? '.png' : contentType.includes('webp') ? '.webp' : '.jpg';
     const safeName = (filename || `unsplash-${Date.now()}`).replace(/[^a-zA-Z0-9._-]/g, '_') + ext;
 
-    // Save to public/backgrounds
+    // Save to backgrounds directory
     const { promises: fs } = await import('fs');
-    const path = await import('path');
-    const dir = path.join(process.cwd(), 'public/backgrounds');
-    await fs.mkdir(dir, { recursive: true });
-    await fs.writeFile(path.join(dir, safeName), buffer);
+    await fs.mkdir(BGS, { recursive: true });
+    await fs.writeFile(path.join(BGS, safeName), buffer);
 
     return NextResponse.json({ path: `/backgrounds/${safeName}` }, { status: 201 });
   } catch (error) {

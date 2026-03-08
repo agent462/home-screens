@@ -1,9 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { runUpgrade, isUpgradeRunning } from '@/lib/upgrade';
 
 export const dynamic = 'force-dynamic';
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   if (isUpgradeRunning()) {
     return NextResponse.json(
       { error: 'An upgrade is already in progress' },

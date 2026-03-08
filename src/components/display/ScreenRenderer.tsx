@@ -4,35 +4,7 @@ import { useEffect, useState } from 'react';
 import type { Screen, GlobalSettings } from '@/types/config';
 import { DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT, WEATHER_REFRESH_MS, CALENDAR_REFRESH_MS } from '@/lib/constants';
 import { moduleComponents } from '@/lib/module-components';
-
-function useFetchData<T>(url: string, refreshMs: number): T | null {
-  const [data, setData] = useState<T | null>(null);
-
-  useEffect(() => {
-    if (!url) { setData(null); return; }
-    let mounted = true;
-
-    async function fetchData() {
-      try {
-        const res = await fetch(url);
-        if (res.ok && mounted) {
-          setData(await res.json());
-        }
-      } catch {
-        // silently retry on next interval
-      }
-    }
-
-    fetchData();
-    const interval = setInterval(fetchData, refreshMs);
-    return () => {
-      mounted = false;
-      clearInterval(interval);
-    };
-  }, [url, refreshMs]);
-
-  return data;
-}
+import { useFetchData } from '@/hooks/useFetchData';
 
 interface ScreenRendererProps {
   screen: Screen;

@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { readConfig } from '@/lib/config';
+import { BACKGROUNDS_DIR } from '@/lib/constants';
+import { getUnsplashAccessKey, trackDownload } from '@/lib/unsplash';
 
 const CACHE_FILE = path.join(process.cwd(), 'data', 'background-cache.json');
-const BACKGROUNDS_DIR = path.join(process.cwd(), 'public', 'backgrounds');
+
+const BGS = path.join(process.cwd(), BACKGROUNDS_DIR);
 
 interface CacheEntry {
   path: string;
@@ -29,16 +32,6 @@ async function writeCache(cache: BackgroundCache): Promise<void> {
   await fs.writeFile(CACHE_FILE, JSON.stringify(cache, null, 2), 'utf-8');
 }
 
-async function getAccessKey(): Promise<string | null> {
-  if (process.env.UNSPLASH_ACCESS_KEY) return process.env.UNSPLASH_ACCESS_KEY;
-  try {
-    const config = await readConfig();
-    return config.settings.unsplashAccessKey || null;
-  } catch {
-    return null;
-  }
-}
-
 async function fetchAndSavePhoto(query: string, accessKey: string): Promise<string | null> {
   // Fetch random photo metadata from Unsplash
   const res = await fetch(
@@ -55,9 +48,7 @@ async function fetchAndSavePhoto(query: string, accessKey: string): Promise<stri
   // Trigger download tracking (required by Unsplash API terms)
   const downloadLocation = photo.links?.download_location;
   if (downloadLocation) {
-    fetch(downloadLocation, {
-      headers: { Authorization: `Client-ID ${accessKey}` },
-    }).catch(() => {});
+    trackDownload(downloadLocation, accessKey);
   }
 
   // Download and save locally
@@ -67,9 +58,9 @@ async function fetchAndSavePhoto(query: string, accessKey: string): Promise<stri
   const buffer = Buffer.from(await imgRes.arrayBuffer());
   const ext = 'jpg';
   const filename = `unsplash-${photoId}.${ext}`;
-  const filePath = path.join(BACKGROUNDS_DIR, filename);
+  const filePath = path.join(BGS, filename);
 
-  await fs.mkdir(BACKGROUNDS_DIR, { recursive: true });
+  await fs.mkdir(BGS, { recursive: true });
   await fs.writeFile(filePath, buffer);
 
   return `/api/backgrounds/serve?file=${encodeURIComponent(filename)}`;
@@ -117,7 +108,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Need to fetch a new background
-  const accessKey = await getAccessKey();
+  const accessKey = await getUnsplashAccessKey();
   if (!accessKey) {
     // No API key — return cached or static fallback
     return NextResponse.json({ path: entry?.path || screen.backgroundImage || null });

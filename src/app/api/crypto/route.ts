@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { errorResponse } from '@/lib/api-utils';
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const idsParam = searchParams.get('ids') || 'bitcoin,ethereum';
+    const idsParam = request.nextUrl.searchParams.get('ids') || 'bitcoin,ethereum';
     const ids = idsParam.split(',').map((s) => s.trim()).filter(Boolean).join(',');
 
     const url = `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(ids)}&vs_currencies=usd&include_24hr_change=true`;
@@ -24,7 +24,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ prices });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to fetch crypto prices';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(error, 'Failed to fetch crypto prices');
   }
 }

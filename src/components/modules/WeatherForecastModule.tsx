@@ -1,28 +1,17 @@
 'use client';
 
-import { useRef, useState, useEffect, useCallback } from 'react';
 import { format, isToday, isTomorrow } from 'date-fns';
 import { CloudRain, Droplets, Wind } from 'lucide-react';
 import type { WeatherForecastConfig, ModuleStyle } from '@/types/config';
+import type { ForecastDay } from '@/lib/weather';
 import { getWeatherIcon } from '@/lib/weather-icons';
+import { useScaledFontSize } from '@/hooks/useScaledFontSize';
 import ModuleWrapper from './ModuleWrapper';
-
-export interface DayForecast {
-  date: string;
-  icon: string;
-  high: number;
-  low: number;
-  description: string;
-  precipProbability?: number;
-  precipAmount?: number;
-  humidity?: number;
-  windSpeed?: number;
-}
 
 interface WeatherForecastModuleProps {
   config: WeatherForecastConfig;
   style: ModuleStyle;
-  data?: DayForecast[];
+  data?: ForecastDay[];
   units?: 'metric' | 'imperial';
 }
 
@@ -36,23 +25,7 @@ function dayLabel(dateStr: string): string {
 export default function WeatherForecastModule({ config, style, data, units = 'imperial' }: WeatherForecastModuleProps) {
   const days = (data ?? []).slice(0, config.daysToShow);
   const windUnit = units === 'metric' ? 'km/h' : 'mph';
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [scaledFontSize, setScaledFontSize] = useState<number>(style.fontSize);
-
-  const updateFontSize = useCallback(() => {
-    if (containerRef.current) {
-      const h = containerRef.current.clientHeight;
-      setScaledFontSize(Math.max(style.fontSize, h * 0.12));
-    }
-  }, [style.fontSize]);
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(updateFontSize);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [updateFontSize]);
+  const { containerRef, scaledFontSize } = useScaledFontSize(style.fontSize, 0.12);
 
   const showHighLow = config.showHighLow !== false;
 

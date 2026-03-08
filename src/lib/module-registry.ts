@@ -17,7 +17,7 @@ export interface ModuleDefinition {
 
 const registry = new Map<ModuleType, ModuleDefinition>();
 
-export function registerModule(definition: ModuleDefinition): void {
+function registerModule(definition: ModuleDefinition): void {
   registry.set(definition.type, definition);
 }
 

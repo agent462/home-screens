@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createWeatherProvider } from '@/lib/weather';
 import { readConfig } from '@/lib/config';
+import { errorResponse } from '@/lib/api-utils';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -46,7 +49,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ hourly, forecast });
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to fetch weather';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(error, 'Failed to fetch weather');
   }
 }

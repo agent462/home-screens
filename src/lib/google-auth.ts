@@ -10,7 +10,7 @@ const SCOPES = ['https://www.googleapis.com/auth/calendar.readonly'];
 const DEVICE_CODE_URL = 'https://oauth2.googleapis.com/device/code';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 
-export interface DeviceCodeResponse {
+interface DeviceCodeResponse {
   device_code: string;
   user_code: string;
   verification_url: string;

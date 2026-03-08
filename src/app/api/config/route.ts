@@ -1,18 +1,20 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { readConfig, writeConfig } from '@/lib/config';
+import { errorResponse } from '@/lib/api-utils';
 import type { ScreenConfiguration } from '@/types/config';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
     const config = await readConfig();
     return NextResponse.json(config);
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to read config';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(error, 'Failed to read config');
   }
 }
 
-export async function PUT(request: Request) {
+export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
     if (!body || !Array.isArray(body.screens) || !body.settings) {
@@ -25,7 +27,6 @@ export async function PUT(request: Request) {
     await writeConfig(config);
     return NextResponse.json(config);
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to write config';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(error, 'Failed to write config');
   }
 }

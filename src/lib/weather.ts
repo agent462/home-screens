@@ -1,12 +1,14 @@
+// ── Public types ─────────────────────────────────────────────────────
+
 export interface HourlyWeather {
   time: string;
   temp: number;
-  feelsLike: number;
-  humidity: number;
+  feelsLike?: number;
+  humidity?: number;
   icon: string;
   description: string;
-  windSpeed: number;
-  precipProbability: number;
+  windSpeed?: number;
+  precipProbability?: number;
 }
 
 export interface ForecastDay {
@@ -15,16 +17,153 @@ export interface ForecastDay {
   low: number;
   icon: string;
   description: string;
-  precipProbability: number;
-  precipAmount: number;
-  humidity: number;
-  windSpeed: number;
+  precipProbability?: number;
+  precipAmount?: number;
+  humidity?: number;
+  windSpeed?: number;
 }
 
 export interface WeatherProvider {
   getHourly(lat: number, lon: number, units: string): Promise<HourlyWeather[]>;
   getForecast(lat: number, lon: number, units: string): Promise<ForecastDay[]>;
 }
+
+// ── OpenWeatherMap API response types ────────────────────────────────
+
+interface OWMWeatherEntry {
+  id: number;
+  main: string;
+  description: string;
+  icon: string;
+}
+
+interface OWMMain {
+  temp: number;
+  feels_like: number;
+  humidity: number;
+  temp_min: number;
+  temp_max: number;
+  pressure: number;
+}
+
+interface OWMWind {
+  speed: number;
+  deg: number;
+}
+
+interface OWMCurrentResponse {
+  dt: number;
+  main: OWMMain;
+  weather: OWMWeatherEntry[];
+  wind: OWMWind;
+}
+
+interface OWMForecastEntry {
+  dt: number;
+  main: OWMMain;
+  weather: OWMWeatherEntry[];
+  wind: OWMWind;
+  pop: number;
+  rain?: { '3h'?: number };
+}
+
+interface OWMForecastResponse {
+  list: OWMForecastEntry[];
+}
+
+// ── WeatherAPI response types ────────────────────────────────────────
+
+interface WACondition {
+  text: string;
+  code: number;
+}
+
+interface WAHour {
+  time: string;
+  time_epoch: number;
+  temp_c: number;
+  temp_f: number;
+  feelslike_c: number;
+  feelslike_f: number;
+  humidity: number;
+  wind_kph: number;
+  wind_mph: number;
+  condition: WACondition;
+  chance_of_rain: number;
+}
+
+interface WADay {
+  maxtemp_c: number;
+  maxtemp_f: number;
+  mintemp_c: number;
+  mintemp_f: number;
+  avghumidity: number;
+  maxwind_kph: number;
+  maxwind_mph: number;
+  totalprecip_mm: number;
+  totalprecip_in: number;
+  daily_chance_of_rain: number;
+  condition: WACondition;
+}
+
+interface WAForecastDay {
+  date: string;
+  day: WADay;
+  hour: WAHour[];
+}
+
+interface WAForecastResponse {
+  current: { is_day: number };
+  forecast: { forecastday: WAForecastDay[] };
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────
+
+interface DayAccumulator {
+  temps: number[];
+  icons: string[];
+  descs: string[];
+  humidity: number[];
+  wind: number[];
+  pop: number[];
+  rain: number;
+}
+
+function groupByDate(entries: OWMForecastEntry[]): Map<string, DayAccumulator> {
+  const dayMap = new Map<string, DayAccumulator>();
+  for (const entry of entries) {
+    const date = new Date(entry.dt * 1000).toISOString().split('T')[0];
+    if (!dayMap.has(date)) {
+      dayMap.set(date, { temps: [], icons: [], descs: [], humidity: [], wind: [], pop: [], rain: 0 });
+    }
+    const day = dayMap.get(date)!;
+    day.temps.push(entry.main.temp);
+    day.humidity.push(entry.main.humidity);
+    day.wind.push(entry.wind?.speed ?? 0);
+    day.pop.push((entry.pop ?? 0) * 100);
+    day.rain += entry.rain?.['3h'] ?? 0;
+    const weather = entry.weather?.[0];
+    day.icons.push(weather?.icon ?? '');
+    day.descs.push(weather?.description ?? '');
+  }
+  return dayMap;
+}
+
+function aggregateDay(date: string, day: DayAccumulator, units: string, mapIcon: (icon: string) => string): ForecastDay {
+  return {
+    date,
+    high: Math.round(Math.max(...day.temps)),
+    low: Math.round(Math.min(...day.temps)),
+    icon: mapIcon(day.icons[Math.floor(day.icons.length / 2)] ?? ''),
+    description: day.descs[Math.floor(day.descs.length / 2)] ?? '',
+    precipProbability: Math.round(Math.max(...day.pop)),
+    precipAmount: units === 'imperial' ? Math.round(day.rain / 25.4 * 100) / 100 : Math.round(day.rain * 10) / 10,
+    humidity: Math.round(day.humidity.reduce((a, b) => a + b, 0) / day.humidity.length),
+    windSpeed: Math.round(day.wind.reduce((a, b) => a + b, 0) / day.wind.length),
+  };
+}
+
+// ── OpenWeatherMap provider ──────────────────────────────────────────
 
 export class OpenWeatherMapProvider implements WeatherProvider {
   private apiKey: string;
@@ -36,7 +175,6 @@ export class OpenWeatherMapProvider implements WeatherProvider {
   }
 
   async getHourly(lat: number, lon: number, units: string): Promise<HourlyWeather[]> {
-    // Fetch current weather and 3-hour forecast in parallel
     const [currentRes, forecastRes] = await Promise.all([
       fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=${units}&appid=${this.apiKey}`),
       fetch(`https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&units=${units}&cnt=8&appid=${this.apiKey}`),
@@ -49,77 +187,47 @@ export class OpenWeatherMapProvider implements WeatherProvider {
       const body = await forecastRes.text();
       throw new Error(`OpenWeatherMap API error ${forecastRes.status}: ${body}`);
     }
-    const [currentData, forecastData] = await Promise.all([currentRes.json(), forecastRes.json()]);
+    const currentData: OWMCurrentResponse = await currentRes.json();
+    const forecastData: OWMForecastResponse = await forecastRes.json();
 
-    // Current conditions as the first entry
     const current: HourlyWeather = {
-      time: new Date((currentData.dt as number) * 1000).toISOString(),
-      temp: (currentData.main as Record<string, number>)?.temp ?? 0,
-      feelsLike: (currentData.main as Record<string, number>)?.feels_like ?? 0,
-      humidity: (currentData.main as Record<string, number>)?.humidity ?? 0,
-      icon: this.mapIcon((currentData.weather as Array<Record<string, unknown>>)?.[0]?.icon as string ?? ''),
-      description: (currentData.weather as Array<Record<string, unknown>>)?.[0]?.description as string ?? '',
-      windSpeed: (currentData.wind as Record<string, number>)?.speed ?? 0,
+      time: new Date(currentData.dt * 1000).toISOString(),
+      temp: currentData.main.temp,
+      feelsLike: currentData.main.feels_like,
+      humidity: currentData.main.humidity,
+      icon: this.mapIcon(currentData.weather[0]?.icon ?? ''),
+      description: currentData.weather[0]?.description ?? '',
+      windSpeed: currentData.wind.speed,
       precipProbability: 0,
     };
 
-    // 3-hour forecast entries
-    const forecast = (forecastData.list ?? []).map((h: Record<string, unknown>) => ({
-      time: new Date((h.dt as number) * 1000).toISOString(),
-      temp: (h.main as Record<string, number>)?.temp ?? 0,
-      feelsLike: (h.main as Record<string, number>)?.feels_like ?? 0,
-      humidity: (h.main as Record<string, number>)?.humidity ?? 0,
-      icon: this.mapIcon((h.weather as Array<Record<string, unknown>>)?.[0]?.icon as string ?? ''),
-      description: (h.weather as Array<Record<string, unknown>>)?.[0]?.description as string ?? '',
-      windSpeed: (h.wind as Record<string, number>)?.speed ?? 0,
-      precipProbability: ((h.pop as number) ?? 0) * 100,
+    const forecast = forecastData.list.map((h) => ({
+      time: new Date(h.dt * 1000).toISOString(),
+      temp: h.main.temp,
+      feelsLike: h.main.feels_like,
+      humidity: h.main.humidity,
+      icon: this.mapIcon(h.weather[0]?.icon ?? ''),
+      description: h.weather[0]?.description ?? '',
+      windSpeed: h.wind.speed,
+      precipProbability: (h.pop ?? 0) * 100,
     }));
 
     return [current, ...forecast];
   }
 
   async getForecast(lat: number, lon: number, units: string): Promise<ForecastDay[]> {
-    // Use free 2.5 forecast endpoint, aggregate 5-day/3-hour into daily
     const url = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&units=${units}&appid=${this.apiKey}`;
     const res = await fetch(url);
     if (!res.ok) {
       const body = await res.text();
       throw new Error(`OpenWeatherMap API error ${res.status}: ${body}`);
     }
-    const data = await res.json();
-
-    // Group 3-hour entries by date, compute daily high/low
-    const dayMap = new Map<string, { temps: number[]; icons: string[]; descs: string[]; humidity: number[]; wind: number[]; pop: number[]; rain: number }>();
-    for (const entry of data.list ?? []) {
-      const date = new Date((entry.dt as number) * 1000).toISOString().split('T')[0];
-      if (!dayMap.has(date)) {
-        dayMap.set(date, { temps: [], icons: [], descs: [], humidity: [], wind: [], pop: [], rain: 0 });
-      }
-      const day = dayMap.get(date)!;
-      const main = entry.main as Record<string, number>;
-      day.temps.push(main.temp);
-      day.humidity.push(main.humidity);
-      day.wind.push((entry.wind as Record<string, number>)?.speed ?? 0);
-      day.pop.push(((entry.pop as number) ?? 0) * 100);
-      day.rain += (entry.rain as Record<string, number>)?.['3h'] ?? 0;
-      const weather = (entry.weather as Array<Record<string, unknown>>)?.[0];
-      day.icons.push(weather?.icon as string ?? '');
-      day.descs.push(weather?.description as string ?? '');
-    }
+    const data: OWMForecastResponse = await res.json();
+    const dayMap = groupByDate(data.list ?? []);
 
     const days: ForecastDay[] = [];
     for (const [date, day] of dayMap) {
-      days.push({
-        date,
-        high: Math.round(Math.max(...day.temps)),
-        low: Math.round(Math.min(...day.temps)),
-        icon: this.mapIcon(day.icons[Math.floor(day.icons.length / 2)] ?? ''),
-        description: day.descs[Math.floor(day.descs.length / 2)] ?? '',
-        precipProbability: Math.round(Math.max(...day.pop)),
-        precipAmount: units === 'imperial' ? Math.round(day.rain / 25.4 * 100) / 100 : Math.round(day.rain * 10) / 10,
-        humidity: Math.round(day.humidity.reduce((a, b) => a + b, 0) / day.humidity.length),
-        windSpeed: Math.round(day.wind.reduce((a, b) => a + b, 0) / day.wind.length),
-      });
+      days.push(aggregateDay(date, day, units, (icon) => this.mapIcon(icon)));
     }
     return days.slice(0, 7);
   }
@@ -140,6 +248,8 @@ export class OpenWeatherMapProvider implements WeatherProvider {
   }
 }
 
+// ── WeatherAPI provider ──────────────────────────────────────────────
+
 export class WeatherAPIProvider implements WeatherProvider {
   private apiKey: string;
 
@@ -156,23 +266,22 @@ export class WeatherAPIProvider implements WeatherProvider {
       const body = await res.text();
       throw new Error(`WeatherAPI error ${res.status}: ${body}`);
     }
-    const data = await res.json();
+    const data: WAForecastResponse = await res.json();
     const isCelsius = units === 'metric';
     const isDay = data.current?.is_day === 1;
 
-    const allDays = data.forecast?.forecastday ?? [];
-    const allHours = allDays.flatMap((d: Record<string, unknown>) => (d as Record<string, unknown[]>).hour ?? []);
+    const allHours = data.forecast.forecastday.flatMap((d) => d.hour);
     const nowEpoch = Math.floor(Date.now() / 1000);
-    const hours = allHours.filter((h: Record<string, unknown>) => (h.time_epoch as number) >= nowEpoch);
-    return hours.map((h: Record<string, unknown>) => ({
-      time: h.time as string,
-      temp: isCelsius ? (h.temp_c as number) : (h.temp_f as number),
-      feelsLike: isCelsius ? (h.feelslike_c as number) : (h.feelslike_f as number),
-      humidity: h.humidity as number,
-      icon: this.mapConditionToIcon((h.condition as Record<string, unknown>)?.code as number, isDay),
-      description: (h.condition as Record<string, unknown>)?.text as string ?? '',
-      windSpeed: isCelsius ? (h.wind_kph as number) : (h.wind_mph as number),
-      precipProbability: (h.chance_of_rain as number) ?? 0,
+    const hours = allHours.filter((h) => h.time_epoch >= nowEpoch);
+    return hours.map((h) => ({
+      time: h.time,
+      temp: isCelsius ? h.temp_c : h.temp_f,
+      feelsLike: isCelsius ? h.feelslike_c : h.feelslike_f,
+      humidity: h.humidity,
+      icon: this.mapConditionToIcon(h.condition.code, isDay),
+      description: h.condition.text ?? '',
+      windSpeed: isCelsius ? h.wind_kph : h.wind_mph,
+      precipProbability: h.chance_of_rain ?? 0,
     }));
   }
 
@@ -183,24 +292,20 @@ export class WeatherAPIProvider implements WeatherProvider {
       const body = await res.text();
       throw new Error(`WeatherAPI error ${res.status}: ${body}`);
     }
-    const data = await res.json();
+    const data: WAForecastResponse = await res.json();
     const isCelsius = units === 'metric';
 
-    const days = data.forecast?.forecastday ?? [];
-    return days.map((d: Record<string, unknown>) => {
-      const day = d.day as Record<string, unknown>;
-      return {
-        date: d.date as string,
-        high: isCelsius ? (day.maxtemp_c as number) : (day.maxtemp_f as number),
-        low: isCelsius ? (day.mintemp_c as number) : (day.mintemp_f as number),
-        icon: this.mapConditionToIcon((day.condition as Record<string, unknown>)?.code as number, true),
-        description: ((day.condition as Record<string, unknown>)?.text as string) ?? '',
-        precipProbability: (day.daily_chance_of_rain as number) ?? 0,
-        precipAmount: isCelsius ? ((day.totalprecip_mm as number) ?? 0) : ((day.totalprecip_in as number) ?? 0),
-        humidity: day.avghumidity as number,
-        windSpeed: isCelsius ? (day.maxwind_kph as number) : (day.maxwind_mph as number),
-      };
-    });
+    return data.forecast.forecastday.map((d) => ({
+      date: d.date,
+      high: isCelsius ? d.day.maxtemp_c : d.day.maxtemp_f,
+      low: isCelsius ? d.day.mintemp_c : d.day.mintemp_f,
+      icon: this.mapConditionToIcon(d.day.condition.code, true),
+      description: d.day.condition.text ?? '',
+      precipProbability: d.day.daily_chance_of_rain ?? 0,
+      precipAmount: isCelsius ? (d.day.totalprecip_mm ?? 0) : (d.day.totalprecip_in ?? 0),
+      humidity: d.day.avghumidity,
+      windSpeed: isCelsius ? d.day.maxwind_kph : d.day.maxwind_mph,
+    }));
   }
 
   private mapConditionToIcon(code: number, isDay: boolean): string {
@@ -217,6 +322,8 @@ export class WeatherAPIProvider implements WeatherProvider {
     return 'thermometer';
   }
 }
+
+// ── Factory ──────────────────────────────────────────────────────────
 
 export function createWeatherProvider(provider: string, apiKey?: string): WeatherProvider {
   switch (provider) {

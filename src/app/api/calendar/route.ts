@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchCalendarEvents } from '@/lib/google-calendar';
 import { readConfig } from '@/lib/config';
+import { errorResponse } from '@/lib/api-utils';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -8,8 +11,7 @@ export async function GET(request: NextRequest) {
   try {
     config = await readConfig();
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to read config';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(error, 'Failed to read config');
   }
 
   // Use query params or fall back to config
@@ -38,7 +40,6 @@ export async function GET(request: NextRequest) {
     const maxEvents = config.settings.calendar.maxEvents ?? 50;
     return NextResponse.json(events.slice(0, maxEvents));
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to fetch calendar events';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(error, 'Failed to fetch calendar events');
   }
 }

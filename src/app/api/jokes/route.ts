@@ -1,4 +1,7 @@
 import { NextResponse } from 'next/server';
+import { errorResponse } from '@/lib/api-utils';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
@@ -11,7 +14,6 @@ export async function GET() {
     const data = await res.json();
     return NextResponse.json({ joke: data.joke });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to fetch joke';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(error, 'Failed to fetch joke');
   }
 }

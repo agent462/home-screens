@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseItems } from '@/lib/rss';
+import { errorResponse } from '@/lib/api-utils';
 
 const DEFAULT_FEED = 'https://feeds.bbci.co.uk/news/rss.xml';
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const feed = searchParams.get('feed') || DEFAULT_FEED;
+    const feed = request.nextUrl.searchParams.get('feed') || DEFAULT_FEED;
 
     try {
       const url = new URL(feed);
@@ -25,7 +25,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ items });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to fetch news';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(error, 'Failed to fetch news');
   }
 }

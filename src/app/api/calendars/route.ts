@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { google } from 'googleapis';
 import { getAuthenticatedClient } from '@/lib/google-auth';
+import { errorResponse } from '@/lib/api-utils';
 
 export async function GET() {
   const auth = await getAuthenticatedClient();
@@ -22,7 +23,6 @@ export async function GET() {
 
     return NextResponse.json(calendars);
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to list calendars';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(error, 'Failed to list calendars');
   }
 }

@@ -3,7 +3,7 @@ import path from 'path';
 import { readConfig, writeConfig } from './config';
 import { migrateUp, getLatestSchemaVersion } from './migrations';
 
-export type UpgradeStep =
+type UpgradeStep =
   | 'preflight'
   | 'backup'
   | 'fetch'
@@ -73,7 +73,7 @@ export function isUpgradeRunning(): boolean {
   return currentUpgrade.running;
 }
 
-export function getUpgradeProgress(): UpgradeProgress {
+function getUpgradeProgress(): UpgradeProgress {
   return currentUpgrade.progress;
 }
 

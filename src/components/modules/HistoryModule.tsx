@@ -1,7 +1,9 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+
 import type { HistoryConfig, ModuleStyle } from '@/types/config';
+import { useRotatingIndex } from '@/hooks/useRotatingIndex';
 import ModuleWrapper from './ModuleWrapper';
+import { useFetchData } from '@/hooks/useFetchData';
 
 interface HistoryModuleProps {
   config: HistoryConfig;
@@ -14,34 +16,11 @@ interface HistoryEvent {
 }
 
 export default function HistoryModule({ config, style }: HistoryModuleProps) {
-  const [events, setEvents] = useState<HistoryEvent[]>([]);
-  const [index, setIndex] = useState(0);
-
-  const fetchHistory = useCallback(async () => {
-    try {
-      const res = await fetch('/api/history');
-      if (res.ok) {
-        const data = await res.json();
-        setEvents(data.events ?? []);
-      }
-    } catch { }
-  }, []);
-
-  useEffect(() => {
-    fetchHistory();
-    const interval = setInterval(fetchHistory, config.refreshIntervalMs ?? 86400000);
-    return () => clearInterval(interval);
-  }, [fetchHistory, config.refreshIntervalMs]);
+  const data = useFetchData<{ events: HistoryEvent[] }>('/api/history', config.refreshIntervalMs ?? 86400000);
+  const events = data?.events ?? [];
 
   const rotationMs = (config.rotationIntervalSec ?? 10) * 1000;
-
-  useEffect(() => {
-    if (events.length <= 1) return;
-    const interval = setInterval(() => {
-      setIndex((prev) => (prev + 1) % events.length);
-    }, rotationMs);
-    return () => clearInterval(interval);
-  }, [events.length, rotationMs]);
+  const index = useRotatingIndex(events.length, rotationMs);
 
   return (
     <ModuleWrapper style={style}>

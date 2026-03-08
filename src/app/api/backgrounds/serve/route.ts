@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { BACKGROUNDS_DIR } from '@/lib/constants';
 
-const BACKGROUNDS_DIR = path.join(process.cwd(), 'public', 'backgrounds');
+const BGS = path.join(process.cwd(), BACKGROUNDS_DIR);
 
 const MIME_TYPES: Record<string, string> = {
   '.jpg': 'image/jpeg',
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
 
   // Prevent directory traversal
   const safe = path.basename(filename);
-  const filePath = path.join(BACKGROUNDS_DIR, safe);
+  const filePath = path.join(BGS, safe);
 
   try {
     const buffer = await fs.readFile(filePath);

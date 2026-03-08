@@ -4,7 +4,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
-export type WeatherIconId =
+type WeatherIconId =
   | 'sun' | 'moon' | 'cloud' | 'cloud-sun' | 'cloud-moon'
   | 'cloud-rain' | 'cloud-drizzle' | 'cloud-snow' | 'cloud-lightning'
   | 'cloud-fog' | 'snowflake' | 'thermometer' | 'cloud-hail';

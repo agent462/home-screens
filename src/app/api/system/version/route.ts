@@ -1,11 +1,10 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getVersionInfo, getVersionTags, fetchRemoteTags } from '@/lib/version';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const forceCheck = url.searchParams.get('check') === 'true';
+export async function GET(request: NextRequest) {
+  const forceCheck = request.nextUrl.searchParams.get('check') === 'true';
 
   if (forceCheck) {
     await fetchRemoteTags(true);

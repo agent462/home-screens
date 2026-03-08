@@ -1,6 +1,6 @@
 import type { ScreenConfiguration } from '@/types/config';
 
-export interface Migration {
+interface Migration {
   version: number;
   description: string;
   up(config: ScreenConfiguration): ScreenConfiguration;

@@ -1,8 +1,8 @@
-import { NextResponse } from 'next/server';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { execFile } from 'child_process';
 import { readFile } from 'fs/promises';
 import path from 'path';
+import { errorResponse } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   let body: { name?: string };
   try {
     body = await request.json();
@@ -80,9 +80,6 @@ export async function POST(request: Request) {
     }
     return NextResponse.json(result);
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Restore failed' },
-      { status: 500 },
-    );
+    return errorResponse(err, 'Restore failed');
   }
 }

@@ -2,14 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { BACKGROUNDS_DIR } from '@/lib/constants';
+import { errorResponse } from '@/lib/api-utils';
 
-function getBackgroundsPath(): string {
-  return path.join(process.cwd(), BACKGROUNDS_DIR);
-}
+const BGS = path.join(process.cwd(), BACKGROUNDS_DIR);
 
 export async function GET() {
   try {
-    const dir = getBackgroundsPath();
+    const dir = BGS;
     await fs.mkdir(dir, { recursive: true });
     const files = await fs.readdir(dir);
     const images = files.filter((f) =>
@@ -18,8 +17,7 @@ export async function GET() {
     const paths = images.map((f) => `/backgrounds/${f}`);
     return NextResponse.json(paths);
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to list backgrounds';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(error, 'Failed to list backgrounds');
   }
 }
 
@@ -42,7 +40,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid file type' }, { status: 400 });
     }
 
-    const dir = getBackgroundsPath();
+    const dir = BGS;
     await fs.mkdir(dir, { recursive: true });
 
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -52,7 +50,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ path: `/backgrounds/${safeName}` }, { status: 201 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to upload background';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(error, 'Failed to upload background');
   }
 }

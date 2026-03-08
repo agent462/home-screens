@@ -1,22 +1,12 @@
 'use client';
 
-import { useRef, useState, useEffect, useCallback } from 'react';
 import { format } from 'date-fns';
 import { CloudRain, Droplets, Wind } from 'lucide-react';
 import type { WeatherHourlyConfig, ModuleStyle } from '@/types/config';
+import type { HourlyWeather } from '@/lib/weather';
 import { getWeatherIcon } from '@/lib/weather-icons';
+import { useScaledFontSize } from '@/hooks/useScaledFontSize';
 import ModuleWrapper from './ModuleWrapper';
-
-export interface HourlyWeather {
-  time: string;
-  temp: number;
-  feelsLike?: number;
-  humidity?: number;
-  windSpeed?: number;
-  precipProbability?: number;
-  icon: string;
-  description: string;
-}
 
 interface WeatherHourlyModuleProps {
   config: WeatherHourlyConfig;
@@ -28,23 +18,7 @@ interface WeatherHourlyModuleProps {
 
 export default function WeatherHourlyModule({ config, style, data, todayHigh, todayLow }: WeatherHourlyModuleProps) {
   const hours = (data ?? []).slice(0, config.hoursToShow);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [scaledFontSize, setScaledFontSize] = useState<number>(style.fontSize);
-
-  const updateFontSize = useCallback(() => {
-    if (containerRef.current) {
-      const h = containerRef.current.clientHeight;
-      setScaledFontSize(Math.max(style.fontSize, h * 0.09));
-    }
-  }, [style.fontSize]);
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(updateFontSize);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [updateFontSize]);
+  const { containerRef, scaledFontSize } = useScaledFontSize(style.fontSize, 0.09);
 
   return (
     <ModuleWrapper style={style}>

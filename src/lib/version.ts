@@ -28,7 +28,7 @@ function exec(cmd: string, args: string[], cwd?: string): Promise<string> {
 }
 
 /** Read version from package.json */
-export async function getPackageVersion(): Promise<string> {
+async function getPackageVersion(): Promise<string> {
   const pkgPath = path.join(process.cwd(), 'package.json');
   const data = await fs.readFile(pkgPath, 'utf-8');
   const pkg = JSON.parse(data);
@@ -36,7 +36,7 @@ export async function getPackageVersion(): Promise<string> {
 }
 
 /** Check if running in a git repository */
-export async function isGitRepo(): Promise<boolean> {
+async function isGitRepo(): Promise<boolean> {
   try {
     await exec('git', ['rev-parse', '--is-inside-work-tree']);
     return true;
@@ -46,7 +46,7 @@ export async function isGitRepo(): Promise<boolean> {
 }
 
 /** Get current commit SHA (short) */
-export async function getCurrentCommit(): Promise<string> {
+async function getCurrentCommit(): Promise<string> {
   try {
     return await exec('git', ['rev-parse', '--short', 'HEAD']);
   } catch {
@@ -55,7 +55,7 @@ export async function getCurrentCommit(): Promise<string> {
 }
 
 /** Get the current branch or tag */
-export async function getCurrentBranch(): Promise<string> {
+async function getCurrentBranch(): Promise<string> {
   try {
     return await exec('git', ['rev-parse', '--abbrev-ref', 'HEAD']);
   } catch {

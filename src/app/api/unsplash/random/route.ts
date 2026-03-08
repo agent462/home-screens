@@ -1,20 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readConfig } from '@/lib/config';
-
-const UNSPLASH_API = 'https://api.unsplash.com';
-
-async function getAccessKey(): Promise<string | null> {
-  if (process.env.UNSPLASH_ACCESS_KEY) return process.env.UNSPLASH_ACCESS_KEY;
-  try {
-    const config = await readConfig();
-    return config.settings.unsplashAccessKey || null;
-  } catch {
-    return null;
-  }
-}
+import { UNSPLASH_API, getUnsplashAccessKey, trackDownload } from '@/lib/unsplash';
 
 export async function GET(request: NextRequest) {
-  const accessKey = await getAccessKey();
+  const accessKey = await getUnsplashAccessKey();
   if (!accessKey) {
     return NextResponse.json({ error: 'Unsplash API key not configured' }, { status: 400 });
   }
@@ -40,9 +28,7 @@ export async function GET(request: NextRequest) {
     // Trigger download tracking
     const downloadLocation = (photo.links as Record<string, string>)?.download_location;
     if (downloadLocation) {
-      fetch(downloadLocation, {
-        headers: { Authorization: `Client-ID ${accessKey}` },
-      }).catch(() => {});
+      trackDownload(downloadLocation, accessKey);
     }
 
     return NextResponse.json({

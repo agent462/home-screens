@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { errorResponse } from '@/lib/api-utils';
 
 interface StockResult {
   symbol: string;
@@ -30,8 +31,7 @@ async function fetchStock(symbol: string): Promise<StockResult> {
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const symbolsParam = searchParams.get('symbols') || 'AAPL';
+    const symbolsParam = request.nextUrl.searchParams.get('symbols') || 'AAPL';
     const symbols = symbolsParam.split(',').map((s) => s.trim()).filter(Boolean);
 
     const results = await Promise.allSettled(symbols.map(fetchStock));
@@ -45,7 +45,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ stocks });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to fetch stocks';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(error, 'Failed to fetch stocks');
   }
 }

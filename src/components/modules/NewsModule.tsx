@@ -1,7 +1,9 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+
 import type { NewsConfig, ModuleStyle } from '@/types/config';
 import ModuleWrapper from './ModuleWrapper';
+import { useFetchData } from '@/hooks/useFetchData';
+import { useRotatingIndex } from '@/hooks/useRotatingIndex';
 
 interface NewsModuleProps {
   config: NewsConfig;
@@ -9,32 +11,12 @@ interface NewsModuleProps {
 }
 
 export default function NewsModule({ config, style }: NewsModuleProps) {
-  const [headlines, setHeadlines] = useState<string[]>([]);
-  const [index, setIndex] = useState(0);
-
-  const fetchNews = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/news?feed=${encodeURIComponent(config.feedUrl)}`);
-      if (res.ok) {
-        const data = await res.json();
-        setHeadlines((data.items ?? []).map((it: { title: string }) => it.title));
-      }
-    } catch { }
-  }, [config.feedUrl]);
-
-  useEffect(() => {
-    fetchNews();
-    const interval = setInterval(fetchNews, config.refreshIntervalMs ?? 300000);
-    return () => clearInterval(interval);
-  }, [fetchNews, config.refreshIntervalMs]);
-
-  useEffect(() => {
-    if (headlines.length <= 1) return;
-    const interval = setInterval(() => {
-      setIndex((prev) => (prev + 1) % headlines.length);
-    }, config.rotateIntervalMs ?? 10000);
-    return () => clearInterval(interval);
-  }, [headlines.length, config.rotateIntervalMs]);
+  const data = useFetchData<{ items: { title: string }[] }>(
+    `/api/news?feed=${encodeURIComponent(config.feedUrl)}`,
+    config.refreshIntervalMs ?? 300000,
+  );
+  const headlines = (data?.items ?? []).map((it) => it.title);
+  const index = useRotatingIndex(headlines.length, config.rotateIntervalMs ?? 10000);
 
   return (
     <ModuleWrapper style={style}>

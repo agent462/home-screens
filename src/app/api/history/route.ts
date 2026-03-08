@@ -1,4 +1,7 @@
 import { NextResponse } from 'next/server';
+import { errorResponse } from '@/lib/api-utils';
+
+export const dynamic = 'force-dynamic';
 
 let cache: { date: string; events: Array<{ year: string; text: string }> } | null = null;
 
@@ -24,7 +27,6 @@ export async function GET() {
     cache = { date: today, events };
     return NextResponse.json({ events });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to fetch historical events';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(error, 'Failed to fetch historical events');
   }
 }
