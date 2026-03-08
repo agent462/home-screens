@@ -96,7 +96,7 @@ case "${action}" in
     ;;
 
   install)
-    npm install --omit=dev 2>&1
+    npm install 2>&1
     echo "{\"ok\":true}"
     ;;
 
