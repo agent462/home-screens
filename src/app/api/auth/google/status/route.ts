@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
-import { isAuthenticated, disconnect } from '@/lib/google-auth';
+import { isAuthenticated, disconnect, hasGoogleCredentials } from '@/lib/google-auth';
 
 export async function GET() {
-  const connected = await isAuthenticated();
-  return NextResponse.json({ connected });
+  const [connected, credentialsConfigured] = await Promise.all([
+    isAuthenticated(),
+    hasGoogleCredentials(),
+  ]);
+  return NextResponse.json({ connected, credentialsConfigured });
 }
 
 export async function DELETE() {

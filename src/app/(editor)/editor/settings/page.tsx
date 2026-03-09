@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useEditorStore } from '@/stores/editor-store';
 import type { GlobalSettings } from '@/types/config';
@@ -11,7 +11,7 @@ import {
   MapPin,
   CloudSun,
   Calendar,
-  Image,
+  Plug,
   Server,
   Database,
 } from 'lucide-react';
@@ -22,7 +22,7 @@ import DisplaySection from '@/components/editor/settings/DisplaySection';
 import SleepSection from '@/components/editor/settings/SleepSection';
 import LocationSection from '@/components/editor/settings/LocationSection';
 import WeatherSection from '@/components/editor/settings/WeatherSection';
-import UnsplashSection from '@/components/editor/settings/UnsplashSection';
+import IntegrationsSection from '@/components/editor/settings/IntegrationsSection';
 import CalendarSection from '@/components/editor/settings/CalendarSection';
 import SystemSection from '@/components/editor/settings/SystemSection';
 import UpgradeModal from '@/components/editor/UpgradeModal';
@@ -35,7 +35,7 @@ const TABS = [
   { id: 'location', label: 'Location', icon: MapPin },
   { id: 'weather', label: 'Weather', icon: CloudSun },
   { id: 'calendar', label: 'Calendar', icon: Calendar },
-  { id: 'integrations', label: 'Other Integrations', icon: Image },
+  { id: 'integrations', label: 'Integrations', icon: Plug },
   { id: 'data', label: 'Data', icon: Database },
   { id: 'system', label: 'System', icon: Server },
 ] as const;
@@ -45,13 +45,11 @@ type TabId = (typeof TABS)[number]['id'];
 /* ─── Settings state ──────────────────────────────── */
 
 interface SettingsState {
-  weatherApiKey: string;
   provider: string;
   lat: string;
   lon: string;
   units: string;
   locationName: string | null;
-  unsplashKey: string;
   selectedCalendarIds: string[];
   maxEvents: number;
   daysAhead: number;
@@ -75,13 +73,11 @@ interface SettingsState {
 
 function initSettings(settings: GlobalSettings | undefined): SettingsState {
   return {
-    weatherApiKey: settings?.weather.apiKey ?? '',
     provider: settings?.weather.provider ?? 'weatherapi',
     lat: (settings?.latitude ?? settings?.weather.latitude)?.toString() ?? '',
     lon: (settings?.longitude ?? settings?.weather.longitude)?.toString() ?? '',
     units: settings?.weather.units ?? 'imperial',
     locationName: settings?.locationName ?? null,
-    unsplashKey: settings?.unsplashAccessKey ?? '',
     selectedCalendarIds:
       settings?.calendar.googleCalendarIds ??
       (settings?.calendar.googleCalendarId ? [settings.calendar.googleCalendarId] : []),
@@ -128,6 +124,16 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
+  // Load config on mount (handles hard refresh / direct URL visit)
+  useEffect(() => {
+    if (!config) loadConfig();
+  }, [config, loadConfig]);
+
+  // Re-initialize local state once config arrives
+  useEffect(() => {
+    if (settings) setState(initSettings(settings));
+  }, [settings]);
+
   // Upgrade/rollback modal state
   const [upgradeTarget, setUpgradeTarget] = useState<string | null>(null);
   const [rollbackTarget, setRollbackTarget] = useState<string | null>(null);
@@ -160,10 +166,8 @@ export default function SettingsPage() {
         longitude: parsedLon,
         locationName: state.locationName ?? undefined,
         timezone: state.timezone || undefined,
-        unsplashAccessKey: state.unsplashKey,
         weather: {
           provider: state.provider as 'openweathermap' | 'weatherapi',
-          apiKey: state.weatherApiKey,
           latitude: parsedLat,
           longitude: parsedLon,
           units: state.units as 'metric' | 'imperial',
@@ -245,7 +249,7 @@ export default function SettingsPage() {
     );
   }
 
-  const showSaveButton = activeTab !== 'system' && activeTab !== 'data';
+  const showSaveButton = activeTab !== 'system' && activeTab !== 'data' && activeTab !== 'integrations';
 
   return (
     <div className="h-screen flex flex-col">
@@ -353,7 +357,6 @@ export default function SettingsPage() {
             {activeTab === 'weather' && (
               <WeatherSection
                 values={{
-                  weatherApiKey: state.weatherApiKey,
                   provider: state.provider,
                   units: state.units,
                   lat: state.lat,
@@ -375,10 +378,7 @@ export default function SettingsPage() {
             )}
 
             {activeTab === 'integrations' && (
-              <UnsplashSection
-                values={{ unsplashKey: state.unsplashKey }}
-                onChange={update}
-              />
+              <IntegrationsSection />
             )}
 
             {activeTab === 'data' && (

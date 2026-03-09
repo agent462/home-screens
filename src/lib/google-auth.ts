@@ -1,6 +1,7 @@
 import { google } from 'googleapis';
 import { readFile, writeFile } from 'fs/promises';
 import path from 'path';
+import { getSecret } from '@/lib/secrets';
 
 const TOKENS_PATH = path.join(process.cwd(), 'data', 'google-tokens.json');
 const SCOPES = ['https://www.googleapis.com/auth/calendar.readonly'];
@@ -20,8 +21,8 @@ interface DeviceCodeResponse {
 
 /** Request a device code + user code from Google. */
 export async function requestDeviceCode(): Promise<DeviceCodeResponse> {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  if (!clientId) throw new Error('GOOGLE_CLIENT_ID must be set');
+  const clientId = await getSecret('google_client_id');
+  if (!clientId) throw new Error('Google OAuth Client ID is not configured. Add it in Settings → Integrations.');
 
   const res = await fetch(DEVICE_CODE_URL, {
     method: 'POST',
@@ -44,9 +45,9 @@ export async function requestDeviceCode(): Promise<DeviceCodeResponse> {
 export async function pollDeviceToken(
   deviceCode: string,
 ): Promise<{ status: 'pending' | 'success' | 'expired' | 'denied'; error?: string }> {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  if (!clientId || !clientSecret) throw new Error('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set');
+  const clientId = await getSecret('google_client_id');
+  const clientSecret = await getSecret('google_client_secret');
+  if (!clientId || !clientSecret) throw new Error('Google OAuth Client ID and Secret are not configured. Add them in Settings → Integrations.');
 
   const res = await fetch(TOKEN_URL, {
     method: 'POST',
@@ -92,17 +93,17 @@ function getRedirectUri(requestUrl?: string) {
   return `${base}/api/auth/google/callback`;
 }
 
-function createOAuth2Client(requestUrl?: string) {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+async function createOAuth2Client(requestUrl?: string) {
+  const clientId = await getSecret('google_client_id');
+  const clientSecret = await getSecret('google_client_secret');
   if (!clientId || !clientSecret) {
-    throw new Error('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set');
+    throw new Error('Google OAuth Client ID and Secret are not configured. Add them in Settings → Integrations.');
   }
   return new google.auth.OAuth2(clientId, clientSecret, getRedirectUri(requestUrl));
 }
 
-export function getAuthUrl(requestUrl?: string): string {
-  const client = createOAuth2Client(requestUrl);
+export async function getAuthUrl(requestUrl?: string): Promise<string> {
+  const client = await createOAuth2Client(requestUrl);
   return client.generateAuthUrl({
     access_type: 'offline',
     prompt: 'consent',
@@ -111,7 +112,7 @@ export function getAuthUrl(requestUrl?: string): string {
 }
 
 export async function handleCallback(code: string, requestUrl?: string) {
-  const client = createOAuth2Client(requestUrl);
+  const client = await createOAuth2Client(requestUrl);
   const { tokens } = await client.getToken(code);
   await writeFile(TOKENS_PATH, JSON.stringify(tokens, null, 2));
   return tokens;
@@ -138,7 +139,7 @@ export async function getAuthenticatedClient() {
   const tokens = await loadTokens();
   if (!tokens?.refresh_token) return null;
 
-  const client = createOAuth2Client();
+  const client = await createOAuth2Client();
   client.setCredentials(tokens);
 
   // If token is expired or about to expire, refresh it
@@ -162,7 +163,7 @@ export async function disconnect() {
   try {
     const tokens = await loadTokens();
     if (tokens?.access_token) {
-      const client = createOAuth2Client();
+      const client = await createOAuth2Client();
       client.setCredentials(tokens);
       await client.revokeToken(tokens.access_token);
     }
@@ -174,4 +175,10 @@ export async function disconnect() {
   } catch {
     // Best effort cleanup
   }
+}
+
+export async function hasGoogleCredentials(): Promise<boolean> {
+  const clientId = await getSecret('google_client_id');
+  const clientSecret = await getSecret('google_client_secret');
+  return Boolean(clientId && clientSecret);
 }

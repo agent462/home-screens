@@ -19,10 +19,7 @@ describe('createWeatherProvider', () => {
 
 describe('OpenWeatherMapProvider', () => {
   it('throws without API key', () => {
-    const original = process.env.OPENWEATHERMAP_API_KEY;
-    delete process.env.OPENWEATHERMAP_API_KEY;
-    expect(() => new OpenWeatherMapProvider()).toThrow('OPENWEATHERMAP_API_KEY is not configured');
-    process.env.OPENWEATHERMAP_API_KEY = original;
+    expect(() => new OpenWeatherMapProvider()).toThrow('OpenWeatherMap API key is not configured');
   });
 
   describe('icon mapping', () => {
@@ -60,10 +57,7 @@ describe('OpenWeatherMapProvider', () => {
 
 describe('WeatherAPIProvider', () => {
   it('throws without API key', () => {
-    const original = process.env.WEATHERAPI_KEY;
-    delete process.env.WEATHERAPI_KEY;
-    expect(() => new WeatherAPIProvider()).toThrow('WEATHERAPI_KEY is not configured');
-    process.env.WEATHERAPI_KEY = original;
+    expect(() => new WeatherAPIProvider()).toThrow('WeatherAPI key is not configured');
   });
 
   describe('condition code mapping', () => {

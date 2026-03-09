@@ -169,9 +169,8 @@ export class OpenWeatherMapProvider implements WeatherProvider {
   private apiKey: string;
 
   constructor(apiKey?: string) {
-    const key = apiKey || process.env.OPENWEATHERMAP_API_KEY;
-    if (!key) throw new Error('OPENWEATHERMAP_API_KEY is not configured. Add it in Settings.');
-    this.apiKey = key;
+    if (!apiKey) throw new Error('OpenWeatherMap API key is not configured. Add it in Settings → Weather.');
+    this.apiKey = apiKey;
   }
 
   async getHourly(lat: number, lon: number, units: string): Promise<HourlyWeather[]> {
@@ -254,9 +253,8 @@ export class WeatherAPIProvider implements WeatherProvider {
   private apiKey: string;
 
   constructor(apiKey?: string) {
-    const key = apiKey || process.env.WEATHERAPI_KEY;
-    if (!key) throw new Error('WEATHERAPI_KEY is not configured. Add it in Settings.');
-    this.apiKey = key;
+    if (!apiKey) throw new Error('WeatherAPI key is not configured. Add it in Settings → Weather.');
+    this.apiKey = apiKey;
   }
 
   async getHourly(lat: number, lon: number, units: string): Promise<HourlyWeather[]> {

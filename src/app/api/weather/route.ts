@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createWeatherProvider } from '@/lib/weather';
 import { readConfig } from '@/lib/config';
+import { getSecret } from '@/lib/secrets';
 import { errorResponse } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
   const lat = searchParams.get('lat') ?? ws?.latitude?.toString();
   const lon = searchParams.get('lon') ?? ws?.longitude?.toString();
   const units = searchParams.get('units') ?? ws?.units ?? 'imperial';
-  const apiKey = ws?.apiKey || undefined;
+  const apiKey = await getSecret(provider === 'weatherapi' ? 'weatherapi_key' : 'openweathermap_key') ?? undefined;
 
   if (!lat || !lon) {
     return NextResponse.json(

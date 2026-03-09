@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { errorResponse, createTTLCache } from '@/lib/api-utils';
+import { getSecret } from '@/lib/secrets';
 
 export const dynamic = 'force-dynamic';
 
@@ -126,8 +127,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(cached);
     }
 
-    const googleKey = process.env.GOOGLE_MAPS_API_KEY;
-    const tomtomKey = process.env.TOMTOM_API_KEY;
+    const googleKey = await getSecret('google_maps_key');
+    const tomtomKey = await getSecret('tomtom_key');
 
     let result;
 
@@ -139,7 +140,7 @@ export async function GET(request: NextRequest) {
       result = {
         routes: mockData(routes),
         mock: true,
-        note: 'Set GOOGLE_MAPS_API_KEY or TOMTOM_API_KEY for real traffic data',
+        note: 'Add a Google Maps or TomTom API key in Settings > Integrations for real traffic data',
       };
     }
 

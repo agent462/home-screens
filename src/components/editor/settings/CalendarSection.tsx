@@ -25,6 +25,7 @@ interface Props {
 export default function CalendarSection({ values, onChange }: Props) {
   const { selectedCalendarIds, maxEvents, daysAhead } = values;
 
+  const [credentialsConfigured, setCredentialsConfigured] = useState(false);
   const [googleConnected, setGoogleConnected] = useState(false);
   const [googleCalendars, setGoogleCalendars] = useState<GoogleCalendar[]>([]);
   const [googleLoading, setGoogleLoading] = useState(true);
@@ -56,6 +57,7 @@ export default function CalendarSection({ values, onChange }: Props) {
       try {
         const res = await fetch('/api/auth/google/status');
         const data = await res.json();
+        setCredentialsConfigured(!!data.credentialsConfigured);
         setGoogleConnected(data.connected);
         if (data.connected) await fetchCalendars();
       } catch {
@@ -195,6 +197,22 @@ export default function CalendarSection({ values, onChange }: Props) {
               <p className="text-xs text-neutral-500">No calendars found.</p>
             )}
           </>
+        ) : !credentialsConfigured ? (
+          <div className="space-y-2">
+            <p className="text-xs text-neutral-400">
+              Google OAuth credentials are required to connect your calendar.
+            </p>
+            <p className="text-xs text-neutral-500">
+              Set up your Client ID and Client Secret in{' '}
+              <a
+                href="/editor/settings?tab=integrations"
+                className="text-blue-400 hover:text-blue-300 underline"
+              >
+                Settings &rarr; Integrations
+              </a>
+              {' '}first.
+            </p>
+          </div>
         ) : (
           <div className="space-y-3">
             {userCode && verificationUrl ? (

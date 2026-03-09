@@ -1,13 +1,11 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { errorResponse } from '@/lib/api-utils';
-import { readFile, writeFile, mkdir } from 'fs/promises';
-import path from 'path';
+import { getSecret, setSecret } from '@/lib/secrets';
 
 export const dynamic = 'force-dynamic';
 
 const TODOIST_API = 'https://api.todoist.com/api/v1';
-const TOKEN_FILE = path.join(process.cwd(), 'data', 'todoist-token.txt');
 
 // Named color → hex map (v2 style, kept for backwards compat)
 const TODOIST_COLORS: Record<string, string> = {
@@ -68,17 +66,6 @@ function arr(obj: Record<string, unknown>, ...keys: string[]): string[] {
   return [];
 }
 
-/** Read the Todoist API token from env var or server-side file. */
-async function getToken(): Promise<string> {
-  if (process.env.TODOIST_API_TOKEN) return process.env.TODOIST_API_TOKEN;
-  try {
-    const token = await readFile(TOKEN_FILE, 'utf-8');
-    return token.trim();
-  } catch {
-    return '';
-  }
-}
-
 /** Fetch a list endpoint, handling { results: [...] } wrapper or bare array. */
 async function fetchTodoistList(endpoint: string, token: string): Promise<Record<string, unknown>[]> {
   const res = await fetch(`${TODOIST_API}${endpoint}`, {
@@ -116,8 +103,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token — Todoist returned ' + res.status }, { status: 401 });
     }
 
-    await mkdir(path.dirname(TOKEN_FILE), { recursive: true });
-    await writeFile(TOKEN_FILE, token, 'utf-8');
+    await setSecret('todoist_token', token);
 
     return NextResponse.json({ ok: true });
   } catch (error) {
@@ -129,11 +115,11 @@ export async function PUT(request: NextRequest) {
 
 export async function GET() {
   try {
-    const token = await getToken();
+    const token = await getSecret('todoist_token');
 
     if (!token) {
       return NextResponse.json(
-        { error: 'No Todoist API token configured. Set TODOIST_API_TOKEN env var or save a token via the editor.' },
+        { error: 'No Todoist API token configured. Add it in Settings > Integrations.' },
         { status: 401 },
       );
     }

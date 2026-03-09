@@ -73,7 +73,6 @@ export interface Screen {
 
 export interface WeatherSettings {
   provider: 'openweathermap' | 'weatherapi';
-  apiKey: string;
   latitude: number;
   longitude: number;
   units: 'metric' | 'imperial';
@@ -118,7 +117,6 @@ export interface GlobalSettings {
   timezone?: string;
   weather: WeatherSettings;
   calendar: CalendarSettings;
-  unsplashAccessKey?: string;
   sleep?: SleepSettings;
   screensaver?: ScreensaverSettings;
 }

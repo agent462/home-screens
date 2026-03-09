@@ -13,7 +13,6 @@ function makeConfig(version: number): ScreenConfiguration {
       longitude: 0,
       weather: {
         provider: 'weatherapi',
-        apiKey: '',
         latitude: 0,
         longitude: 0,
         units: 'imperial',

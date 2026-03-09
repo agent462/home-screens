@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
 import { useEditorStore } from '@/stores/editor-store';
@@ -887,53 +887,45 @@ function AirQualityConfigSection({ mod, screenId }: { mod: ModuleInstance; scree
   );
 }
 
-function TodoistTokenField() {
-  const [token, setToken] = useState('');
-  const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [errorMsg, setErrorMsg] = useState('');
+function TodoistTokenStatus() {
+  const [configured, setConfigured] = useState<boolean | null>(null);
 
-  const saveToken = async () => {
-    if (!token.trim()) return;
-    setStatus('saving');
-    try {
-      const res = await fetch('/api/todoist', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: token.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setStatus('error');
-        setErrorMsg(data.error ?? 'Failed to save');
-        return;
+  useEffect(() => {
+    async function check() {
+      try {
+        const res = await fetch('/api/secrets');
+        if (res.ok) {
+          const data: Record<string, boolean> = await res.json();
+          setConfigured(!!data.todoist_token);
+        }
+      } catch {
+        // ignore
       }
-      setStatus('saved');
-      setToken('');
-      setTimeout(() => setStatus('idle'), 3000);
-    } catch {
-      setStatus('error');
-      setErrorMsg('Network error');
     }
-  };
+    check();
+  }, []);
 
   return (
     <div className="space-y-1">
       <span className="text-xs text-neutral-400">API Token</span>
-      <div className="flex gap-1">
-        <input
-          type="password"
-          value={token}
-          onChange={(e) => { setToken(e.target.value); setStatus('idle'); }}
-          placeholder="Paste token and click Save"
-          className={INPUT_CLASS_FLEX}
-        />
-        <Button size="sm" onClick={saveToken} disabled={!token.trim() || status === 'saving'}>
-          {status === 'saving' ? '...' : 'Save'}
-        </Button>
-      </div>
-      {status === 'saved' && <span className="text-[10px] text-green-400">Token saved securely</span>}
-      {status === 'error' && <span className="text-[10px] text-red-400">{errorMsg}</span>}
-      <span className="text-[10px] text-neutral-500">Todoist → Settings → Integrations → Developer</span>
+      {configured === null ? (
+        <p className="text-[10px] text-neutral-500">Checking...</p>
+      ) : configured ? (
+        <span className="flex items-center gap-1.5 text-[10px] text-green-400">
+          <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" />
+          Connected
+        </span>
+      ) : (
+        <p className="text-[10px] text-neutral-500">
+          Not configured.{' '}
+          <a
+            href="/editor/settings?tab=integrations"
+            className="text-blue-400 hover:text-blue-300 underline"
+          >
+            Settings &rarr; Integrations
+          </a>
+        </p>
+      )}
     </div>
   );
 }
@@ -958,7 +950,7 @@ function TodoistConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId
 
   return (
     <div className="space-y-3">
-      <TodoistTokenField />
+      <TodoistTokenStatus />
       <label className="flex flex-col gap-0.5">
         <span className="text-xs text-neutral-400">Title</span>
         <input

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { readConfig } from '@/lib/config';
+import { getSecret } from '@/lib/secrets';
 import { errorResponse } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
@@ -16,7 +17,7 @@ export async function GET() {
   const ws = s?.weather;
   const lat = s?.latitude ?? ws?.latitude;
   const lon = s?.longitude ?? ws?.longitude;
-  const apiKey = ws?.apiKey;
+  const apiKey = await getSecret('openweathermap_key');
 
   if (lat == null || lon == null) {
     return NextResponse.json(
@@ -27,7 +28,7 @@ export async function GET() {
 
   if (!apiKey) {
     return NextResponse.json(
-      { error: 'Missing OpenWeatherMap API key in weather settings' },
+      { error: 'Missing OpenWeatherMap API key — add it in Settings > Integrations' },
       { status: 400 },
     );
   }

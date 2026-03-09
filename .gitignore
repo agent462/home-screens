@@ -42,6 +42,7 @@ data/client*
 data/backups/
 data/background-cache.json
 data/todoist-token.txt
+data/secrets.json
 data/kiosk.conf
 
 # user-uploaded backgrounds

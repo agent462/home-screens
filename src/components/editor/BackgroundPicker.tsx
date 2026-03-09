@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useEditorStore } from '@/stores/editor-store';
 import type { BackgroundRotation } from '@/types/config';
 import LocalBackgrounds from './LocalBackgrounds';
@@ -9,9 +9,24 @@ import UnsplashBrowser from './UnsplashBrowser';
 export default function BackgroundPicker() {
   const [tab, setTab] = useState<'local' | 'unsplash'>('unsplash');
   const { config, selectedScreenId, updateScreen } = useEditorStore();
+  const [hasUnsplashKey, setHasUnsplashKey] = useState(false);
 
   const currentScreen = config?.screens.find((s) => s.id === selectedScreenId);
-  const hasUnsplashKey = !!config?.settings?.unsplashAccessKey;
+
+  useEffect(() => {
+    async function checkKey() {
+      try {
+        const res = await fetch('/api/secrets');
+        if (res.ok) {
+          const data: Record<string, boolean> = await res.json();
+          setHasUnsplashKey(!!data.unsplash_access_key);
+        }
+      } catch {
+        // ignore
+      }
+    }
+    checkKey();
+  }, []);
 
   if (!currentScreen || !selectedScreenId) return null;
 
