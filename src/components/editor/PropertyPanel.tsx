@@ -1,5 +1,8 @@
 'use client';
 
+import { useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ChevronRight } from 'lucide-react';
 import { useEditorStore } from '@/stores/editor-store';
 import Slider from '@/components/ui/Slider';
 import Toggle from '@/components/ui/Toggle';
@@ -9,11 +12,45 @@ import BackgroundPicker from '@/components/editor/BackgroundPicker';
 import type { ModuleInstance, CountdownEvent, TodoItem } from '@/types/config';
 import { v4 as uuidv4 } from 'uuid';
 
+function AccordionSection({ title, defaultOpen = true, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1.5 w-full py-1.5 text-left group"
+      >
+        <ChevronRight
+          className={`w-3 h-3 text-neutral-500 transition-transform duration-200 ${
+            open ? 'rotate-90' : ''
+          }`}
+        />
+        <span className="text-xs font-semibold text-neutral-500 uppercase">{title}</span>
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: 'easeInOut' }}
+            className="overflow-hidden"
+          >
+            <div className="space-y-3 pb-2">
+              {children}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function PositionSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
   const { moveModule, resizeModule } = useEditorStore();
   return (
     <div className="space-y-2">
-      <h4 className="text-xs font-semibold text-neutral-500 uppercase">Position & Size</h4>
       <div className="grid grid-cols-2 gap-2">
         {[
           { label: 'X', value: mod.position.x, key: 'x' },
@@ -65,7 +102,6 @@ function StyleSection({ mod, screenId }: { mod: ModuleInstance; screenId: string
 
   return (
     <div className="space-y-3">
-      <h4 className="text-xs font-semibold text-neutral-500 uppercase">Style</h4>
       <Slider label="Opacity" value={s.opacity} min={0} max={1} step={0.05} onChange={(v) => set({ opacity: v })} />
       <Slider label="Border Radius" value={s.borderRadius} min={0} max={50} onChange={(v) => set({ borderRadius: v })} />
       <Slider label="Padding" value={s.padding} min={0} max={64} onChange={(v) => set({ padding: v })} />
@@ -118,25 +154,61 @@ function ClockConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: 
 
 function CalendarConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
   const { updateModule } = useEditorStore();
-  const c = mod.config as { daysToShow?: number; showTime?: boolean; showLocation?: boolean };
+  const c = mod.config as { viewMode?: string; daysToShow?: number; showTime?: boolean; showLocation?: boolean; maxEvents?: number; showWeekNumbers?: boolean };
   const set = (updates: Record<string, unknown>) =>
     updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
+  const viewMode = c.viewMode ?? 'daily';
 
   return (
     <>
       <label className="flex flex-col gap-0.5">
-        <span className="text-xs text-neutral-400">Days to Show</span>
-        <input
-          type="number"
-          min={1}
-          max={14}
-          value={c.daysToShow ?? 3}
-          onChange={(e) => set({ daysToShow: Number(e.target.value) })}
+        <span className="text-xs text-neutral-400">View Mode</span>
+        <select
+          value={viewMode}
+          onChange={(e) => set({ viewMode: e.target.value })}
           className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
-        />
+        >
+          <option value="daily">Daily Columns</option>
+          <option value="agenda">Agenda List</option>
+          <option value="week">Week Grid</option>
+          <option value="month">Month Grid</option>
+        </select>
       </label>
-      <Toggle label="Show Time" checked={c.showTime !== false} onChange={(v) => set({ showTime: v })} />
-      <Toggle label="Show Location" checked={!!c.showLocation} onChange={(v) => set({ showLocation: v })} />
+      {viewMode === 'daily' && (
+        <label className="flex flex-col gap-0.5">
+          <span className="text-xs text-neutral-400">Days to Show</span>
+          <input
+            type="number"
+            min={1}
+            max={14}
+            value={c.daysToShow ?? 3}
+            onChange={(e) => set({ daysToShow: Number(e.target.value) })}
+            className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+          />
+        </label>
+      )}
+      {viewMode === 'agenda' && (
+        <label className="flex flex-col gap-0.5">
+          <span className="text-xs text-neutral-400">Max Events</span>
+          <input
+            type="number"
+            min={1}
+            max={50}
+            value={c.maxEvents ?? 20}
+            onChange={(e) => set({ maxEvents: Number(e.target.value) })}
+            className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+          />
+        </label>
+      )}
+      {(viewMode === 'daily' || viewMode === 'agenda') && (
+        <>
+          <Toggle label="Show Time" checked={c.showTime !== false} onChange={(v) => set({ showTime: v })} />
+          <Toggle label="Show Location" checked={!!c.showLocation} onChange={(v) => set({ showLocation: v })} />
+        </>
+      )}
+      {(viewMode === 'week' || viewMode === 'month') && (
+        <Toggle label="Show Week Numbers" checked={!!c.showWeekNumbers} onChange={(v) => set({ showWeekNumbers: v })} />
+      )}
     </>
   );
 }
@@ -883,6 +955,178 @@ function AirQualityConfigSection({ mod, screenId }: { mod: ModuleInstance; scree
   );
 }
 
+function TodoistTokenField() {
+  const [token, setToken] = useState('');
+  const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const saveToken = async () => {
+    if (!token.trim()) return;
+    setStatus('saving');
+    try {
+      const res = await fetch('/api/todoist', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: token.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setStatus('error');
+        setErrorMsg(data.error ?? 'Failed to save');
+        return;
+      }
+      setStatus('saved');
+      setToken('');
+      setTimeout(() => setStatus('idle'), 3000);
+    } catch {
+      setStatus('error');
+      setErrorMsg('Network error');
+    }
+  };
+
+  return (
+    <div className="space-y-1">
+      <span className="text-xs text-neutral-400">API Token</span>
+      <div className="flex gap-1">
+        <input
+          type="password"
+          value={token}
+          onChange={(e) => { setToken(e.target.value); setStatus('idle'); }}
+          placeholder="Paste token and click Save"
+          className="flex-1 px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+        />
+        <Button size="sm" onClick={saveToken} disabled={!token.trim() || status === 'saving'}>
+          {status === 'saving' ? '...' : 'Save'}
+        </Button>
+      </div>
+      {status === 'saved' && <span className="text-[10px] text-green-400">Token saved securely</span>}
+      {status === 'error' && <span className="text-[10px] text-red-400">{errorMsg}</span>}
+      <span className="text-[10px] text-neutral-500">Todoist → Settings → Integrations → Developer</span>
+    </div>
+  );
+}
+
+function TodoistConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
+  const { updateModule } = useEditorStore();
+  const c = mod.config as {
+    title?: string;
+    viewMode?: string;
+    groupBy?: string;
+    sortBy?: string;
+    projectFilter?: string;
+    labelFilter?: string;
+    showNoDueDate?: boolean;
+    showSubtasks?: boolean;
+    showLabels?: boolean;
+    showProject?: boolean;
+    showDescription?: boolean;
+    maxTasks?: number;
+    refreshIntervalMs?: number;
+  };
+  const set = (updates: Record<string, unknown>) =>
+    updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
+  const viewMode = c.viewMode ?? 'list';
+
+  return (
+    <div className="space-y-3">
+      <TodoistTokenField />
+      <label className="flex flex-col gap-0.5">
+        <span className="text-xs text-neutral-400">Title</span>
+        <input
+          type="text"
+          value={(c.title as string) || 'Todoist'}
+          onChange={(e) => set({ title: e.target.value })}
+          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+        />
+      </label>
+      <label className="flex flex-col gap-0.5">
+        <span className="text-xs text-neutral-400">View Mode</span>
+        <select
+          value={viewMode}
+          onChange={(e) => set({ viewMode: e.target.value })}
+          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+        >
+          <option value="list">List</option>
+          <option value="board">Board</option>
+          <option value="focus">Focus (Today)</option>
+        </select>
+      </label>
+      {viewMode !== 'focus' && (
+        <label className="flex flex-col gap-0.5">
+          <span className="text-xs text-neutral-400">Group By</span>
+          <select
+            value={(c.groupBy as string) || 'date'}
+            onChange={(e) => set({ groupBy: e.target.value })}
+            className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+          >
+            <option value="none">None</option>
+            <option value="project">Project</option>
+            <option value="priority">Priority</option>
+            <option value="date">Due Date</option>
+            <option value="label">Label</option>
+          </select>
+        </label>
+      )}
+      <label className="flex flex-col gap-0.5">
+        <span className="text-xs text-neutral-400">Sort By</span>
+        <select
+          value={(c.sortBy as string) || 'default'}
+          onChange={(e) => set({ sortBy: e.target.value })}
+          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+        >
+          <option value="default">Default Order</option>
+          <option value="priority">Priority</option>
+          <option value="due_date">Due Date</option>
+          <option value="alphabetical">Alphabetical</option>
+        </select>
+      </label>
+      <label className="flex flex-col gap-0.5">
+        <span className="text-xs text-neutral-400">Filter Projects (comma-separated)</span>
+        <input
+          type="text"
+          value={(c.projectFilter as string) || ''}
+          onChange={(e) => set({ projectFilter: e.target.value })}
+          placeholder="e.g. Work, Personal"
+          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+        />
+      </label>
+      <label className="flex flex-col gap-0.5">
+        <span className="text-xs text-neutral-400">Filter Labels (comma-separated)</span>
+        <input
+          type="text"
+          value={(c.labelFilter as string) || ''}
+          onChange={(e) => set({ labelFilter: e.target.value })}
+          placeholder="e.g. urgent, home"
+          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+        />
+      </label>
+      <Toggle label="Show Subtasks" checked={c.showSubtasks !== false} onChange={(v) => set({ showSubtasks: v })} />
+      <Toggle label="Show Labels" checked={c.showLabels !== false} onChange={(v) => set({ showLabels: v })} />
+      <Toggle label="Show Project" checked={c.showProject !== false} onChange={(v) => set({ showProject: v })} />
+      <Toggle label="Show Description" checked={!!c.showDescription} onChange={(v) => set({ showDescription: v })} />
+      <Toggle label="Show No-Date Tasks" checked={c.showNoDueDate !== false} onChange={(v) => set({ showNoDueDate: v })} />
+      <label className="flex flex-col gap-0.5">
+        <span className="text-xs text-neutral-400">Max Tasks</span>
+        <input
+          type="number"
+          min={1}
+          max={100}
+          value={c.maxTasks ?? 30}
+          onChange={(e) => set({ maxTasks: Number(e.target.value) })}
+          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+        />
+      </label>
+      <Slider
+        label="Refresh (minutes)"
+        value={(c.refreshIntervalMs ?? 300000) / 60000}
+        min={5}
+        max={30}
+        onChange={(v) => set({ refreshIntervalMs: v * 60000 })}
+      />
+    </div>
+  );
+}
+
 const CONFIG_SECTIONS: Record<string, React.FC<{ mod: ModuleInstance; screenId: string }>> = {
   clock: ClockConfigSection,
   calendar: CalendarConfigSection,
@@ -908,6 +1152,7 @@ const CONFIG_SECTIONS: Record<string, React.FC<{ mod: ModuleInstance; screenId: 
   traffic: TrafficConfigSection,
   sports: SportsConfigSection,
   'air-quality': AirQualityConfigSection,
+  todoist: TodoistConfigSection,
 };
 
 export default function PropertyPanel() {
@@ -936,14 +1181,17 @@ export default function PropertyPanel() {
           </h3>
         </div>
 
-        <PositionSection mod={selectedModule} screenId={selectedScreenId} />
-        <StyleSection mod={selectedModule} screenId={selectedScreenId} />
+        <AccordionSection title="Position & Size">
+          <PositionSection mod={selectedModule} screenId={selectedScreenId} />
+        </AccordionSection>
+        <AccordionSection title="Style" defaultOpen={false}>
+          <StyleSection mod={selectedModule} screenId={selectedScreenId} />
+        </AccordionSection>
 
         {ConfigSection && (
-          <div className="space-y-3">
-            <h4 className="text-xs font-semibold text-neutral-500 uppercase">Config</h4>
+          <AccordionSection title="Config">
             <ConfigSection mod={selectedModule} screenId={selectedScreenId} />
-          </div>
+          </AccordionSection>
         )}
 
         <div className="pt-3 border-t border-neutral-700">

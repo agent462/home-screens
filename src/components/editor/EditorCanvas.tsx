@@ -8,11 +8,23 @@ import { getModuleDefinition } from '@/lib/module-registry';
 import { moduleComponents } from '@/lib/module-components';
 import type { ModuleInstance } from '@/types/config';
 
-function ModulePreview({ mod, previewData }: { mod: ModuleInstance; previewData: PreviewData }) {
+function ModulePreview({ mod, previewData, settings }: { mod: ModuleInstance; previewData: PreviewData; settings: PreviewSettings | null }) {
   const Component = moduleComponents[mod.type];
   if (!Component) return null;
 
   const extraProps: Record<string, unknown> = {};
+
+  // Pass timezone to all modules
+  if (settings?.timezone) {
+    extraProps.timezone = settings.timezone;
+  }
+
+  // Pass global location to location-aware modules
+  if (['moon-phase', 'sunrise-sunset'].includes(mod.type) && settings) {
+    extraProps.latitude = settings.latitude;
+    extraProps.longitude = settings.longitude;
+  }
+
   if (mod.type === 'weather-hourly') {
     extraProps.data = previewData.weatherHourly;
     if (previewData.weatherForecast && Array.isArray(previewData.weatherForecast) && previewData.weatherForecast.length > 0) {
@@ -29,6 +41,12 @@ function ModulePreview({ mod, previewData }: { mod: ModuleInstance; previewData:
   return <Component config={mod.config} style={mod.style} {...extraProps} />;
 }
 
+interface PreviewSettings {
+  latitude: number | undefined;
+  longitude: number | undefined;
+  timezone: string | undefined;
+}
+
 interface PreviewData {
   weatherHourly: unknown[] | null;
   weatherForecast: unknown[] | null;
@@ -42,6 +60,7 @@ function DraggableModule({
   onSelect,
   onResize,
   previewData,
+  settings,
 }: {
   mod: ModuleInstance;
   scale: number;
@@ -49,6 +68,7 @@ function DraggableModule({
   onSelect: () => void;
   onResize: (size: { w: number; h: number }) => void;
   previewData: PreviewData;
+  settings: PreviewSettings | null;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `module-${mod.id}`,
@@ -124,7 +144,7 @@ function DraggableModule({
             pointerEvents: 'none',
           }}
         >
-          <ModulePreview mod={mod} previewData={previewData} />
+          <ModulePreview mod={mod} previewData={previewData} settings={settings} />
         </div>
       </div>
       {/* Type label overlay */}
@@ -250,6 +270,12 @@ export default function EditorCanvas({ onScaleChange }: { onScaleChange?: (scale
 
   const displayWidth = config?.settings.displayWidth || DEFAULT_DISPLAY_WIDTH;
   const displayHeight = config?.settings.displayHeight || DEFAULT_DISPLAY_HEIGHT;
+
+  const previewSettings: PreviewSettings | null = config ? {
+    latitude: config.settings.latitude ?? config.settings.weather.latitude,
+    longitude: config.settings.longitude ?? config.settings.weather.longitude,
+    timezone: config.settings.timezone,
+  } : null;
   const currentScreen = config?.screens.find((s) => s.id === selectedScreenId);
   // Poll the server-side background cache so the editor shows the same
   // rotating background that the display is using.
@@ -363,6 +389,7 @@ export default function EditorCanvas({ onScaleChange }: { onScaleChange?: (scale
             onSelect={() => selectModule(mod.id)}
             onResize={(size) => resizeModule(selectedScreenId!, mod.id, size)}
             previewData={previewData}
+            settings={previewSettings}
           />
         ))}
         {dragState && (() => {

@@ -21,6 +21,7 @@ import EditorCanvas from '@/components/editor/EditorCanvas';
 import PropertyPanel from '@/components/editor/PropertyPanel';
 import SettingsPanel from '@/components/editor/SettingsPanel';
 import SystemPanel from '@/components/editor/SystemPanel';
+import HomeScreensLogo from '@/components/brand/HomeScreensLogo';
 import Button from '@/components/ui/Button';
 
 export default function EditorPage() {
@@ -128,12 +129,13 @@ export default function EditorPage() {
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setActivePaletteType(null)}>
       <div className="h-screen flex flex-col">
         {/* Toolbar */}
-        <div className="flex items-center justify-between border-b border-neutral-700 bg-neutral-900 px-3 py-2">
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold text-neutral-300">Home Screen Editor</span>
+        <div className="flex items-center gap-4 overflow-hidden border-b border-neutral-700 bg-neutral-900 px-3 py-2">
+          <div className="flex min-w-0 flex-1 items-center gap-4 overflow-hidden">
+            <HomeScreensLogo contextLabel="Editor" />
+            <div className="h-8 w-px bg-neutral-800" />
             <ScreenTabs />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <input
               ref={fileInputRef}
               type="file"

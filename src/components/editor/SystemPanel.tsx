@@ -43,6 +43,7 @@ export default function SystemPanel({ onClose }: { onClose: () => void }) {
   const [rollbackTarget, setRollbackTarget] = useState<string | null>(null);
   const [restoreStatus, setRestoreStatus] = useState<string | null>(null);
   const [showChangelog, setShowChangelog] = useState(false);
+  const [powerAction, setPowerAction] = useState<string | null>(null);
 
   const fetchAll = useCallback(async (forceCheck = false) => {
     try {
@@ -117,6 +118,28 @@ export default function SystemPanel({ onClose }: { onClose: () => void }) {
   function handleRollback(tag: string) {
     if (!confirm(`Roll back to ${tag}? The server will restart.`)) return;
     setRollbackTarget(tag);
+  }
+
+  async function handlePowerAction(action: 'reboot' | 'restart-service') {
+    const label = action === 'reboot' ? 'reboot the system' : 'restart the service';
+    if (!confirm(`Are you sure you want to ${label}? You may briefly lose connection.`)) return;
+
+    setPowerAction(action);
+    try {
+      const res = await fetch('/api/system/power', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      if (res.ok) {
+        setPowerAction(`${action}-ok`);
+      } else {
+        const data = await res.json();
+        setPowerAction(`error:${data.error || 'Unknown error'}`);
+      }
+    } catch {
+      setPowerAction('error:Failed to reach server');
+    }
   }
 
   function handleUpgradeComplete() {
@@ -357,6 +380,52 @@ export default function SystemPanel({ onClose }: { onClose: () => void }) {
                     {restoreStatus}
                   </p>
                 )}
+              </section>
+
+              {/* System Actions */}
+              <section>
+                <h3 className="text-sm font-medium text-neutral-300 mb-3 uppercase tracking-wider">
+                  System Actions
+                </h3>
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handlePowerAction('restart-service')}
+                    disabled={!!powerAction}
+                  >
+                    Restart Service
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() => handlePowerAction('reboot')}
+                    disabled={!!powerAction}
+                  >
+                    Reboot System
+                  </Button>
+                </div>
+                {powerAction === 'restart-service-ok' && (
+                  <p className="text-xs text-green-400 mt-2">
+                    Service restart scheduled. The page will reload momentarily...
+                  </p>
+                )}
+                {powerAction === 'reboot-ok' && (
+                  <p className="text-xs text-green-400 mt-2">
+                    System reboot scheduled. The display will come back online shortly...
+                  </p>
+                )}
+                {powerAction?.startsWith('error:') && (
+                  <p className="text-xs text-red-400 mt-2">
+                    {powerAction.slice(6)}
+                  </p>
+                )}
+                {(powerAction === 'reboot' || powerAction === 'restart-service') && (
+                  <p className="text-xs text-neutral-500 mt-2">Processing...</p>
+                )}
+                <p className="text-xs text-neutral-500 mt-2">
+                  Restart Service reloads the app. Reboot System restarts the entire Raspberry Pi.
+                </p>
               </section>
             </>
           )}
