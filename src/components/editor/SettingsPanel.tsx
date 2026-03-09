@@ -61,7 +61,7 @@ function initSettings(settings: GlobalSettings | undefined): SettingsState {
     timezone: settings?.timezone ?? '',
     sleepEnabled: settings?.sleep?.enabled ?? false,
     dimAfterMinutes: settings?.sleep?.dimAfterMinutes ?? 10,
-    sleepAfterMinutes: settings?.sleep?.sleepAfterMinutes ?? 30,
+    sleepAfterMinutes: settings?.sleep?.sleepAfterMinutes ?? 0,
     dimBrightness: settings?.sleep?.dimBrightness ?? 20,
     dimScheduleEnabled: !!settings?.sleep?.dimSchedule,
     dimStartTime: settings?.sleep?.dimSchedule?.startTime ?? '23:00',

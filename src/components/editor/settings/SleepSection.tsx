@@ -45,7 +45,7 @@ export default function SleepSection({ values, onChange }: Props) {
           <span className="text-sm text-neutral-200">Enable display sleep</span>
         </label>
         <p className="text-xs text-neutral-500">
-          Dim and eventually turn off the display after a period of inactivity. Any mouse, touch, or keyboard input wakes it up.
+          Dim and optionally turn off the display after inactivity or on a schedule. Any mouse, touch, or keyboard input wakes it up.
         </p>
 
         {sleepEnabled && (
@@ -60,10 +60,16 @@ export default function SleepSection({ values, onChange }: Props) {
             <Slider
               label="Sleep after dimming (minutes)"
               value={sleepAfterMinutes}
-              min={1}
+              min={0}
               max={120}
+              displayValue={sleepAfterMinutes === 0 ? 'Off' : String(sleepAfterMinutes)}
               onChange={(v) => onChange({ sleepAfterMinutes: v })}
             />
+            {sleepAfterMinutes === 0 && (
+              <p className="text-xs text-neutral-500 -mt-1">
+                The display will dim but never go fully black from inactivity.
+              </p>
+            )}
             <Slider
               label="Dim brightness (%)"
               value={dimBrightness}
@@ -120,7 +126,7 @@ export default function SleepSection({ values, onChange }: Props) {
                   />
                 </label>
                 <p className="col-span-2 text-xs text-neutral-500">
-                  Automatically dim the display during this window. Activity still wakes it. Supports overnight spans.
+                  Dims the display during this window and automatically brightens when it ends. Supports overnight spans.
                 </p>
               </div>
             )}
@@ -156,7 +162,7 @@ export default function SleepSection({ values, onChange }: Props) {
                   />
                 </label>
                 <p className="col-span-2 text-xs text-neutral-500">
-                  Force full sleep during this window regardless of activity. Supports overnight spans.
+                  Forces the display fully off during this window and automatically wakes when it ends. Ignores activity. Supports overnight spans.
                 </p>
               </div>
             )}

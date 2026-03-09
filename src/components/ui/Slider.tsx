@@ -6,15 +6,16 @@ interface SliderProps {
   min: number;
   max: number;
   step?: number;
+  displayValue?: string;
   onChange: (value: number) => void;
 }
 
-export default function Slider({ label, value, min, max, step = 1, onChange }: SliderProps) {
+export default function Slider({ label, value, min, max, step = 1, displayValue, onChange }: SliderProps) {
   return (
     <label className="flex flex-col gap-1">
       <span className="text-xs text-neutral-400 flex justify-between">
         <span>{label}</span>
-        <span className="text-neutral-500">{value}</span>
+        <span className="text-neutral-500">{displayValue ?? value}</span>
       </span>
       <input
         type="range"

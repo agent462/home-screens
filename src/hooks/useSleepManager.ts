@@ -39,6 +39,8 @@ export function useSleepManager(
 ): UseSleepManagerResult {
   const [displayState, setDisplayState] = useState<DisplayState>('active');
   const lastActivityRef = useRef(Date.now());
+  const wasDimScheduleRef = useRef(false);
+  const wasSleepScheduleRef = useRef(false);
   const enabled = sleep?.enabled ?? false;
 
   const wake = useCallback(() => {
@@ -70,20 +72,48 @@ export function useSleepManager(
     const sleepMs = sleep.sleepAfterMinutes * 60 * 1000;
 
     const interval = setInterval(() => {
+      const inSleepWindow = !!sleep.schedule && isInScheduleWindow(sleep.schedule);
+      const inDimWindow = !!sleep.dimSchedule && isInScheduleWindow(sleep.dimSchedule);
+
+      // Detect leaving a sleep schedule window — wake the display
+      if (wasSleepScheduleRef.current && !inSleepWindow) {
+        lastActivityRef.current = Date.now();
+        setDisplayState('active');
+        wasSleepScheduleRef.current = false;
+        wasDimScheduleRef.current = inDimWindow;
+        return;
+      }
+      wasSleepScheduleRef.current = inSleepWindow;
+
+      // Detect leaving a dim schedule window — wake the display
+      if (wasDimScheduleRef.current && !inDimWindow) {
+        lastActivityRef.current = Date.now();
+        setDisplayState('active');
+        wasDimScheduleRef.current = false;
+        return;
+      }
+      wasDimScheduleRef.current = inDimWindow;
+
       // Fixed sleep schedule takes highest priority — force asleep during window
-      if (sleep.schedule && isInScheduleWindow(sleep.schedule)) {
+      if (inSleepWindow) {
         setDisplayState('asleep');
         return;
       }
 
-      // Fixed dim schedule — force dimmed during window (but activity can still wake)
-      const inDimWindow = sleep.dimSchedule && isInScheduleWindow(sleep.dimSchedule);
+      // Fixed dim schedule — force dimmed during window
+      // Idle-based sleep is suppressed during dim schedule; the schedule controls behavior.
+      // If you want the screen fully off at night, use a sleep schedule.
+      if (inDimWindow) {
+        setDisplayState('dimmed');
+        return;
+      }
 
+      // Idle-based transitions (outside any schedule window)
       const idle = Date.now() - lastActivityRef.current;
 
-      if (idle >= dimMs + sleepMs) {
+      if (sleepMs > 0 && idle >= dimMs + sleepMs) {
         setDisplayState('asleep');
-      } else if (idle >= dimMs || inDimWindow) {
+      } else if (idle >= dimMs) {
         setDisplayState('dimmed');
       }
       // Don't reset to 'active' here — that's handled by the activity listener
