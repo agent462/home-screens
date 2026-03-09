@@ -266,10 +266,14 @@ export interface StockTickerConfig {
 }
 
 // Crypto module config
+export type CryptoView = 'cards' | 'ticker' | 'table' | 'compact';
+
 export interface CryptoConfig {
   ids: string;
   refreshIntervalMs: number;
+  view?: CryptoView;
   cardScale?: number;
+  tickerSpeed?: number;
 }
 
 // Word of the day module config

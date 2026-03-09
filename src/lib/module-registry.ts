@@ -252,6 +252,8 @@ registerModule({
   defaultConfig: {
     ids: 'bitcoin,ethereum',
     refreshIntervalMs: 60000,
+    view: 'cards',
+    tickerSpeed: 5,
   },
   defaultSize: DEFAULT_MODULE_SIZES.crypto,
 });
