@@ -54,7 +54,7 @@ export const DEFAULT_MODULE_SIZES: Record<string, { w: number; h: number }> = {
   todo: { w: 350, h: 400 },
   'sticky-note': { w: 300, h: 250 },
   greeting: { w: 500, h: 150 },
-  news: { w: 500, h: 200 },
+  news: { w: 500, h: 400 },
   'stock-ticker': { w: 400, h: 300 },
   crypto: { w: 400, h: 250 },
   'word-of-day': { w: 450, h: 200 },

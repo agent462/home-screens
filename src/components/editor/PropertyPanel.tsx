@@ -10,7 +10,7 @@ import Toggle from '@/components/ui/Toggle';
 import ColorPicker from '@/components/ui/ColorPicker';
 import Button from '@/components/ui/Button';
 import BackgroundPicker from '@/components/editor/BackgroundPicker';
-import type { ModuleInstance, CountdownEvent, TodoItem, WeatherView, WeatherIconSet, WeatherProviderOption, StockTickerView } from '@/types/config';
+import type { ModuleInstance, CountdownEvent, TodoItem, WeatherView, WeatherIconSet, WeatherProviderOption, StockTickerView, NewsView } from '@/types/config';
 import { v4 as uuidv4 } from 'uuid';
 
 const INPUT_CLASS = 'w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200';
@@ -595,28 +595,119 @@ function GreetingConfigSection({ mod, screenId }: { mod: ModuleInstance; screenI
   );
 }
 
+const NEWS_VIEWS: { value: NewsView; label: string }[] = [
+  { value: 'headline', label: 'Headline (Rotating)' },
+  { value: 'list', label: 'List' },
+  { value: 'ticker', label: 'Ticker (Scrolling)' },
+  { value: 'compact', label: 'Compact' },
+];
+
+const NEWS_FEED_PRESETS = [
+  { label: 'BBC News', url: '' },
+  { label: 'NPR', url: 'https://feeds.npr.org/1001/rss.xml' },
+  { label: 'Associated Press', url: 'https://rsshub.app/apnews/topics/apf-topnews' },
+  { label: 'Reuters', url: 'https://feeds.reuters.com/reuters/topNews' },
+  { label: 'ABC News', url: 'https://feeds.abcnews.com/abcnews/topstories' },
+  { label: 'CBS News', url: 'https://www.cbsnews.com/latest/rss/main' },
+  { label: 'Ars Technica', url: 'https://feeds.arstechnica.com/arstechnica/index' },
+  { label: 'MarketWatch', url: 'https://feeds.marketwatch.com/marketwatch/topstories' },
+];
+
+const PRESET_URLS = new Set(NEWS_FEED_PRESETS.map((p) => p.url));
+
 function NewsConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
-  const { config: c, set } = useModuleConfig<{ feedUrl?: string; refreshIntervalMs?: number; rotateIntervalMs?: number }>(mod, screenId);
+  const { config: c, set } = useModuleConfig<{
+    feedUrl?: string; view?: NewsView; refreshIntervalMs?: number; rotateIntervalMs?: number;
+    maxItems?: number; showTimestamp?: boolean; showDescription?: boolean; tickerSpeed?: number;
+  }>(mod, screenId);
+
+  const feedUrl = (c.feedUrl as string) || '';
+  const isCustom = feedUrl !== '' && !PRESET_URLS.has(feedUrl);
+  const view = c.view ?? 'headline';
 
   return (
     <>
       <label className="flex flex-col gap-0.5">
-        <span className="text-xs text-neutral-400">RSS Feed URL (blank = BBC News)</span>
-        <input
-          type="text"
-          value={(c.feedUrl as string) || ''}
-          onChange={(e) => set({ feedUrl: e.target.value })}
-          placeholder="https://feeds.bbci.co.uk/news/rss.xml"
+        <span className="text-xs text-neutral-400">Feed Source</span>
+        <select
+          value={isCustom ? '__custom__' : feedUrl}
+          onChange={(e) => {
+            const val = e.target.value;
+            set({ feedUrl: val === '__custom__' ? 'https://' : val });
+          }}
           className={INPUT_CLASS}
-        />
+        >
+          {NEWS_FEED_PRESETS.map((p) => (
+            <option key={p.url} value={p.url}>{p.label}</option>
+          ))}
+          <option value="__custom__">Custom URL…</option>
+        </select>
       </label>
-      <Slider
-        label="Rotate Headlines (seconds)"
-        value={(c.rotateIntervalMs ?? 10000) / 1000}
-        min={3}
-        max={30}
-        onChange={(v) => set({ rotateIntervalMs: v * 1000 })}
-      />
+      {isCustom && (
+        <label className="flex flex-col gap-0.5">
+          <span className="text-xs text-neutral-400">Custom RSS Feed URL</span>
+          <input
+            type="text"
+            value={feedUrl}
+            onChange={(e) => set({ feedUrl: e.target.value })}
+            placeholder="https://example.com/feed.xml"
+            className={INPUT_CLASS}
+          />
+        </label>
+      )}
+      <label className="flex flex-col gap-0.5">
+        <span className="text-xs text-neutral-400">View</span>
+        <select
+          value={view}
+          onChange={(e) => set({ view: e.target.value as NewsView })}
+          className={INPUT_CLASS}
+        >
+          {NEWS_VIEWS.map((v) => (
+            <option key={v.value} value={v.value}>{v.label}</option>
+          ))}
+        </select>
+      </label>
+      {view === 'headline' && (
+        <Slider
+          label="Rotate Headlines (seconds)"
+          value={(c.rotateIntervalMs ?? 10000) / 1000}
+          min={3}
+          max={30}
+          onChange={(v) => set({ rotateIntervalMs: v * 1000 })}
+        />
+      )}
+      {view !== 'headline' && (
+        <Slider
+          label="Max Items"
+          value={c.maxItems ?? 10}
+          min={3}
+          max={20}
+          onChange={(v) => set({ maxItems: v })}
+        />
+      )}
+      {view === 'ticker' && (
+        <Slider
+          label="Ticker Speed (sec/item)"
+          value={c.tickerSpeed ?? 5}
+          min={1}
+          max={15}
+          onChange={(v) => set({ tickerSpeed: v })}
+        />
+      )}
+      {(view === 'list' || view === 'compact') && (
+        <Toggle
+          label="Show Timestamp"
+          checked={c.showTimestamp ?? false}
+          onChange={(v) => set({ showTimestamp: v })}
+        />
+      )}
+      {view === 'list' && (
+        <Toggle
+          label="Show Description"
+          checked={c.showDescription ?? false}
+          onChange={(v) => set({ showDescription: v })}
+        />
+      )}
       <Slider
         label="Refresh Feed (seconds)"
         value={(c.refreshIntervalMs ?? 300000) / 1000}

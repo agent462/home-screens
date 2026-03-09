@@ -219,8 +219,13 @@ registerModule({
   category: 'News & Finance',
   defaultConfig: {
     feedUrl: '',
+    view: 'headline',
     refreshIntervalMs: 300000,
     rotateIntervalMs: 10000,
+    maxItems: 10,
+    showTimestamp: false,
+    showDescription: false,
+    tickerSpeed: 5,
   },
   defaultSize: DEFAULT_MODULE_SIZES.news,
 });

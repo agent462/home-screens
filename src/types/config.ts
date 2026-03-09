@@ -241,10 +241,17 @@ export interface GreetingConfig {
 }
 
 // News module config
+export type NewsView = 'headline' | 'list' | 'ticker' | 'compact';
+
 export interface NewsConfig {
   feedUrl: string;
+  view: NewsView;
   refreshIntervalMs: number;
   rotateIntervalMs: number;
+  maxItems: number;
+  showTimestamp: boolean;
+  showDescription: boolean;
+  tickerSpeed: number;
 }
 
 // Stock ticker module config
