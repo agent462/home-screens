@@ -36,16 +36,6 @@ function ModulePreview({ mod, previewData, settings }: { mod: ModuleInstance; pr
     extraProps.hourly = wd.hourly ?? [];
     extraProps.forecast = wd.forecast ?? [];
     extraProps.units = settings?.units;
-  } else if (mod.type === 'weather-hourly' && wd) {
-    extraProps.data = wd.hourly;
-    if (wd.forecast && Array.isArray(wd.forecast) && wd.forecast.length > 0) {
-      const today = wd.forecast[0] as Record<string, unknown>;
-      extraProps.todayHigh = today.high;
-      extraProps.todayLow = today.low;
-    }
-  } else if (mod.type === 'weather-forecast' && wd) {
-    extraProps.data = wd.forecast;
-    extraProps.units = settings?.units;
   } else if (mod.type === 'calendar') {
     extraProps.events = previewData.calendarEvents;
   }

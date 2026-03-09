@@ -91,7 +91,7 @@ The config is read via `GET /api/config` and written via `PUT /api/config`. Writ
 ```typescript
 {
   id: string                    // Unique ID (UUID)
-  type: ModuleType              // Module type (e.g. "clock", "weather-hourly")
+  type: ModuleType              // Module type (e.g. "clock", "weather")
   position: { x: number, y: number }   // Top-left position in pixels
   size: { w: number, h: number }       // Width and height in pixels
   zIndex: number                        // Stacking order

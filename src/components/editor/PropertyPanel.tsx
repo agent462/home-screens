@@ -338,63 +338,6 @@ function WeatherConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId
   );
 }
 
-function WeatherHourlyConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
-  const { config: c, set } = useModuleConfig<{
-    hoursToShow?: number;
-    showFeelsLike?: boolean;
-    showPrecipitation?: boolean;
-    showHumidity?: boolean;
-    showWind?: boolean;
-  }>(mod, screenId);
-
-  return (
-    <>
-      <label className="flex flex-col gap-0.5">
-        <span className="text-xs text-neutral-400">Hours to Show</span>
-        <input
-          type="number"
-          value={c.hoursToShow ?? 8}
-          onChange={(e) => set({ hoursToShow: Number(e.target.value) })}
-          className={INPUT_CLASS}
-        />
-      </label>
-      <Toggle label="Feels Like" checked={c.showFeelsLike !== false} onChange={(v) => set({ showFeelsLike: v })} />
-      <Toggle label="Precipitation" checked={c.showPrecipitation !== false} onChange={(v) => set({ showPrecipitation: v })} />
-      <Toggle label="Humidity" checked={!!c.showHumidity} onChange={(v) => set({ showHumidity: v })} />
-      <Toggle label="Wind Speed" checked={!!c.showWind} onChange={(v) => set({ showWind: v })} />
-    </>
-  );
-}
-
-function WeatherForecastConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
-  const { config: c, set } = useModuleConfig<{
-    daysToShow?: number;
-    showHighLow?: boolean;
-    showPrecipitation?: boolean;
-    showPrecipAmount?: boolean;
-    showHumidity?: boolean;
-    showWind?: boolean;
-  }>(mod, screenId);
-
-  return (
-    <>
-      <label className="flex flex-col gap-0.5">
-        <span className="text-xs text-neutral-400">Days to Show</span>
-        <input
-          type="number"
-          value={c.daysToShow ?? 5}
-          onChange={(e) => set({ daysToShow: Number(e.target.value) })}
-          className={INPUT_CLASS}
-        />
-      </label>
-      <Toggle label="High / Low" checked={c.showHighLow !== false} onChange={(v) => set({ showHighLow: v })} />
-      <Toggle label="Precipitation %" checked={!!c.showPrecipitation} onChange={(v) => set({ showPrecipitation: v })} />
-      <Toggle label="Precipitation Amount" checked={!!c.showPrecipAmount} onChange={(v) => set({ showPrecipAmount: v })} />
-      <Toggle label="Humidity" checked={!!c.showHumidity} onChange={(v) => set({ showHumidity: v })} />
-      <Toggle label="Wind Speed" checked={!!c.showWind} onChange={(v) => set({ showWind: v })} />
-    </>
-  );
-}
 
 function CountdownConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
   const { config: c, set } = useModuleConfig<{ events?: CountdownEvent[]; scale?: number; showPastEvents?: boolean }>(mod, screenId);
@@ -1179,8 +1122,6 @@ const CONFIG_SECTIONS: Record<string, React.FC<{ mod: ModuleInstance; screenId: 
   clock: ClockConfigSection,
   calendar: CalendarConfigSection,
   weather: WeatherConfigSection,
-  'weather-hourly': WeatherHourlyConfigSection,
-  'weather-forecast': WeatherForecastConfigSection,
   countdown: CountdownConfigSection,
   'dad-joke': DadJokeConfigSection,
   text: TextConfigSection,

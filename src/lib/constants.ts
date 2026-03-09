@@ -46,8 +46,6 @@ export const DEFAULT_MODULE_SIZES: Record<string, { w: number; h: number }> = {
   clock: { w: 400, h: 200 },
   calendar: { w: 500, h: 600 },
   weather: { w: 600, h: 300 },
-  'weather-hourly': { w: 600, h: 250 },
-  'weather-forecast': { w: 500, h: 400 },
   countdown: { w: 500, h: 500 },
   'dad-joke': { w: 500, h: 200 },
   text: { w: 400, h: 150 },

@@ -140,7 +140,7 @@ function useSharedDisplayData(screens: Screen[], settings: GlobalSettings): Shar
     let wapi = false;
     for (const screen of screens) {
       for (const mod of screen.modules) {
-        if (mod.type === 'weather' || mod.type === 'weather-hourly' || mod.type === 'weather-forecast') {
+        if (mod.type === 'weather') {
           const p = resolveProvider(mod, globalProvider);
           if (p === 'openweathermap') owm = true;
           if (p === 'weatherapi') wapi = true;

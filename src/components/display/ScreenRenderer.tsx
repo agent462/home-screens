@@ -23,7 +23,6 @@ function resolveProvider(mod: { type: string; config: Record<string, unknown> },
     const p = mod.config.provider as string | undefined;
     return (p && p !== 'global') ? p : globalProvider;
   }
-  // Legacy modules always use the global provider
   return globalProvider;
 }
 
@@ -103,16 +102,6 @@ export default function ScreenRenderer({ screen, settings, rotatingBackground, s
         } else if (mod.type === 'weather' && weatherData) {
           extraProps.hourly = weatherData.hourly ?? [];
           extraProps.forecast = weatherData.forecast ?? [];
-          extraProps.units = settings.weather.units;
-        } else if (mod.type === 'weather-hourly' && weatherData) {
-          extraProps.data = weatherData.hourly ?? weatherData;
-          const forecast = weatherData.forecast as Array<Record<string, unknown>> | undefined;
-          if (forecast?.[0]) {
-            extraProps.todayHigh = forecast[0].high;
-            extraProps.todayLow = forecast[0].low;
-          }
-        } else if (mod.type === 'weather-forecast' && weatherData) {
-          extraProps.data = weatherData.forecast ?? weatherData;
           extraProps.units = settings.weather.units;
         }
 

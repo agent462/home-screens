@@ -8,7 +8,7 @@ import {
 import type { ModuleType } from '@/types/config';
 
 const ALL_MODULE_TYPES: ModuleType[] = [
-  'clock', 'calendar', 'weather', 'weather-hourly', 'weather-forecast',
+  'clock', 'calendar', 'weather',
   'countdown', 'dad-joke', 'text', 'image', 'quote', 'todo',
   'sticky-note', 'greeting', 'news', 'stock-ticker', 'crypto',
   'word-of-day', 'history', 'moon-phase', 'sunrise-sunset',
@@ -31,7 +31,7 @@ describe('MODULE_CATEGORIES', () => {
 });
 
 describe('Registry completeness', () => {
-  it('registers all 27 module types', () => {
+  it('registers all 25 module types', () => {
     for (const type of ALL_MODULE_TYPES) {
       expect(getModuleDefinition(type as ModuleType), `Missing module: ${type}`).toBeDefined();
     }
@@ -132,13 +132,6 @@ describe('getModuleDefinition', () => {
       expect(config).toHaveProperty('showWeekNumbers');
     });
 
-    it('weather-hourly has hoursToShow, showFeelsLike, showPrecipitation', () => {
-      const config = getModuleDefinition('weather-hourly')!.defaultConfig;
-      expect(config).toHaveProperty('hoursToShow');
-      expect(config).toHaveProperty('showFeelsLike');
-      expect(config).toHaveProperty('showPrecipitation');
-    });
-
     it('traffic has routes array and refreshIntervalMs', () => {
       const config = getModuleDefinition('traffic')!.defaultConfig;
       expect(config).toHaveProperty('routes');
@@ -157,8 +150,8 @@ describe('getModuleDefinition', () => {
 });
 
 describe('getAllModuleDefinitions', () => {
-  it('returns an array of length 27', () => {
-    expect(getAllModuleDefinitions()).toHaveLength(27);
+  it('returns an array of length 25', () => {
+    expect(getAllModuleDefinitions()).toHaveLength(25);
   });
 
   it('all items have required fields', () => {
@@ -214,12 +207,10 @@ describe('getModulesByCategory', () => {
     expect(types).toContain('year-progress');
   });
 
-  it('Weather & Environment contains weather, weather-hourly, weather-forecast, moon-phase, sunrise-sunset, air-quality', () => {
+  it('Weather & Environment contains weather, moon-phase, sunrise-sunset, air-quality', () => {
     const grouped = getModulesByCategory();
     const types = grouped.get('Weather & Environment')!.map((d) => d.type);
     expect(types).toContain('weather');
-    expect(types).toContain('weather-hourly');
-    expect(types).toContain('weather-forecast');
     expect(types).toContain('moon-phase');
     expect(types).toContain('sunrise-sunset');
     expect(types).toContain('air-quality');
@@ -277,8 +268,8 @@ describe('getModulesByCategory', () => {
         total++;
       }
     }
-    expect(total).toBe(27);
-    expect(allTypes.size).toBe(27);
+    expect(total).toBe(25);
+    expect(allTypes.size).toBe(25);
   });
 });
 
@@ -350,15 +341,6 @@ describe('Data correctness spot checks', () => {
     expect(config.showHighLow).toBe(true);
     expect(config.showPrecipitation).toBe(true);
     expect(config.showPrecipAmount).toBe(false);
-    expect(config.showHumidity).toBe(false);
-    expect(config.showWind).toBe(false);
-  });
-
-  it('weather-forecast defaultConfig: 5 days, highLow and precipitation on', () => {
-    const config = getModuleDefinition('weather-forecast')!.defaultConfig;
-    expect(config.daysToShow).toBe(5);
-    expect(config.showHighLow).toBe(true);
-    expect(config.showPrecipitation).toBe(true);
     expect(config.showHumidity).toBe(false);
     expect(config.showWind).toBe(false);
   });

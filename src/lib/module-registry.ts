@@ -1,7 +1,7 @@
 import type { ModuleType } from '@/types/config';
 import type { LucideIcon } from 'lucide-react';
 import {
-  Clock, CalendarDays, CloudSun, Sun, Hourglass, Laugh, Type, ImageIcon,
+  Clock, CalendarDays, CloudSun, Hourglass, Laugh, Type, ImageIcon,
   Quote, ListTodo, StickyNote, HandMetal,
   Newspaper, TrendingUp, Bitcoin, BookOpen, History,
   Moon, Sunrise, Image, QrCode, BarChart3, Car, Trophy, Wind,
@@ -116,36 +116,6 @@ registerModule({
   defaultSize: DEFAULT_MODULE_SIZES.weather,
 });
 
-registerModule({
-  type: 'weather-hourly',
-  label: 'Hourly Weather (Legacy)',
-  icon: CloudSun,
-  category: 'Weather & Environment',
-  defaultConfig: {
-    hoursToShow: 8,
-    showFeelsLike: true,
-    showPrecipitation: true,
-    showHumidity: false,
-    showWind: false,
-  },
-  defaultSize: DEFAULT_MODULE_SIZES['weather-hourly'],
-});
-
-registerModule({
-  type: 'weather-forecast',
-  label: 'Weather Forecast (Legacy)',
-  icon: Sun,
-  category: 'Weather & Environment',
-  defaultConfig: {
-    daysToShow: 5,
-    showHighLow: true,
-    showPrecipitation: true,
-    showPrecipAmount: false,
-    showHumidity: false,
-    showWind: false,
-  },
-  defaultSize: DEFAULT_MODULE_SIZES['weather-forecast'],
-});
 
 registerModule({
   type: 'countdown',

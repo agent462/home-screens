@@ -2,8 +2,6 @@ export type ModuleType =
   | 'clock'
   | 'calendar'
   | 'weather'
-  | 'weather-hourly'
-  | 'weather-forecast'
   | 'countdown'
   | 'dad-joke'
   | 'text'
@@ -182,23 +180,6 @@ export interface WeatherConfig {
   showWind: boolean;
 }
 
-// Legacy weather configs (kept for backward compatibility during transition)
-export interface WeatherHourlyConfig {
-  hoursToShow: number;
-  showFeelsLike: boolean;
-  showPrecipitation: boolean;
-  showHumidity: boolean;
-  showWind: boolean;
-}
-
-export interface WeatherForecastConfig {
-  daysToShow: number;
-  showHighLow: boolean;
-  showPrecipitation: boolean;
-  showPrecipAmount: boolean;
-  showHumidity: boolean;
-  showWind: boolean;
-}
 
 // Countdown config
 export interface CountdownEvent {
