@@ -64,14 +64,20 @@ export default function DisplaySection({ values, onChange }: Props) {
           Physical rotation applied via wlr-randr on the kiosk. Takes effect on next boot.
         </p>
       </label>
-      <Slider
-        label="Screen Rotation (seconds)"
-        value={rotationInterval}
-        min={5}
-        max={120}
-        step={5}
-        onChange={(v) => onChange({ rotationInterval: v })}
-      />
+      <div className="mb-3">
+        <Slider
+          label="Screen Rotation (seconds)"
+          value={rotationInterval}
+          min={5}
+          max={120}
+          step={5}
+          onChange={(v) => onChange({ rotationInterval: v })}
+        />
+        <p className="text-xs text-neutral-500 mt-1">
+          How long each screen is shown before automatically cycling to the next.
+          Only applies when you have multiple screens configured.
+        </p>
+      </div>
     </section>
   );
 }

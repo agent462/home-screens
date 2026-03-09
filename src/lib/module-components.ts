@@ -8,6 +8,7 @@ import type { ModuleType } from '@/types/config';
 export const moduleComponents = {
   clock: dynamic(() => import('@/components/modules/ClockModule')),
   calendar: dynamic(() => import('@/components/modules/CalendarModule')),
+  weather: dynamic(() => import('@/components/modules/weather/WeatherModule')),
   'weather-hourly': dynamic(() => import('@/components/modules/WeatherHourlyModule')),
   'weather-forecast': dynamic(() => import('@/components/modules/WeatherForecastModule')),
   countdown: dynamic(() => import('@/components/modules/CountdownModule')),

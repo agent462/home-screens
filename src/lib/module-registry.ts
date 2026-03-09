@@ -96,8 +96,29 @@ registerModule({
 });
 
 registerModule({
+  type: 'weather',
+  label: 'Weather',
+  icon: CloudSun,
+  category: 'Weather & Environment',
+  defaultConfig: {
+    view: 'hourly',
+    iconSet: 'color',
+    provider: 'global',
+    hoursToShow: 8,
+    showFeelsLike: true,
+    daysToShow: 5,
+    showHighLow: true,
+    showPrecipitation: true,
+    showPrecipAmount: false,
+    showHumidity: false,
+    showWind: false,
+  },
+  defaultSize: DEFAULT_MODULE_SIZES.weather,
+});
+
+registerModule({
   type: 'weather-hourly',
-  label: 'Hourly Weather',
+  label: 'Hourly Weather (Legacy)',
   icon: CloudSun,
   category: 'Weather & Environment',
   defaultConfig: {
@@ -112,7 +133,7 @@ registerModule({
 
 registerModule({
   type: 'weather-forecast',
-  label: 'Weather Forecast',
+  label: 'Weather Forecast (Legacy)',
   icon: Sun,
   category: 'Weather & Environment',
   defaultConfig: {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import type { Screen, GlobalSettings } from '@/types/config';
 import { DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT, WEATHER_REFRESH_MS, CALENDAR_REFRESH_MS } from '@/lib/constants';
 import { moduleComponents } from '@/lib/module-components';
@@ -12,18 +12,49 @@ interface ScreenRendererProps {
   rotatingBackground?: string;
 }
 
+function resolveProvider(mod: { type: string; config: Record<string, unknown> }, globalProvider: string): string {
+  if (mod.type === 'weather') {
+    const p = mod.config.provider as string | undefined;
+    return (p && p !== 'global') ? p : globalProvider;
+  }
+  // Legacy modules always use the global provider
+  return globalProvider;
+}
+
 export default function ScreenRenderer({ screen, settings, rotatingBackground }: ScreenRendererProps) {
   const lat = settings.latitude ?? settings.weather.latitude;
   const lon = settings.longitude ?? settings.weather.longitude;
-  const weatherUrl = `/api/weather?lat=${lat}&lon=${lon}&units=${settings.weather.units}&provider=${settings.weather.provider}`;
+  const globalProvider = settings.weather.provider;
+  const baseParams = `lat=${lat}&lon=${lon}&units=${settings.weather.units}`;
+
+  // Determine which providers are needed by weather modules on this screen
+  const { needsOWM, needsWAPI } = useMemo(() => {
+    let owm = false;
+    let wapi = false;
+    for (const mod of screen.modules) {
+      if (mod.type === 'weather' || mod.type === 'weather-hourly' || mod.type === 'weather-forecast') {
+        const p = resolveProvider(mod, globalProvider);
+        if (p === 'openweathermap') owm = true;
+        if (p === 'weatherapi') wapi = true;
+      }
+    }
+    return { needsOWM: owm, needsWAPI: wapi };
+  }, [screen.modules, globalProvider]);
+
+  // Always call both hooks (React rules), empty URL = no fetch
+  const owmUrl = needsOWM ? `/api/weather?${baseParams}&provider=openweathermap` : '';
+  const wapiUrl = needsWAPI ? `/api/weather?${baseParams}&provider=weatherapi` : '';
+  const owmData = useFetchData(owmUrl, WEATHER_REFRESH_MS);
+  const wapiData = useFetchData(wapiUrl, WEATHER_REFRESH_MS);
+
   const calendarIdList = settings.calendar.googleCalendarIds?.length
     ? settings.calendar.googleCalendarIds
     : settings.calendar.googleCalendarId ? [settings.calendar.googleCalendarId] : [];
   const calendarUrl = calendarIdList.length
     ? `/api/calendar?calendarIds=${encodeURIComponent(calendarIdList.join(','))}`
     : '';
-  const weatherData = useFetchData(weatherUrl, WEATHER_REFRESH_MS);
   const calendarData = useFetchData(calendarUrl, CALENDAR_REFRESH_MS);
+
   const [viewportSize, setViewportSize] = useState({ w: 0, h: 0 });
   useEffect(() => {
     function update() {
@@ -40,10 +71,16 @@ export default function ScreenRenderer({ screen, settings, rotatingBackground }:
   const displayW = settings.displayWidth || DEFAULT_DISPLAY_WIDTH;
   const displayH = settings.displayHeight || DEFAULT_DISPLAY_HEIGHT;
 
-  // Scale the canvas to fit the viewport
   const scale = viewportSize.w > 0
     ? Math.min(viewportSize.w / displayW, viewportSize.h / displayH)
     : 1;
+
+  function getWeatherData(mod: { type: string; config: Record<string, unknown> }): Record<string, unknown> | null {
+    const p = resolveProvider(mod, globalProvider);
+    if (p === 'openweathermap') return owmData as Record<string, unknown> | null;
+    if (p === 'weatherapi') return wapiData as Record<string, unknown> | null;
+    return null;
+  }
 
   return (
     <div
@@ -76,29 +113,31 @@ export default function ScreenRenderer({ screen, settings, rotatingBackground }:
         const Component = moduleComponents[mod.type];
         if (!Component) return null;
 
-        // Build extra props based on module type
         const extraProps: Record<string, unknown> = {};
-
-        // Pass timezone to all modules (ignored by modules that don't accept it)
         extraProps.timezone = settings.timezone;
 
-        // Pass global location to location-aware modules
         if (['moon-phase', 'sunrise-sunset'].includes(mod.type)) {
           extraProps.latitude = settings.latitude ?? settings.weather.latitude;
           extraProps.longitude = settings.longitude ?? settings.weather.longitude;
         }
 
+        const weatherData = getWeatherData(mod);
+
         if (mod.type === 'calendar' && calendarData) {
           extraProps.events = Array.isArray(calendarData) ? calendarData : (calendarData as Record<string, unknown>).events ?? [];
+        } else if (mod.type === 'weather' && weatherData) {
+          extraProps.hourly = weatherData.hourly ?? [];
+          extraProps.forecast = weatherData.forecast ?? [];
+          extraProps.units = settings.weather.units;
         } else if (mod.type === 'weather-hourly' && weatherData) {
-          extraProps.data = (weatherData as Record<string, unknown>).hourly ?? weatherData;
-          const forecast = (weatherData as Record<string, unknown>).forecast as Array<Record<string, unknown>> | undefined;
+          extraProps.data = weatherData.hourly ?? weatherData;
+          const forecast = weatherData.forecast as Array<Record<string, unknown>> | undefined;
           if (forecast?.[0]) {
             extraProps.todayHigh = forecast[0].high;
             extraProps.todayLow = forecast[0].low;
           }
         } else if (mod.type === 'weather-forecast' && weatherData) {
-          extraProps.data = (weatherData as Record<string, unknown>).forecast ?? weatherData;
+          extraProps.data = weatherData.forecast ?? weatherData;
           extraProps.units = settings.weather.units;
         }
 

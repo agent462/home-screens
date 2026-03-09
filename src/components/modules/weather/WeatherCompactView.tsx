@@ -1,0 +1,44 @@
+import { CloudRain, Droplets, Wind } from 'lucide-react';
+import { getWeatherIcon } from '@/lib/weather-icons';
+import { WeatherStat } from '../WeatherStat';
+import type { WeatherViewProps } from './types';
+
+export default function WeatherCompactView({ config, hourly, forecast, scaledFontSize, containerRef }: WeatherViewProps) {
+  const current = hourly[0];
+  const today = forecast[0];
+
+  if (!current) {
+    return (
+      <div ref={containerRef} className="w-full h-full flex items-center justify-center">
+        <p className="opacity-50" style={{ fontSize: `${scaledFontSize}px` }}>No weather data</p>
+      </div>
+    );
+  }
+
+  const Icon = getWeatherIcon(current.icon, config.iconSet);
+
+  return (
+    <div ref={containerRef} className="w-full h-full flex flex-col justify-center gap-1" style={{ fontSize: `${scaledFontSize}px` }}>
+      <div className="flex items-center gap-3">
+        <Icon size="1.8em" strokeWidth={1.5} />
+        <span className="font-light" style={{ fontSize: '2em' }}>{Math.round(current.temp)}&deg;</span>
+        {today && config.showHighLow !== false && (
+          <span className="opacity-50" style={{ fontSize: '0.85em' }}>
+            H:{Math.round(today.high)}&deg; L:{Math.round(today.low)}&deg;
+          </span>
+        )}
+        <span className="opacity-50 capitalize truncate" style={{ fontSize: '0.8em' }}>{current.description}</span>
+      </div>
+      <div className="flex items-center gap-3">
+        {config.showFeelsLike !== false && current.feelsLike != null && (
+          <span className="opacity-40" style={{ fontSize: '0.7em' }}>
+            Feels {Math.round(current.feelsLike)}&deg;
+          </span>
+        )}
+        <WeatherStat icon={CloudRain} value={current.precipProbability} unit="%" visible={config.showPrecipitation !== false} fontSize="0.7em" />
+        <WeatherStat icon={Droplets} value={current.humidity} unit="%" visible={config.showHumidity} fontSize="0.7em" />
+        <WeatherStat icon={Wind} value={current.windSpeed} visible={config.showWind} fontSize="0.7em" />
+      </div>
+    </div>
+  );
+}

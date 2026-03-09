@@ -10,7 +10,7 @@ import Toggle from '@/components/ui/Toggle';
 import ColorPicker from '@/components/ui/ColorPicker';
 import Button from '@/components/ui/Button';
 import BackgroundPicker from '@/components/editor/BackgroundPicker';
-import type { ModuleInstance, CountdownEvent, TodoItem } from '@/types/config';
+import type { ModuleInstance, CountdownEvent, TodoItem, WeatherView, WeatherIconSet, WeatherProviderOption } from '@/types/config';
 import { v4 as uuidv4 } from 'uuid';
 
 const INPUT_CLASS = 'w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200';
@@ -207,6 +207,133 @@ function CalendarConfigSection({ mod, screenId }: { mod: ModuleInstance; screenI
       {(viewMode === 'week' || viewMode === 'month') && (
         <Toggle label="Show Week Numbers" checked={!!c.showWeekNumbers} onChange={(v) => set({ showWeekNumbers: v })} />
       )}
+    </>
+  );
+}
+
+const WEATHER_VIEWS: { value: WeatherView; label: string }[] = [
+  { value: 'current', label: 'Current Only' },
+  { value: 'hourly', label: 'Hourly' },
+  { value: 'daily', label: 'Daily Forecast' },
+  { value: 'combined', label: 'Combined' },
+  { value: 'compact', label: 'Compact' },
+  { value: 'table', label: 'Table' },
+];
+
+function WeatherConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
+  const { config: c, set } = useModuleConfig<{
+    view?: WeatherView;
+    iconSet?: WeatherIconSet;
+    provider?: WeatherProviderOption;
+    hoursToShow?: number;
+    showFeelsLike?: boolean;
+    daysToShow?: number;
+    showHighLow?: boolean;
+    showPrecipitation?: boolean;
+    showPrecipAmount?: boolean;
+    showHumidity?: boolean;
+    showWind?: boolean;
+  }>(mod, screenId);
+
+  const [configuredProviders, setConfiguredProviders] = useState<string[]>([]);
+  useEffect(() => {
+    async function check() {
+      try {
+        const res = await fetch('/api/secrets');
+        if (res.ok) {
+          const data: Record<string, boolean> = await res.json();
+          const providers: string[] = [];
+          if (data.openweathermap_key) providers.push('openweathermap');
+          if (data.weatherapi_key) providers.push('weatherapi');
+          setConfiguredProviders(providers);
+        }
+      } catch { /* ignore */ }
+    }
+    check();
+  }, []);
+
+  const view = c.view ?? 'hourly';
+  const showsHours = view === 'hourly' || view === 'combined';
+  const showsDays = view === 'daily' || view === 'combined' || view === 'table';
+  const showsCurrent = ['current', 'hourly', 'combined', 'compact'].includes(view);
+
+  return (
+    <>
+      <label className="flex flex-col gap-0.5">
+        <span className="text-xs text-neutral-400">View</span>
+        <select
+          value={view}
+          onChange={(e) => set({ view: e.target.value as WeatherView })}
+          className={INPUT_CLASS}
+        >
+          {WEATHER_VIEWS.map((v) => (
+            <option key={v.value} value={v.value}>{v.label}</option>
+          ))}
+        </select>
+      </label>
+      <label className="flex flex-col gap-0.5">
+        <span className="text-xs text-neutral-400">Icon Style</span>
+        <select
+          value={c.iconSet ?? 'color'}
+          onChange={(e) => set({ iconSet: e.target.value as WeatherIconSet })}
+          className={INPUT_CLASS}
+        >
+          <option value="outline">Outline</option>
+          <option value="color">Color</option>
+        </select>
+      </label>
+      {configuredProviders.length > 0 && (
+        <label className="flex flex-col gap-0.5">
+          <span className="text-xs text-neutral-400">Data Provider</span>
+          <select
+            value={c.provider ?? 'global'}
+            onChange={(e) => set({ provider: e.target.value as WeatherProviderOption })}
+            className={INPUT_CLASS}
+          >
+            <option value="global">Global Default</option>
+            {configuredProviders.includes('openweathermap') && (
+              <option value="openweathermap">OpenWeatherMap</option>
+            )}
+            {configuredProviders.includes('weatherapi') && (
+              <option value="weatherapi">WeatherAPI</option>
+            )}
+          </select>
+        </label>
+      )}
+      {showsHours && (
+        <label className="flex flex-col gap-0.5">
+          <span className="text-xs text-neutral-400">Hours to Show</span>
+          <input
+            type="number"
+            value={c.hoursToShow ?? 8}
+            onChange={(e) => set({ hoursToShow: Number(e.target.value) })}
+            className={INPUT_CLASS}
+          />
+        </label>
+      )}
+      {showsDays && (
+        <label className="flex flex-col gap-0.5">
+          <span className="text-xs text-neutral-400">Days to Show</span>
+          <input
+            type="number"
+            value={c.daysToShow ?? 5}
+            onChange={(e) => set({ daysToShow: Number(e.target.value) })}
+            className={INPUT_CLASS}
+          />
+        </label>
+      )}
+      {showsCurrent && (
+        <Toggle label="Feels Like" checked={c.showFeelsLike !== false} onChange={(v) => set({ showFeelsLike: v })} />
+      )}
+      {showsDays && (
+        <Toggle label="High / Low" checked={c.showHighLow !== false} onChange={(v) => set({ showHighLow: v })} />
+      )}
+      <Toggle label="Precipitation" checked={c.showPrecipitation !== false} onChange={(v) => set({ showPrecipitation: v })} />
+      {showsDays && (
+        <Toggle label="Precipitation Amount" checked={!!c.showPrecipAmount} onChange={(v) => set({ showPrecipAmount: v })} />
+      )}
+      <Toggle label="Humidity" checked={!!c.showHumidity} onChange={(v) => set({ showHumidity: v })} />
+      <Toggle label="Wind Speed" checked={!!c.showWind} onChange={(v) => set({ showWind: v })} />
     </>
   );
 }
@@ -1051,6 +1178,7 @@ function TodoistConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId
 const CONFIG_SECTIONS: Record<string, React.FC<{ mod: ModuleInstance; screenId: string }>> = {
   clock: ClockConfigSection,
   calendar: CalendarConfigSection,
+  weather: WeatherConfigSection,
   'weather-hourly': WeatherHourlyConfigSection,
   'weather-forecast': WeatherForecastConfigSection,
   countdown: CountdownConfigSection,

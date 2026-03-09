@@ -8,7 +8,7 @@ import {
 import type { ModuleType } from '@/types/config';
 
 const ALL_MODULE_TYPES: ModuleType[] = [
-  'clock', 'calendar', 'weather-hourly', 'weather-forecast',
+  'clock', 'calendar', 'weather', 'weather-hourly', 'weather-forecast',
   'countdown', 'dad-joke', 'text', 'image', 'quote', 'todo',
   'sticky-note', 'greeting', 'news', 'stock-ticker', 'crypto',
   'word-of-day', 'history', 'moon-phase', 'sunrise-sunset',
@@ -31,7 +31,7 @@ describe('MODULE_CATEGORIES', () => {
 });
 
 describe('Registry completeness', () => {
-  it('registers all 26 module types', () => {
+  it('registers all 27 module types', () => {
     for (const type of ALL_MODULE_TYPES) {
       expect(getModuleDefinition(type as ModuleType), `Missing module: ${type}`).toBeDefined();
     }
@@ -157,8 +157,8 @@ describe('getModuleDefinition', () => {
 });
 
 describe('getAllModuleDefinitions', () => {
-  it('returns an array of length 26', () => {
-    expect(getAllModuleDefinitions()).toHaveLength(26);
+  it('returns an array of length 27', () => {
+    expect(getAllModuleDefinitions()).toHaveLength(27);
   });
 
   it('all items have required fields', () => {
@@ -214,9 +214,10 @@ describe('getModulesByCategory', () => {
     expect(types).toContain('year-progress');
   });
 
-  it('Weather & Environment contains weather-hourly, weather-forecast, moon-phase, sunrise-sunset, air-quality', () => {
+  it('Weather & Environment contains weather, weather-hourly, weather-forecast, moon-phase, sunrise-sunset, air-quality', () => {
     const grouped = getModulesByCategory();
     const types = grouped.get('Weather & Environment')!.map((d) => d.type);
+    expect(types).toContain('weather');
     expect(types).toContain('weather-hourly');
     expect(types).toContain('weather-forecast');
     expect(types).toContain('moon-phase');
@@ -276,8 +277,8 @@ describe('getModulesByCategory', () => {
         total++;
       }
     }
-    expect(total).toBe(26);
-    expect(allTypes.size).toBe(26);
+    expect(total).toBe(27);
+    expect(allTypes.size).toBe(27);
   });
 });
 
@@ -336,6 +337,21 @@ describe('Data correctness spot checks', () => {
     expect(config.showWeek).toBe(true);
     expect(config.showDay).toBe(true);
     expect(config.showPercentage).toBe(true);
+  });
+
+  it('weather defaultConfig: view hourly, iconSet color, provider global, hoursToShow 8, daysToShow 5', () => {
+    const config = getModuleDefinition('weather')!.defaultConfig;
+    expect(config.view).toBe('hourly');
+    expect(config.iconSet).toBe('color');
+    expect(config.provider).toBe('global');
+    expect(config.hoursToShow).toBe(8);
+    expect(config.daysToShow).toBe(5);
+    expect(config.showFeelsLike).toBe(true);
+    expect(config.showHighLow).toBe(true);
+    expect(config.showPrecipitation).toBe(true);
+    expect(config.showPrecipAmount).toBe(false);
+    expect(config.showHumidity).toBe(false);
+    expect(config.showWind).toBe(false);
   });
 
   it('weather-forecast defaultConfig: 5 days, highLow and precipitation on', () => {

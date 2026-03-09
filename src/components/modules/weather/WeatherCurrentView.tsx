@@ -1,0 +1,44 @@
+import { CloudRain, Droplets, Wind } from 'lucide-react';
+import { getWeatherIcon } from '@/lib/weather-icons';
+import { WeatherStat } from '../WeatherStat';
+import type { WeatherViewProps } from './types';
+
+export default function WeatherCurrentView({ config, forecast, hourly, scaledFontSize, containerRef }: WeatherViewProps) {
+  const current = hourly[0];
+  const today = forecast[0];
+
+  if (!current) {
+    return (
+      <div ref={containerRef} className="w-full h-full flex items-center justify-center">
+        <p className="opacity-50" style={{ fontSize: `${scaledFontSize}px` }}>No weather data</p>
+      </div>
+    );
+  }
+
+  const Icon = getWeatherIcon(current.icon, config.iconSet);
+
+  return (
+    <div ref={containerRef} className="w-full h-full flex flex-col items-center justify-center gap-2" style={{ fontSize: `${scaledFontSize}px` }}>
+      <div className="flex items-center gap-3">
+        <Icon size="3em" strokeWidth={1.5} />
+        <span className="font-light" style={{ fontSize: '4em' }}>{Math.round(current.temp)}&deg;</span>
+      </div>
+      <p className="opacity-60 capitalize" style={{ fontSize: '1em' }}>{current.description}</p>
+      {today && (
+        <span className="opacity-50" style={{ fontSize: '0.9em' }}>
+          H:{Math.round(today.high)}&deg; L:{Math.round(today.low)}&deg;
+        </span>
+      )}
+      {config.showFeelsLike !== false && current.feelsLike != null && (
+        <span className="opacity-50" style={{ fontSize: '0.85em' }}>
+          Feels like {Math.round(current.feelsLike)}&deg;
+        </span>
+      )}
+      <div className="flex items-center gap-3">
+        <WeatherStat icon={CloudRain} value={current.precipProbability} unit="%" visible={config.showPrecipitation !== false} fontSize="0.85em" />
+        <WeatherStat icon={Droplets} value={current.humidity} unit="%" visible={config.showHumidity} fontSize="0.85em" />
+        <WeatherStat icon={Wind} value={current.windSpeed} visible={config.showWind} fontSize="0.85em" />
+      </div>
+    </div>
+  );
+}

@@ -25,15 +25,27 @@ function ModulePreview({ mod, previewData, settings }: { mod: ModuleInstance; pr
     extraProps.longitude = settings.longitude;
   }
 
-  if (mod.type === 'weather-hourly') {
-    extraProps.data = previewData.weatherHourly;
-    if (previewData.weatherForecast && Array.isArray(previewData.weatherForecast) && previewData.weatherForecast.length > 0) {
-      const today = previewData.weatherForecast[0] as Record<string, unknown>;
+  // Resolve provider for weather modules
+  const globalProvider = settings?.globalProvider ?? 'weatherapi';
+  const modProvider = mod.type === 'weather'
+    ? ((mod.config.provider as string) && (mod.config.provider as string) !== 'global' ? (mod.config.provider as string) : globalProvider)
+    : globalProvider;
+  const wd = previewData.weatherByProvider[modProvider] ?? previewData.weatherByProvider[globalProvider];
+
+  if (mod.type === 'weather' && wd) {
+    extraProps.hourly = wd.hourly ?? [];
+    extraProps.forecast = wd.forecast ?? [];
+    extraProps.units = settings?.units;
+  } else if (mod.type === 'weather-hourly' && wd) {
+    extraProps.data = wd.hourly;
+    if (wd.forecast && Array.isArray(wd.forecast) && wd.forecast.length > 0) {
+      const today = wd.forecast[0] as Record<string, unknown>;
       extraProps.todayHigh = today.high;
       extraProps.todayLow = today.low;
     }
-  } else if (mod.type === 'weather-forecast') {
-    extraProps.data = previewData.weatherForecast;
+  } else if (mod.type === 'weather-forecast' && wd) {
+    extraProps.data = wd.forecast;
+    extraProps.units = settings?.units;
   } else if (mod.type === 'calendar') {
     extraProps.events = previewData.calendarEvents;
   }
@@ -45,11 +57,17 @@ interface PreviewSettings {
   latitude: number | undefined;
   longitude: number | undefined;
   timezone: string | undefined;
+  globalProvider: string;
+  units: 'metric' | 'imperial';
+}
+
+interface ProviderWeatherData {
+  hourly: unknown[] | null;
+  forecast: unknown[] | null;
 }
 
 interface PreviewData {
-  weatherHourly: unknown[] | null;
-  weatherForecast: unknown[] | null;
+  weatherByProvider: Record<string, ProviderWeatherData>;
   calendarEvents: unknown[] | null;
 }
 
@@ -231,8 +249,7 @@ export default function EditorCanvas({ onScaleChange }: { onScaleChange?: (scale
   const [scale, setScale] = useState(0.4);
   const { config, selectedScreenId, selectedModuleId, selectModule, resizeModule } = useEditorStore();
   const [previewData, setPreviewData] = useState<PreviewData>({
-    weatherHourly: null,
-    weatherForecast: null,
+    weatherByProvider: {},
     calendarEvents: null,
   });
   const [dragState, setDragState] = useState<{
@@ -275,6 +292,8 @@ export default function EditorCanvas({ onScaleChange }: { onScaleChange?: (scale
     latitude: config.settings.latitude ?? config.settings.weather.latitude,
     longitude: config.settings.longitude ?? config.settings.weather.longitude,
     timezone: config.settings.timezone,
+    globalProvider: config.settings.weather.provider,
+    units: config.settings.weather.units,
   } : null;
   const currentScreen = config?.screens.find((s) => s.id === selectedScreenId);
   // Poll the server-side background cache so the editor shows the same
@@ -304,31 +323,38 @@ export default function EditorCanvas({ onScaleChange }: { onScaleChange?: (scale
     return () => clearInterval(id);
   }, [currentScreen?.id, currentScreen?.backgroundRotation?.enabled]);
 
-  // Fetch live data for previews
+  // Fetch live data for previews — fetch all configured providers
   useEffect(() => {
     async function fetchPreviewData() {
-      try {
-        const res = await fetch('/api/weather');
-        if (res.ok) {
+      // Fetch both providers in parallel; the server-side cache + secrets
+      // check means unconfigured providers will simply fail gracefully
+      const providers = ['openweathermap', 'weatherapi'] as const;
+      const results = await Promise.allSettled(
+        providers.map(async (p) => {
+          const res = await fetch(`/api/weather?provider=${p}`);
+          if (!res.ok) return null;
           const data = await res.json();
-          setPreviewData((prev) => ({
-            ...prev,
-            weatherHourly: data.hourly ?? null,
-            weatherForecast: data.forecast ?? null,
-          }));
+          return { provider: p, hourly: data.hourly ?? null, forecast: data.forecast ?? null };
+        }),
+      );
+
+      const byProvider: Record<string, ProviderWeatherData> = {};
+      for (const result of results) {
+        if (result.status === 'fulfilled' && result.value) {
+          byProvider[result.value.provider] = {
+            hourly: result.value.hourly,
+            forecast: result.value.forecast,
+          };
         }
-      } catch {
-        // ignore
       }
+      setPreviewData((prev) => ({ ...prev, weatherByProvider: byProvider }));
+
       try {
         const calRes = await fetch('/api/calendar');
         if (calRes.ok) {
           const calData = await calRes.json();
           const events = Array.isArray(calData.events) ? calData.events : Array.isArray(calData) ? calData : [];
-          setPreviewData((prev) => ({
-            ...prev,
-            calendarEvents: events,
-          }));
+          setPreviewData((prev) => ({ ...prev, calendarEvents: events }));
         }
       } catch {
         // ignore

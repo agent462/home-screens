@@ -1,6 +1,7 @@
 export type ModuleType =
   | 'clock'
   | 'calendar'
+  | 'weather'
   | 'weather-hourly'
   | 'weather-forecast'
   | 'countdown'
@@ -161,7 +162,27 @@ export interface CalendarConfig {
   showWeekNumbers: boolean;
 }
 
-// Weather hourly config
+// Unified weather module config
+export type WeatherView = 'current' | 'hourly' | 'daily' | 'combined' | 'compact' | 'table';
+
+export type WeatherIconSet = 'outline' | 'color';
+export type WeatherProviderOption = 'global' | 'openweathermap' | 'weatherapi';
+
+export interface WeatherConfig {
+  view: WeatherView;
+  iconSet: WeatherIconSet;
+  provider: WeatherProviderOption;
+  hoursToShow: number;
+  showFeelsLike: boolean;
+  daysToShow: number;
+  showHighLow: boolean;
+  showPrecipAmount: boolean;
+  showPrecipitation: boolean;
+  showHumidity: boolean;
+  showWind: boolean;
+}
+
+// Legacy weather configs (kept for backward compatibility during transition)
 export interface WeatherHourlyConfig {
   hoursToShow: number;
   showFeelsLike: boolean;
@@ -170,7 +191,6 @@ export interface WeatherHourlyConfig {
   showWind: boolean;
 }
 
-// Weather forecast config
 export interface WeatherForecastConfig {
   daysToShow: number;
   showHighLow: boolean;
