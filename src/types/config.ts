@@ -90,6 +90,10 @@ export interface SleepSettings {
   dimAfterMinutes: number;
   sleepAfterMinutes: number;
   dimBrightness: number;
+  dimSchedule?: {
+    startTime: string; // "23:00"
+    endTime: string;   // "06:00"
+  };
   schedule?: {
     startTime: string; // "23:00"
     endTime: string;   // "06:00"

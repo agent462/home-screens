@@ -6,7 +6,7 @@ import type { SleepSettings, ScreensaverSettings } from '@/types/config';
 export type DisplayState = 'active' | 'dimmed' | 'asleep';
 
 /**
- * Checks whether the current time falls within a fixed sleep schedule window.
+ * Checks whether the current time falls within a schedule window.
  * Handles overnight windows (e.g., 23:00–06:00) correctly.
  */
 function isInScheduleWindow(schedule: { startTime: string; endTime: string }): boolean {
@@ -62,7 +62,7 @@ export function useSleepManager(
     };
   }, [enabled]);
 
-  // Timer that checks idle time and schedule
+  // Timer that checks idle time, dim schedule, and sleep schedule
   useEffect(() => {
     if (!enabled || !sleep) return;
 
@@ -70,17 +70,20 @@ export function useSleepManager(
     const sleepMs = sleep.sleepAfterMinutes * 60 * 1000;
 
     const interval = setInterval(() => {
-      // Fixed schedule takes priority — force asleep during schedule window
+      // Fixed sleep schedule takes highest priority — force asleep during window
       if (sleep.schedule && isInScheduleWindow(sleep.schedule)) {
         setDisplayState('asleep');
         return;
       }
 
+      // Fixed dim schedule — force dimmed during window (but activity can still wake)
+      const inDimWindow = sleep.dimSchedule && isInScheduleWindow(sleep.dimSchedule);
+
       const idle = Date.now() - lastActivityRef.current;
 
       if (idle >= dimMs + sleepMs) {
         setDisplayState('asleep');
-      } else if (idle >= dimMs) {
+      } else if (idle >= dimMs || inDimWindow) {
         setDisplayState('dimmed');
       }
       // Don't reset to 'active' here — that's handled by the activity listener

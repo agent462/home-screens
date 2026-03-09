@@ -49,6 +49,9 @@ export default function SettingsPanel({ onClose }: { onClose: () => void }) {
   const [dimAfterMinutes, setDimAfterMinutes] = useState(settings?.sleep?.dimAfterMinutes ?? 10);
   const [sleepAfterMinutes, setSleepAfterMinutes] = useState(settings?.sleep?.sleepAfterMinutes ?? 30);
   const [dimBrightness, setDimBrightness] = useState(settings?.sleep?.dimBrightness ?? 20);
+  const [dimScheduleEnabled, setDimScheduleEnabled] = useState(!!settings?.sleep?.dimSchedule);
+  const [dimStartTime, setDimStartTime] = useState(settings?.sleep?.dimSchedule?.startTime ?? '23:00');
+  const [dimEndTime, setDimEndTime] = useState(settings?.sleep?.dimSchedule?.endTime ?? '06:00');
   const [sleepScheduleEnabled, setSleepScheduleEnabled] = useState(!!settings?.sleep?.schedule);
   const [sleepStartTime, setSleepStartTime] = useState(settings?.sleep?.schedule?.startTime ?? '23:00');
   const [sleepEndTime, setSleepEndTime] = useState(settings?.sleep?.schedule?.endTime ?? '06:00');
@@ -281,6 +284,7 @@ export default function SettingsPanel({ onClose }: { onClose: () => void }) {
         dimAfterMinutes,
         sleepAfterMinutes,
         dimBrightness,
+        ...(dimScheduleEnabled ? { dimSchedule: { startTime: dimStartTime, endTime: dimEndTime } } : {}),
         ...(sleepScheduleEnabled ? { schedule: { startTime: sleepStartTime, endTime: sleepEndTime } } : {}),
       },
       screensaver: {
@@ -465,11 +469,47 @@ export default function SettingsPanel({ onClose }: { onClose: () => void }) {
                   <label className="flex items-center gap-2 cursor-pointer mt-2">
                     <input
                       type="checkbox"
+                      checked={dimScheduleEnabled}
+                      onChange={(e) => setDimScheduleEnabled(e.target.checked)}
+                      className="rounded border-neutral-600 bg-neutral-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+                    />
+                    <span className="text-sm text-neutral-200">Dim on a schedule</span>
+                  </label>
+
+                  {dimScheduleEnabled && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="block">
+                        <span className="text-xs text-neutral-400">Dim at</span>
+                        <input
+                          type="time"
+                          value={dimStartTime}
+                          onChange={(e) => setDimStartTime(e.target.value)}
+                          className="mt-1 block w-full rounded-md bg-neutral-800 border border-neutral-600 text-sm text-neutral-200 px-3 py-2 focus:outline-none focus:border-blue-500"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="text-xs text-neutral-400">Brighten at</span>
+                        <input
+                          type="time"
+                          value={dimEndTime}
+                          onChange={(e) => setDimEndTime(e.target.value)}
+                          className="mt-1 block w-full rounded-md bg-neutral-800 border border-neutral-600 text-sm text-neutral-200 px-3 py-2 focus:outline-none focus:border-blue-500"
+                        />
+                      </label>
+                      <p className="col-span-2 text-xs text-neutral-500">
+                        Automatically dim the display during this window. Activity still wakes it. Supports overnight spans.
+                      </p>
+                    </div>
+                  )}
+
+                  <label className="flex items-center gap-2 cursor-pointer mt-2">
+                    <input
+                      type="checkbox"
                       checked={sleepScheduleEnabled}
                       onChange={(e) => setSleepScheduleEnabled(e.target.checked)}
                       className="rounded border-neutral-600 bg-neutral-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
                     />
-                    <span className="text-sm text-neutral-200">Fixed sleep schedule</span>
+                    <span className="text-sm text-neutral-200">Sleep on a schedule</span>
                   </label>
 
                   {sleepScheduleEnabled && (
@@ -493,7 +533,7 @@ export default function SettingsPanel({ onClose }: { onClose: () => void }) {
                         />
                       </label>
                       <p className="col-span-2 text-xs text-neutral-500">
-                        Force sleep during this window regardless of activity. Supports overnight spans.
+                        Force full sleep during this window regardless of activity. Supports overnight spans.
                       </p>
                     </div>
                   )}
