@@ -27,8 +27,8 @@ export const CONFIG_FILE_PATH = 'data/config.json';
 // Backgrounds directory
 export const BACKGROUNDS_DIR = 'public/backgrounds';
 
-// Weather refresh interval (15 minutes)
-export const WEATHER_REFRESH_MS = 15 * 60 * 1000;
+// Weather refresh interval (5 minutes)
+export const WEATHER_REFRESH_MS = 5 * 60 * 1000;
 
 // Calendar refresh interval (5 minutes)
 export const CALENDAR_REFRESH_MS = 5 * 60 * 1000;

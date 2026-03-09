@@ -1,15 +1,21 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import type { Screen, GlobalSettings } from '@/types/config';
-import { DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT, WEATHER_REFRESH_MS, CALENDAR_REFRESH_MS } from '@/lib/constants';
+import { DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT } from '@/lib/constants';
 import { moduleComponents } from '@/lib/module-components';
-import { useFetchData } from '@/hooks/useFetchData';
+
+export interface SharedDisplayData {
+  owmData: unknown;
+  wapiData: unknown;
+  calendarData: unknown;
+}
 
 interface ScreenRendererProps {
   screen: Screen;
   settings: GlobalSettings;
   rotatingBackground?: string;
+  sharedData: SharedDisplayData;
 }
 
 function resolveProvider(mod: { type: string; config: Record<string, unknown> }, globalProvider: string): string {
@@ -21,39 +27,8 @@ function resolveProvider(mod: { type: string; config: Record<string, unknown> },
   return globalProvider;
 }
 
-export default function ScreenRenderer({ screen, settings, rotatingBackground }: ScreenRendererProps) {
-  const lat = settings.latitude ?? settings.weather.latitude;
-  const lon = settings.longitude ?? settings.weather.longitude;
+export default function ScreenRenderer({ screen, settings, rotatingBackground, sharedData }: ScreenRendererProps) {
   const globalProvider = settings.weather.provider;
-  const baseParams = `lat=${lat}&lon=${lon}&units=${settings.weather.units}`;
-
-  // Determine which providers are needed by weather modules on this screen
-  const { needsOWM, needsWAPI } = useMemo(() => {
-    let owm = false;
-    let wapi = false;
-    for (const mod of screen.modules) {
-      if (mod.type === 'weather' || mod.type === 'weather-hourly' || mod.type === 'weather-forecast') {
-        const p = resolveProvider(mod, globalProvider);
-        if (p === 'openweathermap') owm = true;
-        if (p === 'weatherapi') wapi = true;
-      }
-    }
-    return { needsOWM: owm, needsWAPI: wapi };
-  }, [screen.modules, globalProvider]);
-
-  // Always call both hooks (React rules), empty URL = no fetch
-  const owmUrl = needsOWM ? `/api/weather?${baseParams}&provider=openweathermap` : '';
-  const wapiUrl = needsWAPI ? `/api/weather?${baseParams}&provider=weatherapi` : '';
-  const owmData = useFetchData(owmUrl, WEATHER_REFRESH_MS);
-  const wapiData = useFetchData(wapiUrl, WEATHER_REFRESH_MS);
-
-  const calendarIdList = settings.calendar.googleCalendarIds?.length
-    ? settings.calendar.googleCalendarIds
-    : settings.calendar.googleCalendarId ? [settings.calendar.googleCalendarId] : [];
-  const calendarUrl = calendarIdList.length
-    ? `/api/calendar?calendarIds=${encodeURIComponent(calendarIdList.join(','))}`
-    : '';
-  const calendarData = useFetchData(calendarUrl, CALENDAR_REFRESH_MS);
 
   const [viewportSize, setViewportSize] = useState({ w: 0, h: 0 });
   useEffect(() => {
@@ -77,8 +52,8 @@ export default function ScreenRenderer({ screen, settings, rotatingBackground }:
 
   function getWeatherData(mod: { type: string; config: Record<string, unknown> }): Record<string, unknown> | null {
     const p = resolveProvider(mod, globalProvider);
-    if (p === 'openweathermap') return owmData as Record<string, unknown> | null;
-    if (p === 'weatherapi') return wapiData as Record<string, unknown> | null;
+    if (p === 'openweathermap') return sharedData.owmData as Record<string, unknown> | null;
+    if (p === 'weatherapi') return sharedData.wapiData as Record<string, unknown> | null;
     return null;
   }
 
@@ -123,8 +98,8 @@ export default function ScreenRenderer({ screen, settings, rotatingBackground }:
 
         const weatherData = getWeatherData(mod);
 
-        if (mod.type === 'calendar' && calendarData) {
-          extraProps.events = Array.isArray(calendarData) ? calendarData : (calendarData as Record<string, unknown>).events ?? [];
+        if (mod.type === 'calendar' && sharedData.calendarData) {
+          extraProps.events = Array.isArray(sharedData.calendarData) ? sharedData.calendarData : (sharedData.calendarData as Record<string, unknown>).events ?? [];
         } else if (mod.type === 'weather' && weatherData) {
           extraProps.hourly = weatherData.hourly ?? [];
           extraProps.forecast = weatherData.forecast ?? [];

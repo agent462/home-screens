@@ -1,11 +1,14 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { Screen, GlobalSettings, ScreenConfiguration } from '@/types/config';
 import ScreenRenderer from './ScreenRenderer';
+import type { SharedDisplayData } from './ScreenRenderer';
 import SleepOverlay from './SleepOverlay';
 import { useSleepManager } from '@/hooks/useSleepManager';
+import { useFetchData } from '@/hooks/useFetchData';
+import { WEATHER_REFRESH_MS, CALENDAR_REFRESH_MS } from '@/lib/constants';
 
 /** How often the display polls for config changes (ms) */
 const CONFIG_POLL_MS = 3_000;
@@ -116,11 +119,59 @@ function useLiveConfig(initialScreens: Screen[], initialSettings: GlobalSettings
   return { screens, settings };
 }
 
+function resolveProvider(mod: { type: string; config: Record<string, unknown> }, globalProvider: string): string {
+  if (mod.type === 'weather') {
+    const p = mod.config.provider as string | undefined;
+    return (p && p !== 'global') ? p : globalProvider;
+  }
+  return globalProvider;
+}
+
+/** Fetch weather + calendar data once, shared across all screen rotations. */
+function useSharedDisplayData(screens: Screen[], settings: GlobalSettings): SharedDisplayData {
+  const globalProvider = settings.weather.provider;
+  const lat = settings.latitude ?? settings.weather.latitude;
+  const lon = settings.longitude ?? settings.weather.longitude;
+  const baseParams = `lat=${lat}&lon=${lon}&units=${settings.weather.units}`;
+
+  // Determine which weather providers are needed across ALL screens
+  const { needsOWM, needsWAPI } = useMemo(() => {
+    let owm = false;
+    let wapi = false;
+    for (const screen of screens) {
+      for (const mod of screen.modules) {
+        if (mod.type === 'weather' || mod.type === 'weather-hourly' || mod.type === 'weather-forecast') {
+          const p = resolveProvider(mod, globalProvider);
+          if (p === 'openweathermap') owm = true;
+          if (p === 'weatherapi') wapi = true;
+        }
+      }
+    }
+    return { needsOWM: owm, needsWAPI: wapi };
+  }, [screens, globalProvider]);
+
+  const owmUrl = needsOWM ? `/api/weather?${baseParams}&provider=openweathermap` : '';
+  const wapiUrl = needsWAPI ? `/api/weather?${baseParams}&provider=weatherapi` : '';
+  const owmData = useFetchData(owmUrl, WEATHER_REFRESH_MS);
+  const wapiData = useFetchData(wapiUrl, WEATHER_REFRESH_MS);
+
+  const calendarIdList = settings.calendar.googleCalendarIds?.length
+    ? settings.calendar.googleCalendarIds
+    : settings.calendar.googleCalendarId ? [settings.calendar.googleCalendarId] : [];
+  const calendarUrl = calendarIdList.length
+    ? `/api/calendar?calendarIds=${encodeURIComponent(calendarIdList.join(','))}`
+    : '';
+  const calendarData = useFetchData(calendarUrl, CALENDAR_REFRESH_MS);
+
+  return { owmData, wapiData, calendarData };
+}
+
 export default function ScreenRotator({ screens: initialScreens, settings: initialSettings }: ScreenRotatorProps) {
   const { screens, settings } = useLiveConfig(initialScreens, initialSettings);
   const [currentIndex, setCurrentIndex] = useState(0);
   const rotatingBackgrounds = useBackgroundRotation(screens);
   const { displayState, dimOpacity } = useSleepManager(settings.sleep, settings.screensaver);
+  const sharedData = useSharedDisplayData(screens, settings);
 
   const advance = useCallback(() => {
     setCurrentIndex((prev) => (prev + 1) % screens.length);
@@ -159,7 +210,7 @@ export default function ScreenRotator({ screens: initialScreens, settings: initi
           exit={{ opacity: 0, scale: 1.02 }}
           transition={{ duration: 0.6, ease: 'easeInOut' }}
         >
-          <ScreenRenderer screen={screen} settings={settings} rotatingBackground={rotatingBackgrounds[screen.id]} />
+          <ScreenRenderer screen={screen} settings={settings} rotatingBackground={rotatingBackgrounds[screen.id]} sharedData={sharedData} />
         </motion.div>
       </AnimatePresence>
 

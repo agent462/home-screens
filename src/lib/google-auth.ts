@@ -63,7 +63,11 @@ export async function pollDeviceToken(
   const data = await res.json();
 
   if (res.ok && data.access_token) {
-    // Success — save tokens
+    // Success — convert expires_in (relative seconds) to expiry_date (absolute ms)
+    // so getAuthenticatedClient() can proactively refresh before expiry
+    if (data.expires_in && !data.expiry_date) {
+      data.expiry_date = Date.now() + data.expires_in * 1000;
+    }
     await writeFile(TOKENS_PATH, JSON.stringify(data, null, 2));
     return { status: 'success' };
   }
@@ -143,12 +147,20 @@ export async function getAuthenticatedClient() {
   client.setCredentials(tokens);
 
   // If token is expired or about to expire, refresh it
-  if (tokens.expiry_date && tokens.expiry_date < Date.now() + 60_000) {
-    const { credentials } = await client.refreshAccessToken();
-    // Preserve the refresh token (Google doesn't always return it on refresh)
-    const updated = { ...credentials, refresh_token: tokens.refresh_token };
-    await writeFile(TOKENS_PATH, JSON.stringify(updated, null, 2));
-    client.setCredentials(updated);
+  const needsRefresh = tokens.expiry_date
+    ? tokens.expiry_date < Date.now() + 60_000
+    : !tokens.access_token; // No expiry_date and no access_token → must refresh
+  if (needsRefresh) {
+    try {
+      const { credentials } = await client.refreshAccessToken();
+      // Preserve the refresh token (Google doesn't always return it on refresh)
+      const updated = { ...credentials, refresh_token: tokens.refresh_token };
+      await writeFile(TOKENS_PATH, JSON.stringify(updated, null, 2));
+      client.setCredentials(updated);
+    } catch {
+      // Refresh token is likely revoked — re-authentication required
+      return null;
+    }
   }
 
   return client;
