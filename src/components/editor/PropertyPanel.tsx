@@ -10,7 +10,7 @@ import Toggle from '@/components/ui/Toggle';
 import ColorPicker from '@/components/ui/ColorPicker';
 import Button from '@/components/ui/Button';
 import BackgroundPicker from '@/components/editor/BackgroundPicker';
-import type { ModuleInstance, CountdownEvent, TodoItem, WeatherView, WeatherIconSet, WeatherProviderOption } from '@/types/config';
+import type { ModuleInstance, CountdownEvent, TodoItem, WeatherView, WeatherIconSet, WeatherProviderOption, StockTickerView } from '@/types/config';
 import { v4 as uuidv4 } from 'uuid';
 
 const INPUT_CLASS = 'w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200';
@@ -629,8 +629,17 @@ function NewsConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: s
   );
 }
 
+const STOCK_VIEWS: { value: StockTickerView; label: string }[] = [
+  { value: 'cards', label: 'Cards' },
+  { value: 'ticker', label: 'Ticker (Scrolling)' },
+  { value: 'table', label: 'Table' },
+  { value: 'compact', label: 'Compact' },
+];
+
 function StockTickerConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
-  const { config: c, set } = useModuleConfig<{ symbols?: string; refreshIntervalMs?: number; cardScale?: number }>(mod, screenId);
+  const { config: c, set } = useModuleConfig<{ symbols?: string; view?: StockTickerView; refreshIntervalMs?: number; cardScale?: number; tickerSpeed?: number }>(mod, screenId);
+
+  const view = c.view ?? 'cards';
 
   return (
     <>
@@ -643,14 +652,38 @@ function StockTickerConfigSection({ mod, screenId }: { mod: ModuleInstance; scre
           className={INPUT_CLASS}
         />
       </label>
-      <Slider
-        label="Card Scale"
-        value={c.cardScale ?? 1}
-        min={0.5}
-        max={3}
-        step={0.1}
-        onChange={(v) => set({ cardScale: v })}
-      />
+      <label className="flex flex-col gap-0.5">
+        <span className="text-xs text-neutral-400">View</span>
+        <select
+          value={view}
+          onChange={(e) => set({ view: e.target.value as StockTickerView })}
+          className={INPUT_CLASS}
+        >
+          {STOCK_VIEWS.map((v) => (
+            <option key={v.value} value={v.value}>{v.label}</option>
+          ))}
+        </select>
+      </label>
+      {view !== 'ticker' && (
+        <Slider
+          label="Scale"
+          value={c.cardScale ?? 1}
+          min={0.5}
+          max={3}
+          step={0.1}
+          onChange={(v) => set({ cardScale: v })}
+        />
+      )}
+      {view === 'ticker' && (
+        <Slider
+          label="Ticker Speed (sec/stock)"
+          value={c.tickerSpeed ?? 5}
+          min={2}
+          max={15}
+          step={1}
+          onChange={(v) => set({ tickerSpeed: v })}
+        />
+      )}
       <Slider
         label="Refresh (seconds)"
         value={(c.refreshIntervalMs ?? 60000) / 1000}

@@ -21,7 +21,7 @@ export default function NewsModule({ config, style }: NewsModuleProps) {
   return (
     <ModuleWrapper style={style}>
       <div className="flex flex-col items-center justify-center h-full gap-2">
-        <span className="text-xs uppercase tracking-widest opacity-50">News</span>
+        <span className="uppercase tracking-widest opacity-50" style={{ fontSize: '0.75em' }}>News</span>
         <p className="text-center leading-relaxed">
           {headlines.length > 0 ? headlines[index % headlines.length] : 'Loading news...'}
         </p>

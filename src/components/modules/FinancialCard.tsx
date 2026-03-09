@@ -15,13 +15,13 @@ export default function FinancialCard({ label, price, changeValue, changeLabel, 
       className="flex flex-col items-center rounded-lg"
       style={{
         backgroundColor: 'rgba(255,255,255,0.08)',
-        padding: `${0.75 * scale}rem ${1 * scale}rem`,
-        gap: `${0.25 * scale}rem`,
+        padding: `${0.75 * scale}em ${1 * scale}em`,
+        gap: `${0.25 * scale}em`,
       }}
     >
-      <span className="font-semibold tracking-wider opacity-70" style={{ fontSize: `${0.75 * scale}rem` }}>{label}</span>
-      <span className="font-bold whitespace-nowrap" style={{ fontSize: `${1.25 * scale}rem` }}>${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-      <span className={`whitespace-nowrap ${positive ? 'text-green-400' : 'text-red-400'}`} style={{ fontSize: `${0.75 * scale}rem` }}>
+      <span className="font-semibold tracking-wider opacity-70" style={{ fontSize: `${0.75 * scale}em` }}>{label}</span>
+      <span className="font-bold whitespace-nowrap" style={{ fontSize: `${1.25 * scale}em` }}>${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+      <span className={`whitespace-nowrap ${positive ? 'text-green-400' : 'text-red-400'}`} style={{ fontSize: `${0.75 * scale}em` }}>
         {sign}{changeLabel}
       </span>
     </div>

@@ -248,10 +248,14 @@ export interface NewsConfig {
 }
 
 // Stock ticker module config
+export type StockTickerView = 'cards' | 'ticker' | 'table' | 'compact';
+
 export interface StockTickerConfig {
   symbols: string;
   refreshIntervalMs: number;
+  view?: StockTickerView;
   cardScale?: number;
+  tickerSpeed?: number;
 }
 
 // Crypto module config
