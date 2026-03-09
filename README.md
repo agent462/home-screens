@@ -2,6 +2,12 @@
 
 A custom smart display system built with Next.js. Designed to run on a Raspberry Pi in Chromium kiosk mode, replacing Dakboard/MagicMirror with a fully web-based, drag-and-drop configurable display.
 
+## Screenshots
+
+![Editor view — module palette and canvas](docs/images/editor-1.png)
+
+![Editor view — property panel and settings](docs/images/editor-2.png)
+
 ## Features
 
 - **Drag-and-drop editor** — visually arrange modules on a 1080x1920 portrait canvas
@@ -150,6 +156,16 @@ scripts/
 | `/api/sports` | GET | Live sports scores (ESPN) |
 | `/api/air-quality` | GET | Air quality index and UV (OpenWeatherMap) |
 
+## Documentation
+
+- [Getting Started](docs/getting-started.md) — installation and setup
+- [Editor Guide](docs/editor.md) — how to use the visual editor
+- [Modules Reference](docs/modules.md) — all 25 modules and their options
+- [API Reference](docs/api.md) — all API endpoints
+- [Configuration](docs/configuration.md) — config file schema and examples
+- [Raspberry Pi Deployment](docs/raspberry-pi.md) — kiosk setup and troubleshooting
+- [Development Guide](docs/development.md) — architecture, adding modules, and contributing
+
 ## Adding a Module
 
 1. Create a component in `src/components/modules/`
@@ -160,3 +176,5 @@ scripts/
 6. Add a dynamic import in `src/lib/module-components.ts`
 7. Add an editor config section in `src/components/editor/PropertyPanel.tsx`
 8. (Optional) Create an API route in `src/app/api/` if external data is needed
+
+See the [Development Guide](docs/development.md) for a detailed walkthrough.
