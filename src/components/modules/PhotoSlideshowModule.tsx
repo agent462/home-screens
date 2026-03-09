@@ -49,7 +49,7 @@ export default function PhotoSlideshowModule({ config, style }: PhotoSlideshowMo
   if (files.length === 0) {
     return (
       <ModuleWrapper style={{ ...style, padding: 0 }}>
-        <div className="flex items-center justify-center h-full opacity-40" style={{ fontSize: '0.875em' }}>
+        <div className="flex items-center justify-center h-full opacity-50" style={{ fontSize: '0.875em' }}>
           No photos found
         </div>
       </ModuleWrapper>

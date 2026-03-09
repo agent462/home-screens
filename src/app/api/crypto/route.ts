@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { errorResponse } from '@/lib/api-utils';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const idsParam = request.nextUrl.searchParams.get('ids') || 'bitcoin,ethereum';

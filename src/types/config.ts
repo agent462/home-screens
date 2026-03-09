@@ -263,12 +263,14 @@ export interface CryptoConfig {
 }
 
 // Word of the day module config
-export interface WordOfDayConfig {}
+export interface WordOfDayConfig {
+  refreshIntervalMs: number;
+}
 
 // This day in history module config
 export interface HistoryConfig {
   refreshIntervalMs: number;
-  rotationIntervalSec: number;
+  rotationIntervalMs: number;
 }
 
 // Moon phase module config
@@ -289,6 +291,7 @@ export interface PhotoSlideshowConfig {
   intervalMs: number;
   transition: 'fade' | 'none';
   objectFit: 'cover' | 'contain' | 'fill';
+  refreshIntervalMs: number;
 }
 
 // QR code module config

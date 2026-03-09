@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { createTZDate } from '@/lib/timezone';
+import { useTZClock } from '@/hooks/useTZClock';
 import type { YearProgressConfig, ModuleStyle } from '@/types/config';
 import ModuleWrapper from './ModuleWrapper';
 
@@ -76,12 +75,7 @@ function ProgressBar({ label, percent, showPercentage }: { label: string; percen
 }
 
 export default function YearProgressModule({ config, style, timezone }: YearProgressModuleProps) {
-  const [now, setNow] = useState(() => createTZDate(timezone));
-
-  useEffect(() => {
-    const interval = setInterval(() => setNow(createTZDate(timezone)), 60_000);
-    return () => clearInterval(interval);
-  }, [timezone]);
+  const now = useTZClock(timezone);
 
   const showYear = config.showYear ?? true;
   const showMonth = config.showMonth ?? true;

@@ -4,7 +4,7 @@ import path from 'path';
 import { readConfig, writeConfig } from './config';
 import { migrateUp, getLatestSchemaVersion } from './migrations';
 
-export type UpgradeStep =
+type UpgradeStep =
   | 'preflight'
   | 'backup'
   | 'fetch'
@@ -20,7 +20,7 @@ export type UpgradeStep =
   | 'complete'
   | 'error';
 
-export interface UpgradeProgress {
+interface UpgradeProgress {
   step: UpgradeStep;
   progress: number;
   message: string;
@@ -181,6 +181,21 @@ function streamTo(step: UpgradeStep) {
   return (line: string) => emitOutput(step, line);
 }
 
+interface PipelineStep {
+  step: UpgradeStep;
+  progress: number;
+  message: string;
+  run: () => Promise<void>;
+}
+
+/** Run an array of pipeline steps sequentially, emitting progress for each */
+async function runPipeline(steps: PipelineStep[]): Promise<void> {
+  for (const { step, progress, message, run } of steps) {
+    emit({ step, progress, message });
+    await run();
+  }
+}
+
 export async function runUpgrade(targetTag: string): Promise<void> {
   if (currentUpgrade.running) {
     throw new Error('An upgrade is already in progress');
@@ -189,94 +204,147 @@ export async function runUpgrade(targetTag: string): Promise<void> {
   currentUpgrade.running = true;
   let stashed = false;
 
+  // Shared state across steps
+  let isDirty = false;
+
+  const steps: PipelineStep[] = [
+    {
+      step: 'preflight',
+      progress: 5,
+      message: 'Running pre-flight checks...',
+      run: async () => {
+        const preflightOut = await runUpgradeScript('preflight', [], streamTo('preflight'));
+        const preflight = parseResult(preflightOut);
+        if (!preflight.ok) {
+          throw new Error(preflight.error as string);
+        }
+        isDirty = preflight.dirty as boolean;
+      },
+    },
+    {
+      step: 'backup',
+      progress: 10,
+      message: 'Backing up configuration...',
+      run: async () => {
+        const backupOut = await runUpgradeScript('backup', [], streamTo('backup'));
+        const backup = parseResult(backupOut);
+        if (!backup.ok) {
+          throw new Error(`Backup failed: ${backup.error}`);
+        }
+      },
+    },
+    {
+      step: 'fetch',
+      progress: 20,
+      message: 'Fetching latest code...',
+      run: async () => {
+        await runUpgradeScript('fetch', [], streamTo('fetch'));
+      },
+    },
+    {
+      step: 'stash',
+      progress: 25,
+      message: 'Stashing local changes...',
+      run: async () => {
+        if (!isDirty) return;
+        const stashOut = await runUpgradeScript('stash', [], streamTo('stash'));
+        const stashResult = parseResult(stashOut);
+        stashed = (stashResult.stashed as boolean) ?? false;
+      },
+    },
+    {
+      step: 'checkout',
+      progress: 30,
+      message: `Checking out ${targetTag}...`,
+      run: async () => {
+        const checkoutOut = await runUpgradeScript('checkout', [targetTag], streamTo('checkout'));
+        const checkout = parseResult(checkoutOut);
+        if (!checkout.ok) {
+          throw new Error(`Checkout failed: ${checkout.error}`);
+        }
+      },
+    },
+    {
+      step: 'install',
+      progress: 40,
+      message: 'Installing dependencies...',
+      run: async () => {
+        await runUpgradeScript('install', [], streamTo('install'));
+      },
+    },
+    {
+      step: 'build',
+      progress: 55,
+      message: 'Building application (this may take a few minutes)...',
+      run: async () => {
+        await runUpgradeScript('build', [], streamTo('build'));
+      },
+    },
+    {
+      step: 'migrate',
+      progress: 80,
+      message: 'Migrating configuration...',
+      run: async () => {
+        const config = await readConfig();
+        const targetSchemaVersion = getLatestSchemaVersion();
+        if ((config.version ?? 0) < targetSchemaVersion) {
+          const { config: migrated, migrationsRun } = migrateUp(config, targetSchemaVersion);
+          await writeConfig(migrated);
+          emitOutput('migrate', `Ran ${migrationsRun.length} migration(s): ${migrationsRun.join(', ')}`);
+          emit({
+            step: 'migrate',
+            progress: 85,
+            message: `Ran ${migrationsRun.length} migration(s): ${migrationsRun.join(', ')}`,
+          });
+        } else {
+          emitOutput('migrate', 'Schema is up to date — no migration needed');
+          emit({ step: 'migrate', progress: 85, message: 'No config migration needed' });
+        }
+      },
+    },
+    {
+      step: 'cleanup',
+      progress: 85,
+      message: 'Restoring local changes...',
+      run: async () => {
+        if (!stashed) return;
+        await runUpgradeScript('stash-pop', [], streamTo('cleanup'));
+      },
+    },
+    {
+      step: 'setup-system',
+      progress: 88,
+      message: 'Applying system configuration...',
+      run: async () => {
+        await runUpgradeScript('setup-system', [], streamTo('setup-system'));
+      },
+    },
+    {
+      step: 'restart',
+      progress: 92,
+      message: 'Restarting service...',
+      run: async () => {
+        const restartOut = await runUpgradeScript('restart', [], streamTo('restart'));
+        const restart = parseResult(restartOut);
+        if (restart.method === 'systemctl') {
+          // The delayed nohup restart kills this process ~3s from now, so we
+          // cannot run a meaningful health check here (it would just verify the
+          // OLD server that's still alive). The client polls for the new server.
+          emit({ step: 'health-check', progress: 95, message: 'Server will restart momentarily...' });
+          emitOutput('health-check', 'Server restart scheduled — client will reconnect automatically');
+        }
+      },
+    },
+    {
+      step: 'complete',
+      progress: 100,
+      message: `Upgrade to ${targetTag} complete!`,
+      run: async () => {},
+    },
+  ];
+
   try {
-    // Step 1: Preflight
-    emit({ step: 'preflight', progress: 5, message: 'Running pre-flight checks...' });
-    const preflightOut = await runUpgradeScript('preflight', [], streamTo('preflight'));
-    const preflight = parseResult(preflightOut);
-    if (!preflight.ok) {
-      throw new Error(preflight.error as string);
-    }
-    const isDirty = preflight.dirty as boolean;
-
-    // Step 2: Backup config
-    emit({ step: 'backup', progress: 10, message: 'Backing up configuration...' });
-    const backupOut = await runUpgradeScript('backup', [], streamTo('backup'));
-    const backup = parseResult(backupOut);
-    if (!backup.ok) {
-      throw new Error(`Backup failed: ${backup.error}`);
-    }
-
-    // Step 3: Fetch latest
-    emit({ step: 'fetch', progress: 20, message: 'Fetching latest code...' });
-    await runUpgradeScript('fetch', [], streamTo('fetch'));
-
-    // Step 4: Stash local changes if dirty
-    if (isDirty) {
-      emit({ step: 'stash', progress: 25, message: 'Stashing local changes...' });
-      const stashOut = await runUpgradeScript('stash', [], streamTo('stash'));
-      const stashResult = parseResult(stashOut);
-      stashed = (stashResult.stashed as boolean) ?? false;
-    }
-
-    // Step 5: Checkout target version
-    emit({ step: 'checkout', progress: 30, message: `Checking out ${targetTag}...` });
-    const checkoutOut = await runUpgradeScript('checkout', [targetTag], streamTo('checkout'));
-    const checkout = parseResult(checkoutOut);
-    if (!checkout.ok) {
-      throw new Error(`Checkout failed: ${checkout.error}`);
-    }
-
-    // Step 6: Install dependencies
-    emit({ step: 'install', progress: 40, message: 'Installing dependencies...' });
-    await runUpgradeScript('install', [], streamTo('install'));
-
-    // Step 7: Build
-    emit({ step: 'build', progress: 55, message: 'Building application (this may take a few minutes)...' });
-    await runUpgradeScript('build', [], streamTo('build'));
-
-    // Step 8: Run config migrations
-    emit({ step: 'migrate', progress: 80, message: 'Migrating configuration...' });
-    const config = await readConfig();
-    const targetSchemaVersion = getLatestSchemaVersion();
-    if ((config.version ?? 0) < targetSchemaVersion) {
-      const { config: migrated, migrationsRun } = migrateUp(config, targetSchemaVersion);
-      await writeConfig(migrated);
-      emitOutput('migrate', `Ran ${migrationsRun.length} migration(s): ${migrationsRun.join(', ')}`);
-      emit({
-        step: 'migrate',
-        progress: 85,
-        message: `Ran ${migrationsRun.length} migration(s): ${migrationsRun.join(', ')}`,
-      });
-    } else {
-      emitOutput('migrate', 'Schema is up to date — no migration needed');
-      emit({ step: 'migrate', progress: 85, message: 'No config migration needed' });
-    }
-
-    // Step 9: Pop stash if we stashed
-    if (stashed) {
-      emit({ step: 'cleanup', progress: 85, message: 'Restoring local changes...' });
-      await runUpgradeScript('stash-pop', [], streamTo('cleanup'));
-    }
-
-    // Step 10: Apply system-level configuration
-    emit({ step: 'setup-system', progress: 88, message: 'Applying system configuration...' });
-    await runUpgradeScript('setup-system', [], streamTo('setup-system'));
-
-    // Step 11: Restart service
-    emit({ step: 'restart', progress: 92, message: 'Restarting service...' });
-    const restartOut = await runUpgradeScript('restart', [], streamTo('restart'));
-    const restart = parseResult(restartOut);
-
-    if (restart.method === 'systemctl') {
-      // The delayed nohup restart kills this process ~3s from now, so we
-      // cannot run a meaningful health check here (it would just verify the
-      // OLD server that's still alive). The client polls for the new server.
-      emit({ step: 'health-check', progress: 95, message: 'Server will restart momentarily...' });
-      emitOutput('health-check', 'Server restart scheduled — client will reconnect automatically');
-    }
-
-    emit({ step: 'complete', progress: 100, message: `Upgrade to ${targetTag} complete!` });
+    await runPipeline(steps);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     emit({ step: 'error', progress: 0, message, error: message });
@@ -311,32 +379,70 @@ export async function runRollback(targetTag: string): Promise<void> {
 
   currentUpgrade.running = true;
 
+  const steps: PipelineStep[] = [
+    {
+      step: 'backup',
+      progress: 10,
+      message: 'Backing up current configuration...',
+      run: async () => {
+        await runUpgradeScript('backup', [], streamTo('backup'));
+      },
+    },
+    {
+      step: 'checkout',
+      progress: 30,
+      message: `Rolling back to ${targetTag}...`,
+      run: async () => {
+        await runUpgradeScript('rollback', [targetTag], streamTo('checkout'));
+      },
+    },
+    {
+      step: 'install',
+      progress: 45,
+      message: 'Installing dependencies...',
+      run: async () => {
+        await runUpgradeScript('install', [], streamTo('install'));
+      },
+    },
+    {
+      step: 'build',
+      progress: 60,
+      message: 'Building application...',
+      run: async () => {
+        await runUpgradeScript('build', [], streamTo('build'));
+      },
+    },
+    {
+      step: 'setup-system',
+      progress: 78,
+      message: 'Applying system configuration...',
+      run: async () => {
+        await runUpgradeScript('setup-system', [], streamTo('setup-system'));
+      },
+    },
+    {
+      step: 'restart',
+      progress: 85,
+      message: 'Restarting service...',
+      run: async () => {
+        const restartOut = await runUpgradeScript('restart', [], streamTo('restart'));
+        const restart = parseResult(restartOut);
+        if (restart.method === 'systemctl') {
+          emit({ step: 'health-check', progress: 95, message: 'Server will restart momentarily...' });
+          emitOutput('health-check', 'Server restart scheduled — client will reconnect automatically');
+        }
+      },
+    },
+    {
+      step: 'complete',
+      progress: 100,
+      message: `Rolled back to ${targetTag} successfully!`,
+      run: async () => {},
+    },
+  ];
+
   try {
-    emit({ step: 'backup', progress: 10, message: 'Backing up current configuration...' });
-    await runUpgradeScript('backup', [], streamTo('backup'));
-
-    emit({ step: 'checkout', progress: 30, message: `Rolling back to ${targetTag}...` });
-    await runUpgradeScript('rollback', [targetTag], streamTo('checkout'));
-
-    emit({ step: 'install', progress: 45, message: 'Installing dependencies...' });
-    await runUpgradeScript('install', [], streamTo('install'));
-
-    emit({ step: 'build', progress: 60, message: 'Building application...' });
-    await runUpgradeScript('build', [], streamTo('build'));
-
-    emit({ step: 'setup-system', progress: 78, message: 'Applying system configuration...' });
-    await runUpgradeScript('setup-system', [], streamTo('setup-system'));
-
-    emit({ step: 'restart', progress: 85, message: 'Restarting service...' });
-    const restartOut = await runUpgradeScript('restart', [], streamTo('restart'));
-    const restart = parseResult(restartOut);
-
-    if (restart.method === 'systemctl') {
-      emit({ step: 'health-check', progress: 95, message: 'Server will restart momentarily...' });
-      emitOutput('health-check', 'Server restart scheduled — client will reconnect automatically');
-    }
-
-    emit({ step: 'complete', progress: 100, message: `Rolled back to ${targetTag} successfully!` });
+    await runPipeline(steps);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     emit({ step: 'error', progress: 0, message, error: message });

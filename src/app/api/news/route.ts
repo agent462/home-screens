@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { parseItems } from '@/lib/rss';
 import { errorResponse } from '@/lib/api-utils';
 
+export const dynamic = 'force-dynamic';
+
 const DEFAULT_FEED = 'https://feeds.bbci.co.uk/news/rss.xml';
 
 export async function GET(request: NextRequest) {

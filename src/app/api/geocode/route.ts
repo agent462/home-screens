@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { errorResponse } from '@/lib/api-utils';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   const query = request.nextUrl.searchParams.get('q');
@@ -32,8 +35,8 @@ export async function GET(request: NextRequest) {
         });
       }
     }
-  } catch {
-    // fall through
+  } catch (error) {
+    return errorResponse(error, 'Geocoding request failed');
   }
 
   return NextResponse.json({ error: 'Location not found' }, { status: 404 });

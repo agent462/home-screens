@@ -6,6 +6,7 @@ import type { HourlyWeather } from '@/lib/weather';
 import { getWeatherIcon } from '@/lib/weather-icons';
 import { useScaledFontSize } from '@/hooks/useScaledFontSize';
 import ModuleWrapper from './ModuleWrapper';
+import { WeatherStat } from './WeatherStat';
 
 interface WeatherHourlyModuleProps {
   config: WeatherHourlyConfig;
@@ -45,16 +46,8 @@ export default function WeatherHourlyModule({ config, style, data, todayHigh, to
                     Feels like {Math.round(hours[0].feelsLike)}
                   </span>
                 )}
-                {config.showHumidity && hours[0].humidity != null && (
-                  <span className="opacity-60 flex items-center gap-0.5" style={{ fontSize: '0.85em' }}>
-                    <Droplets size="1em" /> {Math.round(hours[0].humidity)}%
-                  </span>
-                )}
-                {config.showWind && hours[0].windSpeed != null && (
-                  <span className="opacity-60 flex items-center gap-0.5" style={{ fontSize: '0.85em' }}>
-                    <Wind size="1em" /> {Math.round(hours[0].windSpeed)}
-                  </span>
-                )}
+                <WeatherStat icon={Droplets} value={hours[0].humidity} unit="%" visible={config.showHumidity} fontSize="0.85em" />
+                <WeatherStat icon={Wind} value={hours[0].windSpeed} visible={config.showWind} fontSize="0.85em" />
               </div>
             </div>
 
@@ -75,22 +68,10 @@ export default function WeatherHourlyModule({ config, style, data, todayHigh, to
                       })}
                     </span>
                     <Icon size="1.8em" strokeWidth={1.5} />
-                    {config.showPrecipitation !== false && hour.precipProbability != null && (
-                      <span className="opacity-50 flex items-center gap-0.5" style={{ fontSize: '0.7em' }}>
-                        <CloudRain size="1em" />{Math.round(hour.precipProbability)}%
-                      </span>
-                    )}
+                    <WeatherStat icon={CloudRain} value={hour.precipProbability} unit="%" visible={config.showPrecipitation !== false} />
                     <span className="font-medium" style={{ fontSize: '0.875em' }}>{Math.round(hour.temp)}&deg;</span>
-                    {config.showHumidity && hour.humidity != null && (
-                      <span className="opacity-50 flex items-center gap-0.5" style={{ fontSize: '0.7em' }}>
-                        <Droplets size="1em" />{Math.round(hour.humidity)}%
-                      </span>
-                    )}
-                    {config.showWind && hour.windSpeed != null && (
-                      <span className="opacity-50 flex items-center gap-0.5" style={{ fontSize: '0.7em' }}>
-                        <Wind size="1em" />{Math.round(hour.windSpeed)}
-                      </span>
-                    )}
+                    <WeatherStat icon={Droplets} value={hour.humidity} unit="%" visible={config.showHumidity} />
+                    <WeatherStat icon={Wind} value={hour.windSpeed} visible={config.showWind} />
                   </div>
                 );
               })}

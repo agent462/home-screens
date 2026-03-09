@@ -4,6 +4,8 @@ import path from 'path';
 import { BACKGROUNDS_DIR } from '@/lib/constants';
 import { errorResponse } from '@/lib/api-utils';
 
+export const dynamic = 'force-dynamic';
+
 const BGS = path.join(process.cwd(), BACKGROUNDS_DIR);
 
 /** Helper: resolve a background filename to its serve URL */

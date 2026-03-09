@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
-import { errorResponse } from '@/lib/api-utils';
+import { errorResponse, createTTLCache } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
 
-let cache: { date: string; events: Array<{ year: string; text: string }> } | null = null;
+const cache = createTTLCache<Array<{ year: string; text: string }>>(24 * 60 * 60 * 1000); // 24 hours
 
 export async function GET() {
   const today = new Date().toISOString().slice(0, 10);
-  if (cache && cache.date === today) {
-    return NextResponse.json({ events: cache.events });
+  const cached = cache.get(today);
+  if (cached) {
+    return NextResponse.json({ events: cached });
   }
 
   try {
@@ -24,7 +25,7 @@ export async function GET() {
       text: e.text,
     }));
 
-    cache = { date: today, events };
+    cache.set(today, events);
     return NextResponse.json({ events });
   } catch (error) {
     return errorResponse(error, 'Failed to fetch historical events');

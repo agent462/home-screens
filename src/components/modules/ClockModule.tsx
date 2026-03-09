@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { format, getWeek, getDayOfYear } from 'date-fns';
-import { createTZDate } from '@/lib/timezone';
+import { useTZClock } from '@/hooks/useTZClock';
 import type { ClockConfig, ModuleStyle } from '@/types/config';
 import ModuleWrapper from './ModuleWrapper';
 
@@ -13,12 +12,7 @@ interface ClockModuleProps {
 }
 
 export default function ClockModule({ config, style, timezone }: ClockModuleProps) {
-  const [now, setNow] = useState(() => createTZDate(timezone));
-
-  useEffect(() => {
-    const interval = setInterval(() => setNow(createTZDate(timezone)), 1000);
-    return () => clearInterval(interval);
-  }, [timezone]);
+  const now = useTZClock(timezone, 1000);
 
   const timeFormat = config.format24h
     ? config.showSeconds ? 'HH:mm:ss' : 'HH:mm'

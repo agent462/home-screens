@@ -7,6 +7,7 @@ import type { ForecastDay } from '@/lib/weather';
 import { getWeatherIcon } from '@/lib/weather-icons';
 import { useScaledFontSize } from '@/hooks/useScaledFontSize';
 import ModuleWrapper from './ModuleWrapper';
+import { WeatherStat } from './WeatherStat';
 
 interface WeatherForecastModuleProps {
   config: WeatherForecastConfig;
@@ -51,21 +52,9 @@ export default function WeatherForecastModule({ config, style, data, units = 'im
                   )}
                 </div>
                 <div className="flex flex-col items-center gap-0.5">
-                  {config.showPrecipitation && days[0].precipProbability != null && (
-                    <span className="opacity-60 flex items-center gap-0.5" style={{ fontSize: '0.85em' }}>
-                      <CloudRain size="1em" /> {Math.round(days[0].precipProbability)}%
-                    </span>
-                  )}
-                  {config.showHumidity && days[0].humidity != null && (
-                    <span className="opacity-60 flex items-center gap-0.5" style={{ fontSize: '0.85em' }}>
-                      <Droplets size="1em" /> {Math.round(days[0].humidity)}%
-                    </span>
-                  )}
-                  {config.showWind && days[0].windSpeed != null && (
-                    <span className="opacity-60 flex items-center gap-0.5" style={{ fontSize: '0.85em' }}>
-                      <Wind size="1em" /> {Math.round(days[0].windSpeed)} {windUnit}
-                    </span>
-                  )}
+                  <WeatherStat icon={CloudRain} value={days[0].precipProbability} unit="%" visible={config.showPrecipitation} fontSize="0.85em" />
+                  <WeatherStat icon={Droplets} value={days[0].humidity} unit="%" visible={config.showHumidity} fontSize="0.85em" />
+                  <WeatherStat icon={Wind} value={days[0].windSpeed} unit={` ${windUnit}`} visible={config.showWind} fontSize="0.85em" />
                 </div>
               </div>
 
@@ -82,11 +71,7 @@ export default function WeatherForecastModule({ config, style, data, units = 'im
                         {dayLabel(day.date)}
                       </span>
                       <Icon size="1.8em" strokeWidth={1.5} />
-                      {config.showPrecipitation && day.precipProbability != null && (
-                        <span className="opacity-50 flex items-center gap-0.5" style={{ fontSize: '0.7em' }}>
-                          <CloudRain size="1em" />{Math.round(day.precipProbability)}%
-                        </span>
-                      )}
+                      <WeatherStat icon={CloudRain} value={day.precipProbability} unit="%" visible={config.showPrecipitation} />
                       {config.showPrecipAmount && day.precipAmount != null && day.precipAmount > 0 && (
                         <span className="opacity-50" style={{ fontSize: '0.7em' }}>{day.precipAmount.toFixed(1)}&quot;</span>
                       )}
@@ -96,16 +81,8 @@ export default function WeatherForecastModule({ config, style, data, units = 'im
                           <span className="opacity-50">{Math.round(day.low)}&deg;</span>
                         </div>
                       )}
-                      {config.showHumidity && day.humidity != null && (
-                        <span className="opacity-50 flex items-center gap-0.5" style={{ fontSize: '0.7em' }}>
-                          <Droplets size="1em" />{Math.round(day.humidity)}%
-                        </span>
-                      )}
-                      {config.showWind && day.windSpeed != null && (
-                        <span className="opacity-50 flex items-center gap-0.5" style={{ fontSize: '0.7em' }}>
-                          <Wind size="1em" />{Math.round(day.windSpeed)} {windUnit}
-                        </span>
-                      )}
+                      <WeatherStat icon={Droplets} value={day.humidity} unit="%" visible={config.showHumidity} />
+                      <WeatherStat icon={Wind} value={day.windSpeed} unit={` ${windUnit}`} visible={config.showWind} />
                     </div>
                   );
                 })}

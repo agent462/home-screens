@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { errorResponse } from '@/lib/api-utils';
+import { errorResponse, createTTLCache } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,8 +14,7 @@ interface GameResult {
   startTime: string;
 }
 
-const CACHE_TTL_MS = 60_000;
-const cache = new Map<string, { data: unknown; timestamp: number }>();
+const cache = createTTLCache<unknown>(60_000);
 
 const LEAGUE_MAP: Record<string, string> = {
   nfl: 'football/nfl',
@@ -70,15 +69,15 @@ export async function GET(request: NextRequest) {
 
     const cacheKey = [...leagues].sort().join(',');
     const cached = cache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-      return NextResponse.json(cached.data);
+    if (cached) {
+      return NextResponse.json(cached);
     }
 
     const results = await Promise.all(leagues.map(fetchLeague));
     const games = results.flat();
     const response = { games };
 
-    cache.set(cacheKey, { data: response, timestamp: Date.now() });
+    cache.set(cacheKey, response);
     return NextResponse.json(response);
   } catch (error) {
     return errorResponse(error, 'Failed to fetch sports scores');

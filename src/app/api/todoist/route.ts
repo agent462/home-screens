@@ -43,32 +43,30 @@ function resolveColor(color: string | undefined | null): string {
 // ─── Field accessors ───
 // The v1 API may return snake_case (raw) or camelCase (if proxied through SDK).
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-function str(obj: any, ...keys: string[]): string {
+function str(obj: Record<string, unknown>, ...keys: string[]): string {
   for (const k of keys) if (obj[k] != null) return String(obj[k]);
   return '';
 }
 
-function strOrNull(obj: any, ...keys: string[]): string | null {
+function strOrNull(obj: Record<string, unknown>, ...keys: string[]): string | null {
   for (const k of keys) if (obj[k] != null) return String(obj[k]);
   return null;
 }
 
-function num(obj: any, ...keys: string[]): number {
+function num(obj: Record<string, unknown>, ...keys: string[]): number {
   for (const k of keys) if (obj[k] != null) return Number(obj[k]);
   return 0;
 }
 
-function bool(obj: any, ...keys: string[]): boolean {
+function bool(obj: Record<string, unknown>, ...keys: string[]): boolean {
   for (const k of keys) if (obj[k] != null) return Boolean(obj[k]);
   return false;
 }
 
-function arr(obj: any, ...keys: string[]): string[] {
-  for (const k of keys) if (Array.isArray(obj[k])) return obj[k];
+function arr(obj: Record<string, unknown>, ...keys: string[]): string[] {
+  for (const k of keys) if (Array.isArray(obj[k])) return obj[k] as string[];
   return [];
 }
-/* eslint-enable @typescript-eslint/no-explicit-any */
 
 /** Read the Todoist API token from env var or server-side file. */
 async function getToken(): Promise<string> {

@@ -3,6 +3,8 @@ import { google } from 'googleapis';
 import { getAuthenticatedClient } from '@/lib/google-auth';
 import { errorResponse } from '@/lib/api-utils';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   const auth = await getAuthenticatedClient();
   if (!auth) {

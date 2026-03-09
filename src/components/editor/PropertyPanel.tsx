@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
 import { useEditorStore } from '@/stores/editor-store';
+import { useModuleConfig } from '@/hooks/useModuleConfig';
 import Slider from '@/components/ui/Slider';
 import Toggle from '@/components/ui/Toggle';
 import ColorPicker from '@/components/ui/ColorPicker';
@@ -11,6 +12,9 @@ import Button from '@/components/ui/Button';
 import BackgroundPicker from '@/components/editor/BackgroundPicker';
 import type { ModuleInstance, CountdownEvent, TodoItem } from '@/types/config';
 import { v4 as uuidv4 } from 'uuid';
+
+const INPUT_CLASS = 'w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200';
+const INPUT_CLASS_FLEX = 'flex-1 px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200';
 
 function AccordionSection({ title, defaultOpen = true, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -67,7 +71,7 @@ function PositionSection({ mod, screenId }: { mod: ModuleInstance; screenId: str
                   [key]: Number(e.target.value),
                 })
               }
-              className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+              className={INPUT_CLASS}
             />
           </label>
         ))}
@@ -86,7 +90,7 @@ function PositionSection({ mod, screenId }: { mod: ModuleInstance; screenId: str
                   [key]: Number(e.target.value),
                 })
               }
-              className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+              className={INPUT_CLASS}
             />
           </label>
         ))}
@@ -114,7 +118,7 @@ function StyleSection({ mod, screenId }: { mod: ModuleInstance; screenId: string
         <select
           value={s.fontFamily}
           onChange={(e) => set({ fontFamily: e.target.value })}
-          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+          className={INPUT_CLASS}
         >
           <option value="Inter, system-ui, sans-serif">Inter</option>
           <option value="Georgia, serif">Georgia</option>
@@ -127,10 +131,7 @@ function StyleSection({ mod, screenId }: { mod: ModuleInstance; screenId: string
 }
 
 function ClockConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
-  const { updateModule } = useEditorStore();
-  const c = mod.config as { format24h?: boolean; showSeconds?: boolean; showDate?: boolean; dateFormat?: string; showWeekNumber?: boolean; showDayOfYear?: boolean };
-  const set = (updates: Record<string, unknown>) =>
-    updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
+  const { config: c, set } = useModuleConfig<{ format24h?: boolean; showSeconds?: boolean; showDate?: boolean; dateFormat?: string; showWeekNumber?: boolean; showDayOfYear?: boolean }>(mod, screenId);
 
   return (
     <>
@@ -143,7 +144,7 @@ function ClockConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: 
           type="text"
           value={(c.dateFormat as string) || ''}
           onChange={(e) => set({ dateFormat: e.target.value })}
-          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+          className={INPUT_CLASS}
         />
       </label>
       <Toggle label="Show Week Number" checked={!!c.showWeekNumber} onChange={(v) => set({ showWeekNumber: v })} />
@@ -153,10 +154,7 @@ function ClockConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: 
 }
 
 function CalendarConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
-  const { updateModule } = useEditorStore();
-  const c = mod.config as { viewMode?: string; daysToShow?: number; showTime?: boolean; showLocation?: boolean; maxEvents?: number; showWeekNumbers?: boolean };
-  const set = (updates: Record<string, unknown>) =>
-    updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
+  const { config: c, set } = useModuleConfig<{ viewMode?: string; daysToShow?: number; showTime?: boolean; showLocation?: boolean; maxEvents?: number; showWeekNumbers?: boolean }>(mod, screenId);
   const viewMode = c.viewMode ?? 'daily';
 
   return (
@@ -166,7 +164,7 @@ function CalendarConfigSection({ mod, screenId }: { mod: ModuleInstance; screenI
         <select
           value={viewMode}
           onChange={(e) => set({ viewMode: e.target.value })}
-          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+          className={INPUT_CLASS}
         >
           <option value="daily">Daily Columns</option>
           <option value="agenda">Agenda List</option>
@@ -183,7 +181,7 @@ function CalendarConfigSection({ mod, screenId }: { mod: ModuleInstance; screenI
             max={14}
             value={c.daysToShow ?? 3}
             onChange={(e) => set({ daysToShow: Number(e.target.value) })}
-            className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+            className={INPUT_CLASS}
           />
         </label>
       )}
@@ -196,7 +194,7 @@ function CalendarConfigSection({ mod, screenId }: { mod: ModuleInstance; screenI
             max={50}
             value={c.maxEvents ?? 20}
             onChange={(e) => set({ maxEvents: Number(e.target.value) })}
-            className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+            className={INPUT_CLASS}
           />
         </label>
       )}
@@ -214,16 +212,13 @@ function CalendarConfigSection({ mod, screenId }: { mod: ModuleInstance; screenI
 }
 
 function WeatherHourlyConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
-  const { updateModule } = useEditorStore();
-  const c = mod.config as {
+  const { config: c, set } = useModuleConfig<{
     hoursToShow?: number;
     showFeelsLike?: boolean;
     showPrecipitation?: boolean;
     showHumidity?: boolean;
     showWind?: boolean;
-  };
-  const set = (updates: Record<string, unknown>) =>
-    updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
+  }>(mod, screenId);
 
   return (
     <>
@@ -233,7 +228,7 @@ function WeatherHourlyConfigSection({ mod, screenId }: { mod: ModuleInstance; sc
           type="number"
           value={c.hoursToShow ?? 8}
           onChange={(e) => set({ hoursToShow: Number(e.target.value) })}
-          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+          className={INPUT_CLASS}
         />
       </label>
       <Toggle label="Feels Like" checked={c.showFeelsLike !== false} onChange={(v) => set({ showFeelsLike: v })} />
@@ -245,17 +240,14 @@ function WeatherHourlyConfigSection({ mod, screenId }: { mod: ModuleInstance; sc
 }
 
 function WeatherForecastConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
-  const { updateModule } = useEditorStore();
-  const c = mod.config as {
+  const { config: c, set } = useModuleConfig<{
     daysToShow?: number;
     showHighLow?: boolean;
     showPrecipitation?: boolean;
     showPrecipAmount?: boolean;
     showHumidity?: boolean;
     showWind?: boolean;
-  };
-  const set = (updates: Record<string, unknown>) =>
-    updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
+  }>(mod, screenId);
 
   return (
     <>
@@ -265,7 +257,7 @@ function WeatherForecastConfigSection({ mod, screenId }: { mod: ModuleInstance; 
           type="number"
           value={c.daysToShow ?? 5}
           onChange={(e) => set({ daysToShow: Number(e.target.value) })}
-          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+          className={INPUT_CLASS}
         />
       </label>
       <Toggle label="High / Low" checked={c.showHighLow !== false} onChange={(v) => set({ showHighLow: v })} />
@@ -278,11 +270,8 @@ function WeatherForecastConfigSection({ mod, screenId }: { mod: ModuleInstance; 
 }
 
 function CountdownConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
-  const { updateModule } = useEditorStore();
-  const c = mod.config as { events?: CountdownEvent[]; scale?: number; showPastEvents?: boolean };
+  const { config: c, set } = useModuleConfig<{ events?: CountdownEvent[]; scale?: number; showPastEvents?: boolean }>(mod, screenId);
   const events = c.events ?? [];
-  const set = (updates: Record<string, unknown>) =>
-    updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
 
   const addEvent = () => {
     set({
@@ -342,10 +331,7 @@ function CountdownConfigSection({ mod, screenId }: { mod: ModuleInstance; screen
 }
 
 function DadJokeConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
-  const { updateModule } = useEditorStore();
-  const c = mod.config as { refreshIntervalMs?: number };
-  const set = (updates: Record<string, unknown>) =>
-    updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
+  const { config: c, set } = useModuleConfig<{ refreshIntervalMs?: number }>(mod, screenId);
 
   return (
     <label className="flex flex-col gap-0.5">
@@ -354,17 +340,14 @@ function DadJokeConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId
         type="number"
         value={c.refreshIntervalMs ?? 60000}
         onChange={(e) => set({ refreshIntervalMs: Number(e.target.value) })}
-        className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+        className={INPUT_CLASS}
       />
     </label>
   );
 }
 
 function TextConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
-  const { updateModule } = useEditorStore();
-  const c = mod.config as { content?: string; alignment?: string };
-  const set = (updates: Record<string, unknown>) =>
-    updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
+  const { config: c, set } = useModuleConfig<{ content?: string; alignment?: string }>(mod, screenId);
 
   return (
     <>
@@ -374,7 +357,7 @@ function TextConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: s
           value={(c.content as string) || ''}
           onChange={(e) => set({ content: e.target.value })}
           rows={3}
-          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200 resize-none"
+          className={`${INPUT_CLASS} resize-none`}
         />
       </label>
       <label className="flex flex-col gap-0.5">
@@ -382,7 +365,7 @@ function TextConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: s
         <select
           value={(c.alignment as string) || 'center'}
           onChange={(e) => set({ alignment: e.target.value })}
-          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+          className={INPUT_CLASS}
         >
           <option value="left">Left</option>
           <option value="center">Center</option>
@@ -394,10 +377,7 @@ function TextConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: s
 }
 
 function ImageConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
-  const { updateModule } = useEditorStore();
-  const c = mod.config as { src?: string; objectFit?: string; alt?: string };
-  const set = (updates: Record<string, unknown>) =>
-    updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
+  const { config: c, set } = useModuleConfig<{ src?: string; objectFit?: string; alt?: string }>(mod, screenId);
 
   return (
     <>
@@ -407,7 +387,7 @@ function ImageConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: 
           type="text"
           value={(c.src as string) || ''}
           onChange={(e) => set({ src: e.target.value })}
-          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+          className={INPUT_CLASS}
         />
       </label>
       <label className="flex flex-col gap-0.5">
@@ -415,7 +395,7 @@ function ImageConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: 
         <select
           value={(c.objectFit as string) || 'cover'}
           onChange={(e) => set({ objectFit: e.target.value })}
-          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+          className={INPUT_CLASS}
         >
           <option value="cover">Cover</option>
           <option value="contain">Contain</option>
@@ -428,7 +408,7 @@ function ImageConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: 
           type="text"
           value={(c.alt as string) || ''}
           onChange={(e) => set({ alt: e.target.value })}
-          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+          className={INPUT_CLASS}
         />
       </label>
     </>
@@ -436,10 +416,7 @@ function ImageConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: 
 }
 
 function QuoteConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
-  const { updateModule } = useEditorStore();
-  const c = mod.config as { refreshIntervalMs?: number };
-  const set = (updates: Record<string, unknown>) =>
-    updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
+  const { config: c, set } = useModuleConfig<{ refreshIntervalMs?: number }>(mod, screenId);
 
   return (
     <Slider
@@ -454,11 +431,8 @@ function QuoteConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: 
 }
 
 function TodoConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
-  const { updateModule } = useEditorStore();
-  const c = mod.config as { title?: string; items?: TodoItem[] };
+  const { config: c, set } = useModuleConfig<{ title?: string; items?: TodoItem[] }>(mod, screenId);
   const items = c.items ?? [];
-  const set = (updates: Record<string, unknown>) =>
-    updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
 
   const addItem = () => {
     set({ items: [...items, { id: uuidv4(), text: 'New item', completed: false }] });
@@ -480,7 +454,7 @@ function TodoConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: s
           type="text"
           value={(c.title as string) || 'To Do'}
           onChange={(e) => set({ title: e.target.value })}
-          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+          className={INPUT_CLASS}
         />
       </label>
       <div className="flex items-center justify-between">
@@ -509,10 +483,7 @@ function TodoConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: s
 }
 
 function StickyNoteConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
-  const { updateModule } = useEditorStore();
-  const c = mod.config as { content?: string; noteColor?: string };
-  const set = (updates: Record<string, unknown>) =>
-    updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
+  const { config: c, set } = useModuleConfig<{ content?: string; noteColor?: string }>(mod, screenId);
 
   return (
     <>
@@ -522,7 +493,7 @@ function StickyNoteConfigSection({ mod, screenId }: { mod: ModuleInstance; scree
           value={(c.content as string) || ''}
           onChange={(e) => set({ content: e.target.value })}
           rows={4}
-          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200 resize-none"
+          className={`${INPUT_CLASS} resize-none`}
         />
       </label>
       <label className="flex flex-col gap-0.5">
@@ -539,10 +510,7 @@ function StickyNoteConfigSection({ mod, screenId }: { mod: ModuleInstance; scree
 }
 
 function GreetingConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
-  const { updateModule } = useEditorStore();
-  const c = mod.config as { name?: string };
-  const set = (updates: Record<string, unknown>) =>
-    updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
+  const { config: c, set } = useModuleConfig<{ name?: string }>(mod, screenId);
 
   return (
     <label className="flex flex-col gap-0.5">
@@ -551,17 +519,14 @@ function GreetingConfigSection({ mod, screenId }: { mod: ModuleInstance; screenI
         type="text"
         value={(c.name as string) || 'Friend'}
         onChange={(e) => set({ name: e.target.value })}
-        className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+        className={INPUT_CLASS}
       />
     </label>
   );
 }
 
 function NewsConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
-  const { updateModule } = useEditorStore();
-  const c = mod.config as { feedUrl?: string; refreshIntervalMs?: number; rotateIntervalMs?: number };
-  const set = (updates: Record<string, unknown>) =>
-    updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
+  const { config: c, set } = useModuleConfig<{ feedUrl?: string; refreshIntervalMs?: number; rotateIntervalMs?: number }>(mod, screenId);
 
   return (
     <>
@@ -572,7 +537,7 @@ function NewsConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: s
           value={(c.feedUrl as string) || ''}
           onChange={(e) => set({ feedUrl: e.target.value })}
           placeholder="https://feeds.bbci.co.uk/news/rss.xml"
-          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+          className={INPUT_CLASS}
         />
       </label>
       <Slider
@@ -595,10 +560,7 @@ function NewsConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: s
 }
 
 function StockTickerConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
-  const { updateModule } = useEditorStore();
-  const c = mod.config as { symbols?: string; refreshIntervalMs?: number; cardScale?: number };
-  const set = (updates: Record<string, unknown>) =>
-    updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
+  const { config: c, set } = useModuleConfig<{ symbols?: string; refreshIntervalMs?: number; cardScale?: number }>(mod, screenId);
 
   return (
     <>
@@ -608,7 +570,7 @@ function StockTickerConfigSection({ mod, screenId }: { mod: ModuleInstance; scre
           type="text"
           value={(c.symbols as string) || 'AAPL,GOOGL,MSFT'}
           onChange={(e) => set({ symbols: e.target.value })}
-          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+          className={INPUT_CLASS}
         />
       </label>
       <Slider
@@ -632,10 +594,7 @@ function StockTickerConfigSection({ mod, screenId }: { mod: ModuleInstance; scre
 }
 
 function CryptoConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
-  const { updateModule } = useEditorStore();
-  const c = mod.config as { ids?: string; refreshIntervalMs?: number; cardScale?: number };
-  const set = (updates: Record<string, unknown>) =>
-    updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
+  const { config: c, set } = useModuleConfig<{ ids?: string; refreshIntervalMs?: number; cardScale?: number }>(mod, screenId);
 
   return (
     <>
@@ -645,7 +604,7 @@ function CryptoConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId:
           type="text"
           value={(c.ids as string) || 'bitcoin,ethereum'}
           onChange={(e) => set({ ids: e.target.value })}
-          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+          className={INPUT_CLASS}
         />
       </label>
       <Slider
@@ -669,20 +628,17 @@ function CryptoConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId:
 }
 
 function HistoryConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
-  const { updateModule } = useEditorStore();
-  const c = mod.config as { refreshIntervalMs?: number; rotationIntervalSec?: number };
-  const set = (updates: Record<string, unknown>) =>
-    updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
+  const { config: c, set } = useModuleConfig<{ refreshIntervalMs?: number; rotationIntervalMs?: number }>(mod, screenId);
 
   return (
     <>
       <Slider
         label="Cycle Events (seconds)"
-        value={c.rotationIntervalSec ?? 10}
+        value={(c.rotationIntervalMs ?? 10000) / 1000}
         min={5}
         max={120}
         step={5}
-        onChange={(v) => set({ rotationIntervalSec: v })}
+        onChange={(v) => set({ rotationIntervalMs: v * 1000 })}
       />
       <Slider
         label="Reload Data (minutes)"
@@ -697,10 +653,7 @@ function HistoryConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId
 }
 
 function MoonPhaseConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
-  const { updateModule } = useEditorStore();
-  const c = mod.config as { showIllumination?: boolean; showMoonTimes?: boolean };
-  const set = (updates: Record<string, unknown>) =>
-    updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
+  const { config: c, set } = useModuleConfig<{ showIllumination?: boolean; showMoonTimes?: boolean }>(mod, screenId);
 
   return (
     <>
@@ -712,10 +665,7 @@ function MoonPhaseConfigSection({ mod, screenId }: { mod: ModuleInstance; screen
 }
 
 function SunriseSunsetConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
-  const { updateModule } = useEditorStore();
-  const c = mod.config as { showDayLength?: boolean; showGoldenHour?: boolean };
-  const set = (updates: Record<string, unknown>) =>
-    updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
+  const { config: c, set } = useModuleConfig<{ showDayLength?: boolean; showGoldenHour?: boolean }>(mod, screenId);
 
   return (
     <>
@@ -727,10 +677,7 @@ function SunriseSunsetConfigSection({ mod, screenId }: { mod: ModuleInstance; sc
 }
 
 function PhotoSlideshowConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
-  const { updateModule } = useEditorStore();
-  const c = mod.config as { directory?: string; intervalMs?: number; transition?: string; objectFit?: string };
-  const set = (updates: Record<string, unknown>) =>
-    updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
+  const { config: c, set } = useModuleConfig<{ directory?: string; intervalMs?: number; transition?: string; objectFit?: string }>(mod, screenId);
 
   return (
     <>
@@ -741,7 +688,7 @@ function PhotoSlideshowConfigSection({ mod, screenId }: { mod: ModuleInstance; s
           value={(c.directory as string) || ''}
           onChange={(e) => set({ directory: e.target.value })}
           placeholder="Leave empty for all backgrounds"
-          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+          className={INPUT_CLASS}
         />
       </label>
       <Slider
@@ -757,7 +704,7 @@ function PhotoSlideshowConfigSection({ mod, screenId }: { mod: ModuleInstance; s
         <select
           value={(c.transition as string) || 'fade'}
           onChange={(e) => set({ transition: e.target.value })}
-          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+          className={INPUT_CLASS}
         >
           <option value="fade">Fade</option>
           <option value="none">None</option>
@@ -768,7 +715,7 @@ function PhotoSlideshowConfigSection({ mod, screenId }: { mod: ModuleInstance; s
         <select
           value={(c.objectFit as string) || 'cover'}
           onChange={(e) => set({ objectFit: e.target.value })}
-          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+          className={INPUT_CLASS}
         >
           <option value="cover">Cover</option>
           <option value="contain">Contain</option>
@@ -780,10 +727,7 @@ function PhotoSlideshowConfigSection({ mod, screenId }: { mod: ModuleInstance; s
 }
 
 function QRCodeConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
-  const { updateModule } = useEditorStore();
-  const c = mod.config as { data?: string; label?: string; fgColor?: string; bgColor?: string };
-  const set = (updates: Record<string, unknown>) =>
-    updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
+  const { config: c, set } = useModuleConfig<{ data?: string; label?: string; fgColor?: string; bgColor?: string }>(mod, screenId);
 
   return (
     <>
@@ -794,7 +738,7 @@ function QRCodeConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId:
           value={(c.data as string) || ''}
           onChange={(e) => set({ data: e.target.value })}
           placeholder="https://example.com"
-          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+          className={INPUT_CLASS}
         />
       </label>
       <label className="flex flex-col gap-0.5">
@@ -803,7 +747,7 @@ function QRCodeConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId:
           type="text"
           value={(c.label as string) || ''}
           onChange={(e) => set({ label: e.target.value })}
-          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+          className={INPUT_CLASS}
         />
       </label>
       <ColorPicker label="QR Color" value={(c.fgColor as string) || '#ffffff'} onChange={(v) => set({ fgColor: v })} />
@@ -813,10 +757,7 @@ function QRCodeConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId:
 }
 
 function YearProgressConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
-  const { updateModule } = useEditorStore();
-  const c = mod.config as { showYear?: boolean; showMonth?: boolean; showWeek?: boolean; showDay?: boolean; showPercentage?: boolean };
-  const set = (updates: Record<string, unknown>) =>
-    updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
+  const { config: c, set } = useModuleConfig<{ showYear?: boolean; showMonth?: boolean; showWeek?: boolean; showDay?: boolean; showPercentage?: boolean }>(mod, screenId);
 
   return (
     <>
@@ -830,11 +771,8 @@ function YearProgressConfigSection({ mod, screenId }: { mod: ModuleInstance; scr
 }
 
 function TrafficConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
-  const { updateModule } = useEditorStore();
-  const c = mod.config as { routes?: { label: string; origin: string; destination: string }[]; refreshIntervalMs?: number };
+  const { config: c, set } = useModuleConfig<{ routes?: { label: string; origin: string; destination: string }[]; refreshIntervalMs?: number }>(mod, screenId);
   const routes = c.routes ?? [];
-  const set = (updates: Record<string, unknown>) =>
-    updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
 
   const addRoute = () => {
     set({ routes: [...routes, { label: 'Work', origin: '', destination: '' }] });
@@ -894,10 +832,7 @@ function TrafficConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId
 }
 
 function SportsConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
-  const { updateModule } = useEditorStore();
-  const c = mod.config as { leagues?: string[]; refreshIntervalMs?: number };
-  const set = (updates: Record<string, unknown>) =>
-    updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
+  const { config: c, set } = useModuleConfig<{ leagues?: string[]; refreshIntervalMs?: number }>(mod, screenId);
 
   const leagueOptions = ['nfl', 'nba', 'mlb', 'nhl', 'mls', 'epl'];
   const selectedLeagues = c.leagues ?? ['nba', 'nfl'];
@@ -933,10 +868,7 @@ function SportsConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId:
 }
 
 function AirQualityConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
-  const { updateModule } = useEditorStore();
-  const c = mod.config as { showAQI?: boolean; showPollutants?: boolean; showUV?: boolean; refreshIntervalMs?: number };
-  const set = (updates: Record<string, unknown>) =>
-    updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
+  const { config: c, set } = useModuleConfig<{ showAQI?: boolean; showPollutants?: boolean; showUV?: boolean; refreshIntervalMs?: number }>(mod, screenId);
 
   return (
     <>
@@ -993,7 +925,7 @@ function TodoistTokenField() {
           value={token}
           onChange={(e) => { setToken(e.target.value); setStatus('idle'); }}
           placeholder="Paste token and click Save"
-          className="flex-1 px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+          className={INPUT_CLASS_FLEX}
         />
         <Button size="sm" onClick={saveToken} disabled={!token.trim() || status === 'saving'}>
           {status === 'saving' ? '...' : 'Save'}
@@ -1007,8 +939,7 @@ function TodoistTokenField() {
 }
 
 function TodoistConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
-  const { updateModule } = useEditorStore();
-  const c = mod.config as {
+  const { config: c, set } = useModuleConfig<{
     title?: string;
     viewMode?: string;
     groupBy?: string;
@@ -1022,9 +953,7 @@ function TodoistConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId
     showDescription?: boolean;
     maxTasks?: number;
     refreshIntervalMs?: number;
-  };
-  const set = (updates: Record<string, unknown>) =>
-    updateModule(screenId, mod.id, { config: { ...mod.config, ...updates } });
+  }>(mod, screenId);
   const viewMode = c.viewMode ?? 'list';
 
   return (
@@ -1036,7 +965,7 @@ function TodoistConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId
           type="text"
           value={(c.title as string) || 'Todoist'}
           onChange={(e) => set({ title: e.target.value })}
-          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+          className={INPUT_CLASS}
         />
       </label>
       <label className="flex flex-col gap-0.5">
@@ -1044,7 +973,7 @@ function TodoistConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId
         <select
           value={viewMode}
           onChange={(e) => set({ viewMode: e.target.value })}
-          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+          className={INPUT_CLASS}
         >
           <option value="list">List</option>
           <option value="board">Board</option>
@@ -1057,7 +986,7 @@ function TodoistConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId
           <select
             value={(c.groupBy as string) || 'date'}
             onChange={(e) => set({ groupBy: e.target.value })}
-            className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+            className={INPUT_CLASS}
           >
             <option value="none">None</option>
             <option value="project">Project</option>
@@ -1072,7 +1001,7 @@ function TodoistConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId
         <select
           value={(c.sortBy as string) || 'default'}
           onChange={(e) => set({ sortBy: e.target.value })}
-          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+          className={INPUT_CLASS}
         >
           <option value="default">Default Order</option>
           <option value="priority">Priority</option>
@@ -1087,7 +1016,7 @@ function TodoistConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId
           value={(c.projectFilter as string) || ''}
           onChange={(e) => set({ projectFilter: e.target.value })}
           placeholder="e.g. Work, Personal"
-          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+          className={INPUT_CLASS}
         />
       </label>
       <label className="flex flex-col gap-0.5">
@@ -1097,7 +1026,7 @@ function TodoistConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId
           value={(c.labelFilter as string) || ''}
           onChange={(e) => set({ labelFilter: e.target.value })}
           placeholder="e.g. urgent, home"
-          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+          className={INPUT_CLASS}
         />
       </label>
       <Toggle label="Show Subtasks" checked={c.showSubtasks !== false} onChange={(v) => set({ showSubtasks: v })} />
@@ -1113,7 +1042,7 @@ function TodoistConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId
           max={100}
           value={c.maxTasks ?? 30}
           onChange={(e) => set({ maxTasks: Number(e.target.value) })}
-          className="w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200"
+          className={INPUT_CLASS}
         />
       </label>
       <Slider

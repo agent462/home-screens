@@ -19,7 +19,7 @@ export default function HistoryModule({ config, style }: HistoryModuleProps) {
   const data = useFetchData<{ events: HistoryEvent[] }>('/api/history', config.refreshIntervalMs ?? 86400000);
   const events = data?.events ?? [];
 
-  const rotationMs = (config.rotationIntervalSec ?? 10) * 1000;
+  const rotationMs = config.rotationIntervalMs ?? 10000;
   const index = useRotatingIndex(events.length, rotationMs);
 
   return (

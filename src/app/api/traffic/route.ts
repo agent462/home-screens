@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { errorResponse } from '@/lib/api-utils';
+import { errorResponse, createTTLCache } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,27 +9,7 @@ interface RouteInput {
   destination: string;
 }
 
-interface CacheEntry {
-  data: unknown;
-  timestamp: number;
-}
-
-const cache = new Map<string, CacheEntry>();
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
-
-function getCached(key: string): unknown | null {
-  const entry = cache.get(key);
-  if (!entry) return null;
-  if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
-    cache.delete(key);
-    return null;
-  }
-  return entry.data;
-}
-
-function setCache(key: string, data: unknown) {
-  cache.set(key, { data, timestamp: Date.now() });
-}
+const cache = createTTLCache<unknown>(5 * 60 * 1000); // 5 minutes
 
 async function fetchGoogle(routes: RouteInput[], apiKey: string) {
   const results = await Promise.all(
@@ -141,7 +121,7 @@ export async function GET(request: NextRequest) {
 
     // Check cache
     const cacheKey = routesParam;
-    const cached = getCached(cacheKey);
+    const cached = cache.get(cacheKey);
     if (cached) {
       return NextResponse.json(cached);
     }
@@ -163,7 +143,7 @@ export async function GET(request: NextRequest) {
       };
     }
 
-    setCache(cacheKey, result);
+    cache.set(cacheKey, result);
     return NextResponse.json(result);
   } catch (error) {
     return errorResponse(error, 'Failed to fetch traffic data');

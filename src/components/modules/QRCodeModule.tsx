@@ -25,11 +25,11 @@ export default function QRCodeModule({ config, style }: QRCodeModuleProps) {
               style={{ width: '80%', height: '80%', maxWidth: '100%', maxHeight: '100%' }}
             />
             {config.label && (
-              <span className="text-sm opacity-80 text-center">{config.label}</span>
+              <span className="opacity-80 text-center" style={{ fontSize: '0.875em' }}>{config.label}</span>
             )}
           </>
         ) : (
-          <span className="text-sm opacity-50">Configure QR data</span>
+          <span className="opacity-50" style={{ fontSize: '0.875em' }}>Configure QR data</span>
         )}
       </div>
     </ModuleWrapper>

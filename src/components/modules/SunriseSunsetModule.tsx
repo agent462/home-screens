@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import SunCalc from 'suncalc';
-import { createTZDate, formatTimeInTZ } from '@/lib/timezone';
+import { formatTimeInTZ } from '@/lib/timezone';
+import { useTZClock } from '@/hooks/useTZClock';
 import type { SunriseSunsetConfig, ModuleStyle } from '@/types/config';
 import ModuleWrapper from './ModuleWrapper';
+import { LocationRequired } from './LocationRequired';
 
 interface SunriseSunsetModuleProps {
   config: SunriseSunsetConfig;
@@ -23,21 +24,10 @@ function getDayLength(sunrise: Date, sunset: Date): string {
 }
 
 export default function SunriseSunsetModule({ config, style, latitude, longitude, timezone }: SunriseSunsetModuleProps) {
-  const [now, setNow] = useState(() => createTZDate(timezone));
-
-  useEffect(() => {
-    const interval = setInterval(() => setNow(createTZDate(timezone)), 60_000);
-    return () => clearInterval(interval);
-  }, [timezone]);
+  const now = useTZClock(timezone);
 
   if (latitude == null || longitude == null) {
-    return (
-      <ModuleWrapper style={style}>
-        <div className="flex items-center justify-center h-full opacity-50" style={{ fontSize: '0.85em' }}>
-          Location not configured
-        </div>
-      </ModuleWrapper>
-    );
+    return <LocationRequired style={style} />;
   }
 
   const times = SunCalc.getTimes(now, latitude, longitude);

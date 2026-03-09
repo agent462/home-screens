@@ -2,8 +2,10 @@ import dynamic from 'next/dynamic';
 import type { ComponentType } from 'react';
 import type { ModuleType } from '@/types/config';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const moduleComponents: Record<ModuleType, ComponentType<any>> = {
+// Module components have heterogeneous props (each module has its own config
+// type). We assert the record type because ComponentType is contravariant in
+// props, preventing direct assignment of specific component types.
+export const moduleComponents = {
   clock: dynamic(() => import('@/components/modules/ClockModule')),
   calendar: dynamic(() => import('@/components/modules/CalendarModule')),
   'weather-hourly': dynamic(() => import('@/components/modules/WeatherHourlyModule')),
@@ -30,4 +32,4 @@ export const moduleComponents: Record<ModuleType, ComponentType<any>> = {
   sports: dynamic(() => import('@/components/modules/SportsModule')),
   'air-quality': dynamic(() => import('@/components/modules/AirQualityModule')),
   todoist: dynamic(() => import('@/components/modules/TodoistModule')),
-};
+} as unknown as Record<ModuleType, ComponentType<Record<string, unknown>>>;

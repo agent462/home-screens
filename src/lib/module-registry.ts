@@ -263,7 +263,9 @@ registerModule({
   label: 'Word of the Day',
   icon: BookOpen,
   category: 'Knowledge & Fun',
-  defaultConfig: {},
+  defaultConfig: {
+    refreshIntervalMs: 86400000,
+  },
   defaultSize: DEFAULT_MODULE_SIZES['word-of-day'],
 });
 
@@ -274,7 +276,7 @@ registerModule({
   category: 'Knowledge & Fun',
   defaultConfig: {
     refreshIntervalMs: 3600000,
-    rotationIntervalSec: 10,
+    rotationIntervalMs: 10000,
   },
   defaultSize: DEFAULT_MODULE_SIZES.history,
 });
@@ -313,6 +315,7 @@ registerModule({
     intervalMs: 30000,
     transition: 'fade',
     objectFit: 'cover',
+    refreshIntervalMs: 600000,
   },
   defaultSize: DEFAULT_MODULE_SIZES['photo-slideshow'],
 });

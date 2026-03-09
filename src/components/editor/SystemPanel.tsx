@@ -33,6 +33,12 @@ interface BackupFile {
   modified: string;
 }
 
+type PowerState =
+  | { status: 'idle' }
+  | { status: 'pending'; action: string }
+  | { status: 'ok'; action: string }
+  | { status: 'error'; message: string };
+
 export default function SystemPanel({ onClose }: { onClose: () => void }) {
   const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
   const [releases, setReleases] = useState<Release[]>([]);
@@ -43,7 +49,7 @@ export default function SystemPanel({ onClose }: { onClose: () => void }) {
   const [rollbackTarget, setRollbackTarget] = useState<string | null>(null);
   const [restoreStatus, setRestoreStatus] = useState<string | null>(null);
   const [showChangelog, setShowChangelog] = useState(false);
-  const [powerAction, setPowerAction] = useState<string | null>(null);
+  const [powerState, setPowerState] = useState<PowerState>({ status: 'idle' });
 
   const fetchAll = useCallback(async (forceCheck = false) => {
     try {
@@ -124,7 +130,7 @@ export default function SystemPanel({ onClose }: { onClose: () => void }) {
     const label = action === 'reboot' ? 'reboot the system' : 'restart the service';
     if (!confirm(`Are you sure you want to ${label}? You may briefly lose connection.`)) return;
 
-    setPowerAction(action);
+    setPowerState({ status: 'pending', action });
     try {
       const res = await fetch('/api/system/power', {
         method: 'POST',
@@ -132,13 +138,13 @@ export default function SystemPanel({ onClose }: { onClose: () => void }) {
         body: JSON.stringify({ action }),
       });
       if (res.ok) {
-        setPowerAction(`${action}-ok`);
+        setPowerState({ status: 'ok', action });
       } else {
         const data = await res.json();
-        setPowerAction(`error:${data.error || 'Unknown error'}`);
+        setPowerState({ status: 'error', message: data.error || 'Unknown error' });
       }
     } catch {
-      setPowerAction('error:Failed to reach server');
+      setPowerState({ status: 'error', message: 'Failed to reach server' });
     }
   }
 
@@ -392,7 +398,7 @@ export default function SystemPanel({ onClose }: { onClose: () => void }) {
                     variant="secondary"
                     size="sm"
                     onClick={() => handlePowerAction('restart-service')}
-                    disabled={!!powerAction}
+                    disabled={powerState.status !== 'idle'}
                   >
                     Restart Service
                   </Button>
@@ -400,27 +406,27 @@ export default function SystemPanel({ onClose }: { onClose: () => void }) {
                     variant="danger"
                     size="sm"
                     onClick={() => handlePowerAction('reboot')}
-                    disabled={!!powerAction}
+                    disabled={powerState.status !== 'idle'}
                   >
                     Reboot System
                   </Button>
                 </div>
-                {powerAction === 'restart-service-ok' && (
+                {powerState.status === 'ok' && powerState.action === 'restart-service' && (
                   <p className="text-xs text-green-400 mt-2">
                     Service restart scheduled. The page will reload momentarily...
                   </p>
                 )}
-                {powerAction === 'reboot-ok' && (
+                {powerState.status === 'ok' && powerState.action === 'reboot' && (
                   <p className="text-xs text-green-400 mt-2">
                     System reboot scheduled. The display will come back online shortly...
                   </p>
                 )}
-                {powerAction?.startsWith('error:') && (
+                {powerState.status === 'error' && (
                   <p className="text-xs text-red-400 mt-2">
-                    {powerAction.slice(6)}
+                    {powerState.message}
                   </p>
                 )}
-                {(powerAction === 'reboot' || powerAction === 'restart-service') && (
+                {powerState.status === 'pending' && (
                   <p className="text-xs text-neutral-500 mt-2">Processing...</p>
                 )}
                 <p className="text-xs text-neutral-500 mt-2">

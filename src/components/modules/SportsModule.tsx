@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import type { SportsConfig, ModuleStyle } from '@/types/config';
 import ModuleWrapper from './ModuleWrapper';
 import { useFetchData } from '@/hooks/useFetchData';
+import { useRotatingIndex } from '@/hooks/useRotatingIndex';
 
 interface SportsModuleProps {
   config: SportsConfig;
@@ -33,13 +34,7 @@ function statusColor(status: string): string {
 }
 
 function LeagueRow({ league, games }: { league: string; games: Game[] }) {
-  const [index, setIndex] = useState(0);
-
-  useEffect(() => {
-    if (games.length <= 1) return;
-    const interval = setInterval(() => setIndex((i) => (i + 1) % games.length), 8000);
-    return () => clearInterval(interval);
-  }, [games.length]);
+  const index = useRotatingIndex(games.length, 8000);
 
   const game = games[index % games.length];
   if (!game) return null;
@@ -47,8 +42,8 @@ function LeagueRow({ league, games }: { league: string; games: Game[] }) {
   return (
     <div className="flex items-center gap-2 w-full" style={{ minHeight: '1.8em' }}>
       <span
-        className="text-xs font-bold uppercase tracking-wider opacity-50 shrink-0"
-        style={{ width: '2.5em' }}
+        className="font-bold uppercase tracking-wider opacity-50 shrink-0"
+        style={{ fontSize: '0.75em', width: '2.5em' }}
       >
         {league}
       </span>
@@ -59,11 +54,11 @@ function LeagueRow({ league, games }: { league: string; games: Game[] }) {
         </span>
         <span className="truncate flex-1">{game.homeTeam}</span>
       </div>
-      <span className={`text-xs shrink-0 ${statusColor(game.status)}`}>
+      <span className={`shrink-0 ${statusColor(game.status)}`} style={{ fontSize: '0.75em' }}>
         {game.status}
       </span>
       {games.length > 1 && (
-        <span className="text-xs opacity-30 shrink-0 tabular-nums">
+        <span className="opacity-30 shrink-0 tabular-nums" style={{ fontSize: '0.75em' }}>
           {(index % games.length) + 1}/{games.length}
         </span>
       )}

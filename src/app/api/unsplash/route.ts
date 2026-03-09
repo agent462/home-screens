@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import path from 'path';
 import { BACKGROUNDS_DIR } from '@/lib/constants';
 import { UNSPLASH_API, getUnsplashAccessKey, trackDownload } from '@/lib/unsplash';
+import { errorResponse } from '@/lib/api-utils';
+
+export const dynamic = 'force-dynamic';
 
 const BGS = path.join(process.cwd(), BACKGROUNDS_DIR);
 
@@ -59,8 +62,7 @@ export async function GET(request: NextRequest) {
       total: data.total ?? 0,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to search Unsplash';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(error, 'Failed to search Unsplash');
   }
 }
 
@@ -101,7 +103,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ path: `/api/backgrounds/serve?file=${encodeURIComponent(safeName)}` }, { status: 201 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to download image';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(error, 'Failed to download image');
   }
 }

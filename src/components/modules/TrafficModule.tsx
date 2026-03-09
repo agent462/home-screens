@@ -39,14 +39,14 @@ export default function TrafficModule({ config, style }: TrafficModuleProps) {
   return (
     <ModuleWrapper style={style}>
       <div className="flex flex-col h-full gap-2">
-        <span className="text-xs uppercase tracking-widest opacity-50 text-center">
+        <span className="uppercase tracking-widest opacity-50 text-center" style={{ fontSize: '0.75em' }}>
           Traffic
         </span>
 
         {routes.length === 0 ? (
-          <p className="text-center opacity-60 text-sm">No routes configured</p>
+          <p className="text-center opacity-50" style={{ fontSize: '0.875em' }}>No routes configured</p>
         ) : !data ? (
-          <p className="text-center opacity-60 text-sm">Loading...</p>
+          <p className="text-center opacity-50" style={{ fontSize: '0.875em' }}>Loading...</p>
         ) : (
           <div className="flex flex-col gap-2">
             {data.routes.map((route, i) => (
@@ -56,8 +56,8 @@ export default function TrafficModule({ config, style }: TrafficModuleProps) {
                   style={{ backgroundColor: delayColor(route.delayMinutes) }}
                 />
                 <div className="flex flex-col min-w-0">
-                  <span className="text-sm font-medium truncate">{route.label}</span>
-                  <span className="text-xs opacity-60">
+                  <span className="font-medium truncate" style={{ fontSize: '0.875em' }}>{route.label}</span>
+                  <span className="opacity-50" style={{ fontSize: '0.75em' }}>
                     {route.durationInTrafficMinutes} min
                     {route.delayMinutes > 0 && (
                       <span style={{ color: delayColor(route.delayMinutes) }}>

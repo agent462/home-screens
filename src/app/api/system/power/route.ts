@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { spawn, execSync } from 'child_process';
+import { errorResponse } from '@/lib/api-utils';
+
+export const dynamic = 'force-dynamic';
 
 /**
  * POST /api/system/power
@@ -40,8 +43,7 @@ function restartService(): NextResponse {
 
     return NextResponse.json({ ok: true, message: 'Service restart scheduled' });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    return errorResponse(error, 'Power action failed');
   }
 }
 
@@ -55,8 +57,7 @@ function rebootSystem(): NextResponse {
 
     return NextResponse.json({ ok: true, message: 'System reboot scheduled' });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    return errorResponse(error, 'Power action failed');
   }
 }
 

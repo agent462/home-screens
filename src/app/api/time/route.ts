@@ -1,15 +1,22 @@
+import { NextResponse } from 'next/server';
+import { errorResponse } from '@/lib/api-utils';
+
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const now = new Date();
-  return Response.json({
-    iso: now.toISOString(),
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    formatted: now.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true,
-    }),
-  });
+  try {
+    const now = new Date();
+    return NextResponse.json({
+      iso: now.toISOString(),
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      formatted: now.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true,
+      }),
+    });
+  } catch (error) {
+    return errorResponse(error, 'Failed to get server time');
+  }
 }

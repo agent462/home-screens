@@ -39,6 +39,25 @@ const STEP_LABELS: Record<string, string> = {
 
 type StepState = 'done' | 'active' | 'pending' | 'error';
 
+const STEP_STYLES: Record<StepState, { icon: React.ReactNode; textClass: string }> = {
+  done: {
+    icon: <span className="text-green-400 text-xs">&#10003;</span>,
+    textClass: 'text-neutral-500',
+  },
+  active: {
+    icon: <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />,
+    textClass: 'text-neutral-100',
+  },
+  error: {
+    icon: <span className="text-red-400 text-xs font-bold">&#10005;</span>,
+    textClass: 'text-red-400',
+  },
+  pending: {
+    icon: <span className="inline-block w-1.5 h-1.5 rounded-full bg-neutral-700" />,
+    textClass: 'text-neutral-600',
+  },
+};
+
 interface Props {
   targetTag: string;
   isRollback: boolean;
@@ -326,6 +345,7 @@ export default function UpgradeModal({ targetTag, isRollback, onComplete, onClos
           <div className="space-y-1">
             {VISIBLE_STEPS.map((step) => {
               const state = getStepState(step);
+              const styles = STEP_STYLES[state] ?? STEP_STYLES.pending;
               const isOpen = expanded.has(step);
               const log = stepLogs[step] || '';
               const hasLog = log.length > 0;
@@ -342,7 +362,6 @@ export default function UpgradeModal({ targetTag, isRollback, onComplete, onClos
                         : 'border-neutral-800/50'
                   }`}
                 >
-                  {/* Step header */}
                   <button
                     disabled={!canExpand}
                     onClick={() => toggleExpand(step)}
@@ -350,44 +369,17 @@ export default function UpgradeModal({ targetTag, isRollback, onComplete, onClos
                       canExpand ? 'cursor-pointer hover:bg-neutral-800/30' : 'cursor-default'
                     }`}
                   >
-                    {/* Status icon */}
                     <span className="w-4 flex-shrink-0 text-center">
-                      {state === 'error' && (
-                        <span className="text-red-400 text-xs font-bold">&#10005;</span>
-                      )}
-                      {state === 'done' && (
-                        <span className="text-green-400 text-xs">&#10003;</span>
-                      )}
-                      {state === 'active' && (
-                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
-                      )}
-                      {state === 'pending' && (
-                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-neutral-700" />
-                      )}
+                      {styles.icon}
                     </span>
-
-                    {/* Label */}
-                    <span
-                      className={`flex-1 ${
-                        state === 'error'
-                          ? 'text-red-400'
-                          : state === 'done'
-                            ? 'text-neutral-500'
-                            : state === 'active'
-                              ? 'text-neutral-100'
-                              : 'text-neutral-600'
-                      }`}
-                    >
+                    <span className={`flex-1 ${styles.textClass}`}>
                       {STEP_LABELS[step] ?? step}
                     </span>
-
-                    {/* Expand chevron */}
                     {canExpand && (
                       <span className="text-neutral-600 text-[10px]">{isOpen ? '▾' : '▸'}</span>
                     )}
                   </button>
 
-                  {/* Output panel */}
                   {isOpen && hasLog && (
                     <div
                       ref={state === 'active' || state === 'error' ? activeLogRef : undefined}

@@ -1,0 +1,213 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import Button from '@/components/ui/Button';
+
+interface LocationSettings {
+  lat: string;
+  lon: string;
+  locationName: string | null;
+  timezone: string;
+}
+
+interface Props {
+  values: LocationSettings;
+  onChange: (updates: Partial<LocationSettings>) => void;
+}
+
+export default function LocationSection({ values, onChange }: Props) {
+  const { lat, lon, locationName, timezone } = values;
+
+  const [locationQuery, setLocationQuery] = useState('');
+  const [locationStatus, setLocationStatus] = useState<string | null>(null);
+
+  const [browserTime, setBrowserTime] = useState(() => new Date());
+  const [serverInfo, setServerInfo] = useState<{ offsetMs: number; timezone: string } | null>(null);
+
+  useEffect(() => {
+    const timer = setInterval(() => setBrowserTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const fetchedAt = Date.now();
+    fetch('/api/time')
+      .then((r) => r.json())
+      .then((data) => {
+        const serverMs = new Date(data.iso).getTime();
+        setServerInfo({ offsetMs: serverMs - fetchedAt, timezone: data.timezone });
+      })
+      .catch(() => {});
+  }, []);
+
+  async function lookupLocation() {
+    if (!locationQuery.trim()) return;
+    setLocationStatus('Looking up...');
+    onChange({ locationName: null });
+    try {
+      const res = await fetch(`/api/geocode?q=${encodeURIComponent(locationQuery.trim())}`);
+      if (res.ok) {
+        const data = await res.json();
+        const newLat = data.latitude.toFixed(4);
+        const newLon = data.longitude.toFixed(4);
+        onChange({ lat: newLat, lon: newLon, locationName: data.displayName });
+        setLocationStatus(`Found: ${data.displayName}`);
+      } else {
+        const err = await res.json();
+        setLocationStatus(`Error: ${err.error}`);
+      }
+    } catch {
+      setLocationStatus('Failed to look up location');
+    }
+  }
+
+  function detectLocation() {
+    if (!navigator.geolocation) {
+      setLocationStatus('Error: Geolocation not supported in this browser');
+      return;
+    }
+    setLocationStatus('Detecting...');
+    onChange({ locationName: null });
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const newLat = pos.coords.latitude.toFixed(4);
+        const newLon = pos.coords.longitude.toFixed(4);
+        onChange({ lat: newLat, lon: newLon });
+        try {
+          const res = await fetch(`/api/geocode?q=${newLat},${newLon}`);
+          if (res.ok) {
+            const data = await res.json();
+            onChange({ locationName: data.displayName });
+            setLocationStatus(`Detected: ${data.displayName}`);
+          } else {
+            setLocationStatus(`Detected: ${newLat}, ${newLon}`);
+          }
+        } catch {
+          setLocationStatus(`Detected: ${newLat}, ${newLon}`);
+        }
+      },
+      (err) => {
+        setLocationStatus(`Error: ${err.message}`);
+      },
+      { enableHighAccuracy: false, timeout: 10000 },
+    );
+  }
+
+  return (
+    <section>
+      <h3 className="text-sm font-medium text-neutral-300 mb-3 uppercase tracking-wider">
+        Location
+      </h3>
+      <div className="space-y-3">
+        <p className="text-xs text-neutral-500">
+          Used by weather, moon phase, sunrise/sunset, and air quality modules.
+        </p>
+
+        <div className="rounded-md bg-neutral-800 border border-neutral-600 px-3 py-2.5 grid grid-cols-2 gap-x-4 gap-y-1">
+          <div>
+            <span className="text-[10px] uppercase tracking-wider text-neutral-500">Browser</span>
+            <p className="text-sm text-neutral-200 tabular-nums">
+              {browserTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })}
+            </p>
+            <p className="text-[10px] text-neutral-500">{Intl.DateTimeFormat().resolvedOptions().timeZone}</p>
+          </div>
+          <div>
+            <span className="text-[10px] uppercase tracking-wider text-neutral-500">Server</span>
+            <p className="text-sm text-neutral-200 tabular-nums">
+              {serverInfo
+                ? new Date(browserTime.getTime() + serverInfo.offsetMs).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true, timeZone: serverInfo.timezone })
+                : <span className="text-neutral-500">...</span>}
+            </p>
+            <p className="text-[10px] text-neutral-500">{serverInfo?.timezone ?? ''}</p>
+          </div>
+        </div>
+
+        <label className="block">
+          <span className="text-xs text-neutral-400">Timezone</span>
+          <select
+            value={timezone}
+            onChange={(e) => onChange({ timezone: e.target.value })}
+            className="mt-1 block w-full rounded-md bg-neutral-800 border border-neutral-600 text-sm text-neutral-200 px-3 py-2 focus:outline-none focus:border-blue-500"
+          >
+            <option value="">System default ({Intl.DateTimeFormat().resolvedOptions().timeZone})</option>
+            {(() => {
+              try {
+                return Intl.supportedValuesOf('timeZone').map((tz: string) => (
+                  <option key={tz} value={tz}>{tz.replace(/_/g, ' ')}</option>
+                ));
+              } catch {
+                return ['America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
+                  'America/Anchorage', 'Pacific/Honolulu', 'Europe/London', 'Europe/Paris',
+                  'Europe/Berlin', 'Asia/Tokyo', 'Asia/Shanghai', 'Australia/Sydney',
+                  'UTC'].map((tz) => (
+                  <option key={tz} value={tz}>{tz.replace(/_/g, ' ')}</option>
+                ));
+              }
+            })()}
+          </select>
+          <p className="text-xs text-neutral-500 mt-1">
+            Override the server&apos;s OS timezone for clock, greeting, and other time-based modules.
+          </p>
+        </label>
+
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={locationQuery}
+              onChange={(e) => setLocationQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && lookupLocation()}
+              placeholder="Zip code or city name"
+              className="flex-1 rounded-md bg-neutral-800 border border-neutral-600 text-sm text-neutral-200 px-3 py-2 focus:outline-none focus:border-blue-500"
+            />
+            <Button variant="secondary" size="sm" onClick={lookupLocation}>
+              Look up
+            </Button>
+            <Button variant="secondary" size="sm" onClick={detectLocation}>
+              Detect
+            </Button>
+          </div>
+          {locationStatus && (
+            <p className={`text-xs ${locationStatus.startsWith('Error') || locationStatus.startsWith('Failed') ? 'text-red-400' : 'text-green-400'}`}>
+              {locationStatus}
+            </p>
+          )}
+          {(lat && lon) && (
+            <p className="text-xs text-neutral-500">
+              {locationName ? `${locationName} — ` : ''}
+              {lat}, {lon}
+            </p>
+          )}
+        </div>
+
+        <details className="text-xs">
+          <summary className="text-neutral-500 cursor-pointer hover:text-neutral-400">
+            Edit coordinates manually
+          </summary>
+          <div className="grid grid-cols-2 gap-3 mt-2">
+            <label className="block">
+              <span className="text-xs text-neutral-400">Latitude</span>
+              <input
+                type="text"
+                value={lat}
+                onChange={(e) => onChange({ lat: e.target.value })}
+                placeholder="40.7128"
+                className="mt-1 block w-full rounded-md bg-neutral-800 border border-neutral-600 text-sm text-neutral-200 px-3 py-2 focus:outline-none focus:border-blue-500"
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs text-neutral-400">Longitude</span>
+              <input
+                type="text"
+                value={lon}
+                onChange={(e) => onChange({ lon: e.target.value })}
+                placeholder="-74.006"
+                className="mt-1 block w-full rounded-md bg-neutral-800 border border-neutral-600 text-sm text-neutral-200 px-3 py-2 focus:outline-none focus:border-blue-500"
+              />
+            </label>
+          </div>
+        </details>
+      </div>
+    </section>
+  );
+}

@@ -22,7 +22,7 @@ export default function ImageModule({ config, style }: ImageModuleProps) {
           }}
         />
       ) : (
-        <div className="flex items-center justify-center h-full opacity-40" style={{ fontSize: '0.875em' }}>
+        <div className="flex items-center justify-center h-full opacity-50" style={{ fontSize: '0.875em' }}>
           No image set
         </div>
       )}
