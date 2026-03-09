@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/home-screens-logo.svg" alt="Home Screens" width="460">
+  <img src="docs/images/home-screens-logo.svg" alt="Home Screens" width="282">
 </p>
 
 # Home Screens
@@ -11,6 +11,8 @@ A custom smart display system built with Next.js. Designed to run on a Raspberry
 ![Editor view — module palette and canvas](docs/images/editor-1.png)
 
 ![Editor view — property panel and settings](docs/images/editor-2.png)
+
+![Editor view — more modules](docs/images/editor-3.png)
 
 ## Features
 
