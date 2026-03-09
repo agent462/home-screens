@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/images/home-screens-logo.svg" alt="Home Screens" width="460">
+</p>
+
 # Home Screens
 
 A custom smart display system built with Next.js. Designed to run on a Raspberry Pi in Chromium kiosk mode, replacing Dakboard/MagicMirror with a fully web-based, drag-and-drop configurable display.
