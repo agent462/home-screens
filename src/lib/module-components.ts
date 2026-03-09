@@ -29,4 +29,5 @@ export const moduleComponents: Record<ModuleType, ComponentType<any>> = {
   traffic: dynamic(() => import('@/components/modules/TrafficModule')),
   sports: dynamic(() => import('@/components/modules/SportsModule')),
   'air-quality': dynamic(() => import('@/components/modules/AirQualityModule')),
+  todoist: dynamic(() => import('@/components/modules/TodoistModule')),
 };

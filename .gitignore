@@ -41,6 +41,7 @@ data/google-tokens.json
 data/client*
 data/backups/
 data/background-cache.json
+data/todoist-token.txt
 data/kiosk.conf
 
 # user-uploaded backgrounds

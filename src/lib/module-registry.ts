@@ -5,6 +5,7 @@ import {
   Quote, ListTodo, StickyNote, HandMetal,
   Newspaper, TrendingUp, Bitcoin, BookOpen, History,
   Moon, Sunrise, Image, QrCode, BarChart3, Car, Trophy, Wind,
+  ListChecks,
 } from 'lucide-react';
 import { DEFAULT_MODULE_SIZES } from './constants';
 
@@ -84,9 +85,12 @@ registerModule({
   icon: CalendarDays,
   category: 'Time & Date',
   defaultConfig: {
+    viewMode: 'daily',
     daysToShow: 3,
     showTime: true,
     showLocation: false,
+    maxEvents: 20,
+    showWeekNumbers: false,
   },
   defaultSize: DEFAULT_MODULE_SIZES.calendar,
 });
@@ -378,4 +382,27 @@ registerModule({
     refreshIntervalMs: 900000,
   },
   defaultSize: DEFAULT_MODULE_SIZES['air-quality'],
+});
+
+registerModule({
+  type: 'todoist',
+  label: 'Todoist',
+  icon: ListChecks,
+  category: 'Personal',
+  defaultConfig: {
+    viewMode: 'list',
+    groupBy: 'date',
+    sortBy: 'default',
+    projectFilter: '',
+    labelFilter: '',
+    showNoDueDate: true,
+    showSubtasks: true,
+    showLabels: true,
+    showProject: true,
+    showDescription: false,
+    maxTasks: 30,
+    refreshIntervalMs: 300000,
+    title: 'Todoist',
+  },
+  defaultSize: DEFAULT_MODULE_SIZES.todoist,
 });

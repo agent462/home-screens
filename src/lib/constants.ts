@@ -68,4 +68,5 @@ export const DEFAULT_MODULE_SIZES: Record<string, { w: number; h: number }> = {
   traffic: { w: 450, h: 300 },
   sports: { w: 500, h: 300 },
   'air-quality': { w: 350, h: 250 },
+  todoist: { w: 400, h: 550 },
 };

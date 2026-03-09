@@ -23,7 +23,8 @@ export type ModuleType =
   | 'year-progress'
   | 'traffic'
   | 'sports'
-  | 'air-quality';
+  | 'air-quality'
+  | 'todoist';
 
 export interface ModuleStyle {
   opacity: number;
@@ -151,10 +152,15 @@ export interface ClockConfig {
 }
 
 // Calendar module config
+export type CalendarViewMode = 'daily' | 'agenda' | 'week' | 'month';
+
 export interface CalendarConfig {
+  viewMode: CalendarViewMode;
   daysToShow: number;
   showTime: boolean;
   showLocation: boolean;
+  maxEvents: number;
+  showWeekNumbers: boolean;
 }
 
 // Weather hourly config
@@ -318,6 +324,27 @@ export interface TrafficConfig {
 export interface SportsConfig {
   leagues: string[];
   refreshIntervalMs: number;
+}
+
+// Todoist module config
+export type TodoistViewMode = 'list' | 'board' | 'focus';
+export type TodoistGroupBy = 'none' | 'project' | 'priority' | 'date' | 'label';
+export type TodoistSortBy = 'default' | 'priority' | 'due_date' | 'alphabetical';
+
+export interface TodoistConfig {
+  viewMode: TodoistViewMode;
+  groupBy: TodoistGroupBy;
+  sortBy: TodoistSortBy;
+  projectFilter: string;
+  labelFilter: string;
+  showNoDueDate: boolean;
+  showSubtasks: boolean;
+  showLabels: boolean;
+  showProject: boolean;
+  showDescription: boolean;
+  maxTasks: number;
+  refreshIntervalMs: number;
+  title: string;
 }
 
 // Air quality module config
