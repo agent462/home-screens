@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { editorFetch } from '@/lib/editor-fetch';
 import Button from '@/components/ui/Button';
+import { useConfirmStore } from '@/stores/confirm-store';
 
 interface TagInfo {
   tag: string;
@@ -18,6 +19,8 @@ interface VersionInfo {
   installedVia: 'git' | 'unknown';
   channel: string;
   tags: TagInfo[];
+  buildPending: boolean;
+  buildPendingTag: string | null;
 }
 
 interface Release {
@@ -42,9 +45,10 @@ type PowerState =
 interface Props {
   onUpgrade: (tag: string) => void;
   onRollback: (tag: string) => void;
+  onRebuild: () => void;
 }
 
-export default function SystemSection({ onUpgrade, onRollback }: Props) {
+export default function SystemSection({ onUpgrade, onRollback, onRebuild }: Props) {
   const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
   const [releases, setReleases] = useState<Release[]>([]);
   const [backups, setBackups] = useState<BackupFile[]>([]);
@@ -100,7 +104,11 @@ export default function SystemSection({ onUpgrade, onRollback }: Props) {
   }
 
   async function handleRestoreBackup(name: string) {
-    if (!confirm(`Restore configuration from ${name}? Current config will be overwritten.`)) return;
+    if (!(await useConfirmStore.getState().confirm({
+      title: 'Restore Backup',
+      message: `Restore configuration from ${name}? Current config will be overwritten.`,
+      confirmLabel: 'Restore',
+    }))) return;
     setRestoreStatus('Restoring...');
     try {
       const res = await editorFetch('/api/system/backups', {
@@ -119,19 +127,32 @@ export default function SystemSection({ onUpgrade, onRollback }: Props) {
     }
   }
 
-  function handleUpgrade(tag: string) {
-    if (!confirm(`Upgrade to ${tag}? The server will restart and you may briefly lose connection.`)) return;
+  async function handleUpgrade(tag: string) {
+    if (!(await useConfirmStore.getState().confirm({
+      title: 'Upgrade',
+      message: `Upgrade to ${tag}? The server will restart and you may briefly lose connection.`,
+      confirmLabel: 'Upgrade',
+      variant: 'primary',
+    }))) return;
     onUpgrade(tag);
   }
 
-  function handleRollback(tag: string) {
-    if (!confirm(`Roll back to ${tag}? The server will restart.`)) return;
+  async function handleRollback(tag: string) {
+    if (!(await useConfirmStore.getState().confirm({
+      title: 'Rollback',
+      message: `Roll back to ${tag}? The server will restart.`,
+      confirmLabel: 'Roll Back',
+    }))) return;
     onRollback(tag);
   }
 
   async function handlePowerAction(action: 'reboot' | 'restart-service') {
     const label = action === 'reboot' ? 'reboot the system' : 'restart the service';
-    if (!confirm(`Are you sure you want to ${label}? You may briefly lose connection.`)) return;
+    if (!(await useConfirmStore.getState().confirm({
+      title: action === 'reboot' ? 'Reboot System' : 'Restart Service',
+      message: `Are you sure you want to ${label}? You may briefly lose connection.`,
+      confirmLabel: action === 'reboot' ? 'Reboot' : 'Restart',
+    }))) return;
 
     setPowerState({ status: 'pending', action });
     try {
@@ -196,7 +217,29 @@ export default function SystemSection({ onUpgrade, onRollback }: Props) {
           </Button>
         </div>
 
-        {versionInfo.updateAvailable && versionInfo.latest && (
+        {versionInfo.buildPending && (
+          <div className="mt-3 rounded-lg bg-red-950/50 border border-red-800/50 p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-red-300 font-medium">
+                  Build failed for {versionInfo.buildPendingTag}
+                </p>
+                <p className="text-xs text-red-400/70 mt-0.5">
+                  Code was checked out but the build did not complete successfully.
+                </p>
+              </div>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={onRebuild}
+              >
+                Retry Build
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {!versionInfo.buildPending && versionInfo.updateAvailable && versionInfo.latest && (
           <div className="mt-3 rounded-lg bg-blue-950/50 border border-blue-800/50 p-3">
             <div className="flex items-center justify-between">
               <div>
@@ -218,7 +261,7 @@ export default function SystemSection({ onUpgrade, onRollback }: Props) {
           </div>
         )}
 
-        {!versionInfo.updateAvailable && versionInfo.installedVia === 'git' && (
+        {!versionInfo.buildPending && !versionInfo.updateAvailable && versionInfo.installedVia === 'git' && (
           <p className="text-xs text-green-400/80 mt-2 flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" />
             You&apos;re on the latest version

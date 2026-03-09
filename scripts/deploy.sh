@@ -75,6 +75,7 @@ rsync -azP --delete \
   --exclude 'data/google-tokens.json' \
   --exclude 'data/client*' \
   --exclude 'data/secrets.json' \
+  --exclude 'data/auth.json' \
   --exclude 'data/backups' \
   --exclude 'data/background-cache.json' \
   --exclude 'data/kiosk.conf' \

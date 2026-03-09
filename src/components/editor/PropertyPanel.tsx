@@ -5,13 +5,14 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
 import { editorFetch } from '@/lib/editor-fetch';
 import { useEditorStore } from '@/stores/editor-store';
+import { useConfirmStore } from '@/stores/confirm-store';
 import { useModuleConfig } from '@/hooks/useModuleConfig';
 import Slider from '@/components/ui/Slider';
 import Toggle from '@/components/ui/Toggle';
 import ColorPicker from '@/components/ui/ColorPicker';
 import Button from '@/components/ui/Button';
 import BackgroundPicker from '@/components/editor/BackgroundPicker';
-import type { ModuleInstance, CountdownEvent, TodoItem, WeatherView, WeatherIconSet, WeatherProviderOption, StockTickerView, NewsView } from '@/types/config';
+import type { ModuleInstance, CountdownEvent, TodoItem, WeatherView, WeatherIconSet, WeatherProviderOption, StockTickerView, CryptoView, NewsView } from '@/types/config';
 import { v4 as uuidv4 } from 'uuid';
 
 const INPUT_CLASS = 'w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200';
@@ -788,8 +789,17 @@ function StockTickerConfigSection({ mod, screenId }: { mod: ModuleInstance; scre
   );
 }
 
+const CRYPTO_VIEWS: { value: CryptoView; label: string }[] = [
+  { value: 'cards', label: 'Cards' },
+  { value: 'ticker', label: 'Ticker (Scrolling)' },
+  { value: 'table', label: 'Table' },
+  { value: 'compact', label: 'Compact' },
+];
+
 function CryptoConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
-  const { config: c, set } = useModuleConfig<{ ids?: string; refreshIntervalMs?: number; cardScale?: number }>(mod, screenId);
+  const { config: c, set } = useModuleConfig<{ ids?: string; view?: CryptoView; refreshIntervalMs?: number; cardScale?: number; tickerSpeed?: number }>(mod, screenId);
+
+  const view = c.view ?? 'cards';
 
   return (
     <>
@@ -802,14 +812,38 @@ function CryptoConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId:
           className={INPUT_CLASS}
         />
       </label>
-      <Slider
-        label="Card Scale"
-        value={c.cardScale ?? 1}
-        min={0.5}
-        max={3}
-        step={0.1}
-        onChange={(v) => set({ cardScale: v })}
-      />
+      <label className="flex flex-col gap-0.5">
+        <span className="text-xs text-neutral-400">View</span>
+        <select
+          value={view}
+          onChange={(e) => set({ view: e.target.value as CryptoView })}
+          className={INPUT_CLASS}
+        >
+          {CRYPTO_VIEWS.map((v) => (
+            <option key={v.value} value={v.value}>{v.label}</option>
+          ))}
+        </select>
+      </label>
+      {view !== 'ticker' && (
+        <Slider
+          label="Scale"
+          value={c.cardScale ?? 1}
+          min={0.5}
+          max={3}
+          step={0.1}
+          onChange={(v) => set({ cardScale: v })}
+        />
+      )}
+      {view === 'ticker' && (
+        <Slider
+          label="Ticker Speed (sec/coin)"
+          value={c.tickerSpeed ?? 5}
+          min={2}
+          max={15}
+          step={1}
+          onChange={(v) => set({ tickerSpeed: v })}
+        />
+      )}
       <Slider
         label="Refresh (seconds)"
         value={(c.refreshIntervalMs ?? 60000) / 1000}
@@ -1313,8 +1347,8 @@ export default function PropertyPanel() {
           <Button
             variant="danger"
             className="w-full"
-            onClick={() => {
-              if (confirm('Delete this module?')) {
+            onClick={async () => {
+              if (await useConfirmStore.getState().confirm('Delete this module?')) {
                 removeModule(selectedScreenId, selectedModule.id);
               }
             }}

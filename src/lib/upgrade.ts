@@ -1,8 +1,11 @@
 import { spawn } from 'child_process';
 import { createInterface } from 'readline';
+import { promises as fs } from 'fs';
 import path from 'path';
 import { readConfig, writeConfig } from './config';
 import { migrateUp, getLatestSchemaVersion } from './migrations';
+
+const BUILD_PENDING_PATH = path.join(process.cwd(), 'data', '.build-pending');
 
 type UpgradeStep =
   | 'preflight'
@@ -181,6 +184,31 @@ function streamTo(step: UpgradeStep) {
   return (line: string) => emitOutput(step, line);
 }
 
+/** Write a marker file indicating a build is pending (checkout done, build not yet complete) */
+async function writeBuildPending(tag: string): Promise<void> {
+  await fs.writeFile(BUILD_PENDING_PATH, JSON.stringify({ tag, since: new Date().toISOString() }));
+}
+
+/** Clear the build-pending marker (build succeeded) */
+async function clearBuildPending(): Promise<void> {
+  try {
+    await fs.unlink(BUILD_PENDING_PATH);
+  } catch {
+    // File may not exist
+  }
+}
+
+/** Check if there's a pending (failed) build. Returns the tag or null. */
+export async function getBuildPendingTag(): Promise<string | null> {
+  try {
+    const data = await fs.readFile(BUILD_PENDING_PATH, 'utf-8');
+    const parsed = JSON.parse(data);
+    return parsed.tag ?? null;
+  } catch {
+    return null;
+  }
+}
+
 interface PipelineStep {
   step: UpgradeStep;
   progress: number;
@@ -262,6 +290,8 @@ export async function runUpgrade(targetTag: string): Promise<void> {
         if (!checkout.ok) {
           throw new Error(`Checkout failed: ${checkout.error}`);
         }
+        // Mark build as pending — if anything after this fails, the user can retry
+        await writeBuildPending(targetTag);
       },
     },
     {
@@ -317,6 +347,9 @@ export async function runUpgrade(targetTag: string): Promise<void> {
       message: 'Applying system configuration...',
       run: async () => {
         await runUpgradeScript('setup-system', [], streamTo('setup-system'));
+        // Clear marker before restart — the build has provably succeeded at this point,
+        // and the restart step may kill the process before 'complete' runs
+        await clearBuildPending();
       },
     },
     {
@@ -394,6 +427,7 @@ export async function runRollback(targetTag: string): Promise<void> {
       message: `Rolling back to ${targetTag}...`,
       run: async () => {
         await runUpgradeScript('rollback', [targetTag], streamTo('checkout'));
+        await writeBuildPending(targetTag);
       },
     },
     {
@@ -418,6 +452,7 @@ export async function runRollback(targetTag: string): Promise<void> {
       message: 'Applying system configuration...',
       run: async () => {
         await runUpgradeScript('setup-system', [], streamTo('setup-system'));
+        await clearBuildPending();
       },
     },
     {
@@ -437,6 +472,95 @@ export async function runRollback(targetTag: string): Promise<void> {
       step: 'complete',
       progress: 100,
       message: `Rolled back to ${targetTag} successfully!`,
+      run: async () => {},
+    },
+  ];
+
+  try {
+    await runPipeline(steps);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    emit({ step: 'error', progress: 0, message, error: message });
+    throw error;
+  } finally {
+    currentUpgrade.running = false;
+  }
+}
+
+export async function runRebuild(): Promise<void> {
+  if (currentUpgrade.running) {
+    throw new Error('An upgrade is already in progress');
+  }
+
+  currentUpgrade.running = true;
+
+  const pendingTag = await getBuildPendingTag();
+  if (!pendingTag) {
+    currentUpgrade.running = false;
+    throw new Error('No pending build found');
+  }
+
+  const steps: PipelineStep[] = [
+    {
+      step: 'install',
+      progress: 10,
+      message: 'Verifying dependencies...',
+      run: async () => {
+        await runUpgradeScript('install', [], streamTo('install'));
+      },
+    },
+    {
+      step: 'build',
+      progress: 30,
+      message: 'Building application (this may take a few minutes)...',
+      run: async () => {
+        await runUpgradeScript('build', [], streamTo('build'));
+      },
+    },
+    {
+      step: 'migrate',
+      progress: 70,
+      message: 'Migrating configuration...',
+      run: async () => {
+        const config = await readConfig();
+        const targetSchemaVersion = getLatestSchemaVersion();
+        if ((config.version ?? 0) < targetSchemaVersion) {
+          const { config: migrated, migrationsRun } = migrateUp(config, targetSchemaVersion);
+          await writeConfig(migrated);
+          emitOutput('migrate', `Ran ${migrationsRun.length} migration(s): ${migrationsRun.join(', ')}`);
+        } else {
+          emitOutput('migrate', 'Schema is up to date — no migration needed');
+        }
+      },
+    },
+    {
+      step: 'setup-system',
+      progress: 80,
+      message: 'Applying system configuration...',
+      run: async () => {
+        await runUpgradeScript('setup-system', [], streamTo('setup-system'));
+        // Clear marker before restart — the build has provably succeeded at this point,
+        // and the restart step may kill the process before 'complete' runs
+        await clearBuildPending();
+      },
+    },
+    {
+      step: 'restart',
+      progress: 90,
+      message: 'Restarting service...',
+      run: async () => {
+        const restartOut = await runUpgradeScript('restart', [], streamTo('restart'));
+        const restart = parseResult(restartOut);
+        if (restart.method === 'systemctl') {
+          emit({ step: 'health-check', progress: 95, message: 'Server will restart momentarily...' });
+          emitOutput('health-check', 'Server restart scheduled — client will reconnect automatically');
+        }
+      },
+    },
+    {
+      step: 'complete',
+      progress: 100,
+      message: `Rebuild for ${pendingTag} complete!`,
       run: async () => {},
     },
   ];

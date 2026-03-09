@@ -28,6 +28,7 @@ import CalendarSection from '@/components/editor/settings/CalendarSection';
 import SystemSection from '@/components/editor/settings/SystemSection';
 import SecuritySection from '@/components/editor/settings/SecuritySection';
 import UpgradeModal from '@/components/editor/UpgradeModal';
+import { useConfirmStore } from '@/stores/confirm-store';
 
 /* ─── Tab definitions ─────────────────────────────── */
 
@@ -137,9 +138,10 @@ export default function SettingsPage() {
     if (settings) setState(initSettings(settings));
   }, [settings]);
 
-  // Upgrade/rollback modal state
+  // Upgrade/rollback/rebuild modal state
   const [upgradeTarget, setUpgradeTarget] = useState<string | null>(null);
   const [rollbackTarget, setRollbackTarget] = useState<string | null>(null);
+  const [rebuildActive, setRebuildActive] = useState(false);
 
   const update = useCallback((updates: Partial<SettingsState>) => {
     setState((prev) => ({ ...prev, ...updates }));
@@ -204,6 +206,7 @@ export default function SettingsPage() {
   function handleUpgradeComplete() {
     setUpgradeTarget(null);
     setRollbackTarget(null);
+    setRebuildActive(false);
     setTimeout(() => window.location.reload(), 2000);
   }
 
@@ -224,7 +227,7 @@ export default function SettingsPage() {
         const imported = useEditorStore.getState().config?.settings;
         setState(initSettings(imported));
       } catch {
-        alert('Invalid config file.');
+        useConfirmStore.getState().alert('Invalid config file.');
       }
     };
     reader.readAsText(file);
@@ -233,13 +236,14 @@ export default function SettingsPage() {
 
   const activeTarget = upgradeTarget || rollbackTarget;
 
-  if (activeTarget) {
+  if (activeTarget || rebuildActive) {
     return (
       <UpgradeModal
-        targetTag={activeTarget}
+        targetTag={activeTarget || 'rebuild'}
         isRollback={!!rollbackTarget}
+        isRebuild={rebuildActive}
         onComplete={handleUpgradeComplete}
-        onClose={() => { setUpgradeTarget(null); setRollbackTarget(null); }}
+        onClose={() => { setUpgradeTarget(null); setRollbackTarget(null); setRebuildActive(false); }}
       />
     );
   }
@@ -421,6 +425,7 @@ export default function SettingsPage() {
               <SystemSection
                 onUpgrade={(tag) => setUpgradeTarget(tag)}
                 onRollback={(tag) => setRollbackTarget(tag)}
+                onRebuild={() => setRebuildActive(true)}
               />
             )}
           </div>

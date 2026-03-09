@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { editorFetch } from '@/lib/editor-fetch';
 import { useEditorStore } from '@/stores/editor-store';
+import { useConfirmStore } from '@/stores/confirm-store';
 import Button from '@/components/ui/Button';
 
 interface Props {
@@ -62,7 +63,7 @@ export default function LocalBackgrounds({ selectedScreenId }: Props) {
 
   const handleDelete = async (bg: string) => {
     const filename = filenameFromPath(bg);
-    if (!confirm(`Delete "${filename}"?`)) return;
+    if (!(await useConfirmStore.getState().confirm(`Delete "${filename}"?`))) return;
     setDeleting(bg);
     try {
       const res = await editorFetch('/api/backgrounds', {

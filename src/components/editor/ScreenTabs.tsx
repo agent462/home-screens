@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import clsx from 'clsx';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEditorStore } from '@/stores/editor-store';
+import { useConfirmStore } from '@/stores/confirm-store';
 import Button from '@/components/ui/Button';
 
 export default function ScreenTabs() {
@@ -133,9 +134,9 @@ export default function ScreenTabs() {
               )}
               {config.screens.length > 1 && editingId !== screen.id && (
                 <button
-                  onClick={(e) => {
+                  onClick={async (e) => {
                     e.stopPropagation();
-                    if (confirm(`Remove "${screen.name}"?`)) {
+                    if (await useConfirmStore.getState().confirm(`Remove "${screen.name}"?`)) {
                       removeScreen(screen.id);
                     }
                   }}

@@ -25,6 +25,16 @@ const VISIBLE_STEPS = [
   'health-check',
 ] as const;
 
+/** Subset of steps shown during a rebuild (no preflight/backup/fetch/checkout) */
+const REBUILD_STEPS = [
+  'install',
+  'build',
+  'migrate',
+  'setup-system',
+  'restart',
+  'health-check',
+] as const;
+
 const STEP_LABELS: Record<string, string> = {
   preflight: 'Pre-flight checks',
   backup: 'Back up configuration',
@@ -62,13 +72,16 @@ const STEP_STYLES: Record<StepState, { icon: React.ReactNode; textClass: string 
 interface Props {
   targetTag: string;
   isRollback: boolean;
+  isRebuild?: boolean;
   onComplete: () => void;
   onClose: () => void;
 }
 
-export default function UpgradeModal({ targetTag, isRollback, onComplete, onClose }: Props) {
+export default function UpgradeModal({ targetTag, isRollback, isRebuild, onComplete, onClose }: Props) {
+  const steps: readonly string[] = isRebuild ? REBUILD_STEPS : VISIBLE_STEPS;
+  const firstStep = steps[0];
   const [progress, setProgress] = useState<ProgressData>({
-    step: 'preflight',
+    step: firstStep,
     progress: 0,
     message: 'Starting...',
   });
@@ -78,13 +91,13 @@ export default function UpgradeModal({ targetTag, isRollback, onComplete, onClos
   const [reloadStatus, setReloadStatus] = useState<string | null>(null);
 
   // Track the last real step (not 'error' or 'complete')
-  const [activeStep, setActiveStep] = useState('preflight');
+  const [activeStep, setActiveStep] = useState(firstStep);
   // Track which steps were actually visited (for rollback correctness)
-  const [visitedSteps, setVisitedSteps] = useState<Set<string>>(new Set(['preflight']));
+  const [visitedSteps, setVisitedSteps] = useState<Set<string>>(new Set([firstStep]));
   // Per-step accumulated log output
   const [stepLogs, setStepLogs] = useState<Record<string, string>>({});
   // Which accordion panels are expanded
-  const [expanded, setExpanded] = useState<Set<string>>(new Set(['preflight']));
+  const [expanded, setExpanded] = useState<Set<string>>(new Set([firstStep]));
 
   const activeLogRef = useRef<HTMLDivElement>(null);
   const progressRef = useRef(progress);
@@ -154,7 +167,7 @@ export default function UpgradeModal({ targetTag, isRollback, onComplete, onClos
           if (
             data.step !== 'error' &&
             data.step !== 'complete' &&
-            (VISIBLE_STEPS as readonly string[]).includes(data.step)
+            steps.includes(data.step)
           ) {
             // Only update activeStep for visible steps — hidden steps like
             // 'stash'/'cleanup' would make indexOf return -1 and break the
@@ -223,8 +236,10 @@ export default function UpgradeModal({ targetTag, isRollback, onComplete, onClos
       }
     };
 
-    // Trigger the upgrade/rollback
-    const endpoint = isRollback ? '/api/system/rollback' : '/api/system/upgrade';
+    // Trigger the upgrade/rollback/rebuild
+    const endpoint = isRebuild
+      ? '/api/system/rebuild'
+      : isRollback ? '/api/system/rollback' : '/api/system/upgrade';
     editorFetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -301,8 +316,8 @@ export default function UpgradeModal({ targetTag, isRollback, onComplete, onClos
   }, [done]);
 
   function getStepState(step: string): StepState {
-    const stepIdx = VISIBLE_STEPS.indexOf(step as (typeof VISIBLE_STEPS)[number]);
-    const activeIdx = VISIBLE_STEPS.indexOf(activeStep as (typeof VISIBLE_STEPS)[number]);
+    const stepIdx = steps.indexOf(step);
+    const activeIdx = steps.indexOf(activeStep);
 
     // Only mark steps as done if they were actually visited (fixes rollback
     // showing all steps green even when preflight/fetch/migrate were skipped)
@@ -319,7 +334,7 @@ export default function UpgradeModal({ targetTag, isRollback, onComplete, onClos
         {/* Header */}
         <div className="px-5 py-4 border-b border-neutral-700 flex-shrink-0">
           <h2 className="text-lg font-semibold text-neutral-100">
-            {isRollback ? 'Rolling back' : 'Upgrading'} to {targetTag}
+            {isRebuild ? 'Rebuilding application' : `${isRollback ? 'Rolling back' : 'Upgrading'} to ${targetTag}`}
           </h2>
         </div>
 
@@ -344,7 +359,7 @@ export default function UpgradeModal({ targetTag, isRollback, onComplete, onClos
 
           {/* Accordion step list */}
           <div className="space-y-1">
-            {VISIBLE_STEPS.map((step) => {
+            {steps.map((step) => {
               const state = getStepState(step);
               const styles = STEP_STYLES[state] ?? STEP_STYLES.pending;
               const isOpen = expanded.has(step);
