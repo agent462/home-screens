@@ -1,21 +1,25 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getSecretStatus, setSecret, deleteSecret, isValidSecretKey } from '@/lib/secrets';
+import { requireSession } from '@/lib/auth';
 import { errorResponse } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    await requireSession(request);
     const status = await getSecretStatus();
     return NextResponse.json(status);
   } catch (error) {
+    if (error instanceof Response) return error;
     return errorResponse(error, 'Failed to read secret status');
   }
 }
 
 export async function PUT(request: NextRequest) {
   try {
+    await requireSession(request);
     const body = await request.json();
     const { key, value } = body as { key?: string; value?: string };
 
@@ -49,12 +53,14 @@ export async function PUT(request: NextRequest) {
     await setSecret(key, value);
     return NextResponse.json({ ok: true });
   } catch (error) {
+    if (error instanceof Response) return error;
     return errorResponse(error, 'Failed to save secret');
   }
 }
 
 export async function DELETE(request: NextRequest) {
   try {
+    await requireSession(request);
     const body = await request.json();
     const { key } = body as { key?: string };
 
@@ -75,6 +81,7 @@ export async function DELETE(request: NextRequest) {
     await deleteSecret(key);
     return NextResponse.json({ ok: true });
   } catch (error) {
+    if (error instanceof Response) return error;
     return errorResponse(error, 'Failed to delete secret');
   }
 }

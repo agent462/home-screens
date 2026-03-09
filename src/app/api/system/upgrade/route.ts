@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runUpgrade, isUpgradeRunning } from '@/lib/upgrade';
+import { requireSession } from '@/lib/auth';
 import { errorResponse } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
+    await requireSession(request);
     if (isUpgradeRunning()) {
       return NextResponse.json(
         { error: 'An upgrade is already in progress' },
@@ -37,6 +39,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ ok: true, message: `Upgrade to ${tag} started` });
   } catch (error) {
+    if (error instanceof Response) return error;
     return errorResponse(error, 'Failed to start upgrade');
   }
 }

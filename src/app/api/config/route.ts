@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readConfig, writeConfig } from '@/lib/config';
+import { requireSession } from '@/lib/auth';
 import { errorResponse } from '@/lib/api-utils';
 import type { ScreenConfiguration } from '@/types/config';
 
@@ -16,6 +17,7 @@ export async function GET() {
 
 export async function PUT(request: NextRequest) {
   try {
+    await requireSession(request);
     const body = await request.json();
     if (!body || !Array.isArray(body.screens) || !body.settings) {
       return NextResponse.json(
@@ -27,6 +29,7 @@ export async function PUT(request: NextRequest) {
     await writeConfig(config);
     return NextResponse.json(config);
   } catch (error) {
+    if (error instanceof Response) return error;
     return errorResponse(error, 'Failed to write config');
   }
 }

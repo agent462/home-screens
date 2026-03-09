@@ -11,6 +11,7 @@ interface RouteInput {
 }
 
 const cache = createTTLCache<unknown>(5 * 60 * 1000); // 5 minutes
+const geocodeCache = createTTLCache<string>(60 * 60 * 1000); // 1 hour
 
 async function fetchGoogle(routes: RouteInput[], apiKey: string) {
   const results = await Promise.all(
@@ -59,10 +60,34 @@ async function fetchGoogle(routes: RouteInput[], apiKey: string) {
   return results;
 }
 
+async function tomtomGeocode(address: string, apiKey: string): Promise<string> {
+  const cached = geocodeCache.get(address);
+  if (cached) return cached;
+
+  const url = `https://api.tomtom.com/search/2/geocode/${encodeURIComponent(address)}.json?key=${apiKey}&limit=1`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`TomTom Geocode error: ${res.status}`);
+  }
+  const data = await res.json();
+  const pos = data.results?.[0]?.position;
+  if (!pos) {
+    throw new Error(`TomTom Geocode: no results for "${address}"`);
+  }
+  const coords = `${pos.lat},${pos.lon}`;
+  geocodeCache.set(address, coords);
+  return coords;
+}
+
 async function fetchTomTom(routes: RouteInput[], apiKey: string) {
   const results = await Promise.all(
     routes.map(async (route) => {
-      const url = `https://api.tomtom.com/routing/1/calculateRoute/${encodeURIComponent(route.origin)}:${encodeURIComponent(route.destination)}/json?key=${apiKey}&traffic=true`;
+      const [originCoords, destCoords] = await Promise.all([
+        tomtomGeocode(route.origin, apiKey),
+        tomtomGeocode(route.destination, apiKey),
+      ]);
+
+      const url = `https://api.tomtom.com/routing/1/calculateRoute/${originCoords}:${destCoords}/json?key=${apiKey}&traffic=true&computeTravelTimeFor=all`;
 
       const res = await fetch(url);
       if (!res.ok) {
@@ -144,7 +169,9 @@ export async function GET(request: NextRequest) {
       };
     }
 
-    cache.set(cacheKey, result);
+    if (!result.mock) {
+      cache.set(cacheKey, result);
+    }
     return NextResponse.json(result);
   } catch (error) {
     return errorResponse(error, 'Failed to fetch traffic data');

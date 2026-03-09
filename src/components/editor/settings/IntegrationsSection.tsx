@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { editorFetch } from '@/lib/editor-fetch';
 import Button from '@/components/ui/Button';
 
 type SecretKey =
@@ -54,7 +55,7 @@ function SecretField({
     setSaveStatus('saving');
     setErrorMsg('');
     try {
-      const res = await fetch('/api/secrets', {
+      const res = await editorFetch('/api/secrets', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key: secretKey, value: value.trim() }),
@@ -77,7 +78,7 @@ function SecretField({
 
   async function handleDelete() {
     try {
-      const res = await fetch('/api/secrets', {
+      const res = await editorFetch('/api/secrets', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key: secretKey }),
@@ -138,7 +139,7 @@ export default function IntegrationsSection() {
 
   const fetchStatus = useCallback(async () => {
     try {
-      const res = await fetch('/api/secrets');
+      const res = await editorFetch('/api/secrets');
       if (res.ok) {
         const data: SecretStatus = await res.json();
         setStatus(data);

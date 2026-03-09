@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { getRemoteUrl } from '@/lib/version';
+import { requireSession } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  try { await requireSession(request); } catch (e) { if (e instanceof Response) return e; throw e; }
   const remoteUrl = await getRemoteUrl();
   if (!remoteUrl) {
     return NextResponse.json({ error: 'No git remote configured' }, { status: 404 });

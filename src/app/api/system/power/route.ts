@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { spawn, execSync } from 'child_process';
+import { requireSession } from '@/lib/auth';
 import { errorResponse } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
@@ -11,6 +12,7 @@ export const dynamic = 'force-dynamic';
  * Both actions use a short delay so the API can respond before the process dies.
  */
 export async function POST(request: NextRequest) {
+  try { await requireSession(request); } catch (e) { if (e instanceof Response) return e; throw e; }
   const { action } = await request.json();
 
   if (action === 'restart-service') {

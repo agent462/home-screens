@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { execFile } from 'child_process';
 import { readFile } from 'fs/promises';
 import path from 'path';
+import { requireSession } from '@/lib/auth';
 import { errorResponse } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
@@ -25,6 +26,7 @@ function run(action: string, args: string[] = []): Promise<string> {
 }
 
 export async function GET(request: NextRequest) {
+  try { await requireSession(request); } catch (e) { if (e instanceof Response) return e; throw e; }
   const download = request.nextUrl.searchParams.get('download');
 
   if (download) {
@@ -55,6 +57,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  try { await requireSession(request); } catch (e) { if (e instanceof Response) return e; throw e; }
   let body: { name?: string };
   try {
     body = await request.json();

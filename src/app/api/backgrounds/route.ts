@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { BACKGROUNDS_DIR } from '@/lib/constants';
+import { requireSession } from '@/lib/auth';
 import { errorResponse } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
@@ -30,6 +31,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    await requireSession(request);
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
 
@@ -57,12 +59,14 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ path: serveUrl(safeName) }, { status: 201 });
   } catch (error) {
+    if (error instanceof Response) return error;
     return errorResponse(error, 'Failed to upload background');
   }
 }
 
 export async function DELETE(request: NextRequest) {
   try {
+    await requireSession(request);
     const { file } = await request.json();
     if (!file || typeof file !== 'string') {
       return NextResponse.json({ error: 'file parameter required' }, { status: 400 });
@@ -81,6 +85,7 @@ export async function DELETE(request: NextRequest) {
     await fs.unlink(filePath);
     return NextResponse.json({ deleted: safe });
   } catch (error) {
+    if (error instanceof Response) return error;
     return errorResponse(error, 'Failed to delete background');
   }
 }

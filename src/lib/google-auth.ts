@@ -106,12 +106,13 @@ async function createOAuth2Client(requestUrl?: string) {
   return new google.auth.OAuth2(clientId, clientSecret, getRedirectUri(requestUrl));
 }
 
-export async function getAuthUrl(requestUrl?: string): Promise<string> {
+export async function getAuthUrl(requestUrl?: string, state?: string): Promise<string> {
   const client = await createOAuth2Client(requestUrl);
   return client.generateAuthUrl({
     access_type: 'offline',
     prompt: 'consent',
     scope: SCOPES,
+    ...(state ? { state } : {}),
   });
 }
 

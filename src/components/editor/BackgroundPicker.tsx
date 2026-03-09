@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { editorFetch } from '@/lib/editor-fetch';
 import { useEditorStore } from '@/stores/editor-store';
 import type { BackgroundRotation } from '@/types/config';
 import LocalBackgrounds from './LocalBackgrounds';
@@ -16,7 +17,7 @@ export default function BackgroundPicker() {
   useEffect(() => {
     async function checkKey() {
       try {
-        const res = await fetch('/api/secrets');
+        const res = await editorFetch('/api/secrets');
         if (res.ok) {
           const data: Record<string, boolean> = await res.json();
           setHasUnsplashKey(!!data.unsplash_access_key);

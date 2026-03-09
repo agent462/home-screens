@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requestDeviceCode, pollDeviceToken } from '@/lib/google-auth';
+import { requireSession } from '@/lib/auth';
 
 /** POST — start device flow, returns user_code + verification_url */
-export async function POST() {
+export async function POST(request: NextRequest) {
+  try { await requireSession(request); } catch (e) { if (e instanceof Response) return e; throw e; }
   try {
     const data = await requestDeviceCode();
     return NextResponse.json(data);
@@ -14,6 +16,7 @@ export async function POST() {
 
 /** PUT — poll for token completion. Body: { device_code } */
 export async function PUT(request: NextRequest) {
+  try { await requireSession(request); } catch (e) { if (e instanceof Response) return e; throw e; }
   try {
     const { device_code } = await request.json();
     if (!device_code) {

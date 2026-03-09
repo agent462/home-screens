@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { editorFetch } from '@/lib/editor-fetch';
 import Button from '@/components/ui/Button';
 
 interface TagInfo {
@@ -57,8 +58,8 @@ export default function SystemSection({ onUpgrade, onRollback }: Props) {
     try {
       const params = forceCheck ? '?check=true' : '';
       const [vRes, bRes] = await Promise.all([
-        fetch(`/api/system/version${params}`),
-        fetch('/api/system/backups'),
+        editorFetch(`/api/system/version${params}`),
+        editorFetch('/api/system/backups'),
       ]);
 
       if (vRes.ok) {
@@ -79,7 +80,7 @@ export default function SystemSection({ onUpgrade, onRollback }: Props) {
 
   const fetchChangelog = useCallback(async () => {
     try {
-      const res = await fetch('/api/system/changelog');
+      const res = await editorFetch('/api/system/changelog');
       if (res.ok) {
         const data = await res.json();
         setReleases(data.releases ?? []);
@@ -102,7 +103,7 @@ export default function SystemSection({ onUpgrade, onRollback }: Props) {
     if (!confirm(`Restore configuration from ${name}? Current config will be overwritten.`)) return;
     setRestoreStatus('Restoring...');
     try {
-      const res = await fetch('/api/system/backups', {
+      const res = await editorFetch('/api/system/backups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name }),
@@ -134,7 +135,7 @@ export default function SystemSection({ onUpgrade, onRollback }: Props) {
 
     setPowerState({ status: 'pending', action });
     try {
-      const res = await fetch('/api/system/power', {
+      const res = await editorFetch('/api/system/power', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action }),

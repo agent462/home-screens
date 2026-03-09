@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { UNSPLASH_API, getUnsplashAccessKey, trackDownload } from '@/lib/unsplash';
+import { requireSession } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
+  try { await requireSession(request); } catch (e) { if (e instanceof Response) return e; throw e; }
   const accessKey = await getUnsplashAccessKey();
   if (!accessKey) {
     return NextResponse.json({ error: 'Unsplash API key not configured' }, { status: 400 });

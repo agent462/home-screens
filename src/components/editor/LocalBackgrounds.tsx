@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { editorFetch } from '@/lib/editor-fetch';
 import { useEditorStore } from '@/stores/editor-store';
 import Button from '@/components/ui/Button';
 
@@ -19,7 +20,7 @@ export default function LocalBackgrounds({ selectedScreenId }: Props) {
   const currentScreen = config?.screens.find((s) => s.id === selectedScreenId);
 
   useEffect(() => {
-    fetch('/api/backgrounds')
+    editorFetch('/api/backgrounds')
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) setLocalBackgrounds(data);
@@ -35,7 +36,7 @@ export default function LocalBackgrounds({ selectedScreenId }: Props) {
     const formData = new FormData();
     formData.append('file', file);
     try {
-      const res = await fetch('/api/backgrounds', { method: 'POST', body: formData });
+      const res = await editorFetch('/api/backgrounds', { method: 'POST', body: formData });
       const data = await res.json();
       if (!res.ok) {
         setUploadError(data.error || `Upload failed (${res.status})`);
@@ -64,7 +65,7 @@ export default function LocalBackgrounds({ selectedScreenId }: Props) {
     if (!confirm(`Delete "${filename}"?`)) return;
     setDeleting(bg);
     try {
-      const res = await fetch('/api/backgrounds', {
+      const res = await editorFetch('/api/backgrounds', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ file: filename }),

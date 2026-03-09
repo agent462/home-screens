@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { editorFetch } from '@/lib/editor-fetch';
 import { useEditorStore } from '@/stores/editor-store';
 import Button from '@/components/ui/Button';
 
@@ -50,7 +51,7 @@ export default function UnsplashBrowser({ selectedScreenId, hasUnsplashKey }: Pr
     setIsLoading(true);
     setUnsplashError(null);
     try {
-      const res = await fetch(
+      const res = await editorFetch(
         `/api/unsplash?query=${encodeURIComponent(query)}&page=${pageNum}&per_page=12&orientation=portrait`
       );
       const data = await res.json();
@@ -90,7 +91,7 @@ export default function UnsplashBrowser({ selectedScreenId, hasUnsplashKey }: Pr
     if (!selectedScreenId) return;
     setIsSaving(photo.id);
     try {
-      const res = await fetch('/api/unsplash', {
+      const res = await editorFetch('/api/unsplash', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

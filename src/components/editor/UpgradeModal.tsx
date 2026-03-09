@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { editorFetch } from '@/lib/editor-fetch';
 import Button from '@/components/ui/Button';
 
 interface ProgressData {
@@ -224,7 +225,7 @@ export default function UpgradeModal({ targetTag, isRollback, onComplete, onClos
 
     // Trigger the upgrade/rollback
     const endpoint = isRollback ? '/api/system/rollback' : '/api/system/upgrade';
-    fetch(endpoint, {
+    editorFetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tag: targetTag }),

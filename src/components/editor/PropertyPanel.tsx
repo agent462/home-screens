@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
+import { editorFetch } from '@/lib/editor-fetch';
 import { useEditorStore } from '@/stores/editor-store';
 import { useModuleConfig } from '@/hooks/useModuleConfig';
 import Slider from '@/components/ui/Slider';
@@ -239,7 +240,7 @@ function WeatherConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId
   useEffect(() => {
     async function check() {
       try {
-        const res = await fetch('/api/secrets');
+        const res = await editorFetch('/api/secrets');
         if (res.ok) {
           const data: Record<string, boolean> = await res.json();
           const providers: string[] = [];
@@ -405,11 +406,11 @@ function DadJokeConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId
 
   return (
     <label className="flex flex-col gap-0.5">
-      <span className="text-xs text-neutral-400">Refresh Interval (ms)</span>
+      <span className="text-xs text-neutral-400">Refresh Interval (seconds)</span>
       <input
         type="number"
-        value={c.refreshIntervalMs ?? 60000}
-        onChange={(e) => set({ refreshIntervalMs: Number(e.target.value) })}
+        value={Math.round((c.refreshIntervalMs ?? 60000) / 1000)}
+        onChange={(e) => set({ refreshIntervalMs: Number(e.target.value) * 1000 })}
         className={INPUT_CLASS}
       />
     </label>
@@ -1087,7 +1088,7 @@ function TodoistTokenStatus() {
   useEffect(() => {
     async function check() {
       try {
-        const res = await fetch('/api/secrets');
+        const res = await editorFetch('/api/secrets');
         if (res.ok) {
           const data: Record<string, boolean> = await res.json();
           setConfigured(!!data.todoist_token);

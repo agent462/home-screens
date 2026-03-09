@@ -1,8 +1,11 @@
+import type { NextRequest } from 'next/server';
 import { subscribeToEvents, type UpgradeEvent } from '@/lib/upgrade';
+import { requireSession } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  try { await requireSession(request); } catch (e) { if (e instanceof Response) return e; throw e; }
   const encoder = new TextEncoder();
   let unsubscribe: (() => void) | null = null;
 

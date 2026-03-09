@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import path from 'path';
 import { BACKGROUNDS_DIR } from '@/lib/constants';
 import { UNSPLASH_API, getUnsplashAccessKey, trackDownload } from '@/lib/unsplash';
+import { requireSession } from '@/lib/auth';
 import { errorResponse } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
@@ -9,6 +10,7 @@ export const dynamic = 'force-dynamic';
 const BGS = path.join(process.cwd(), BACKGROUNDS_DIR);
 
 export async function GET(request: NextRequest) {
+  try { await requireSession(request); } catch (e) { if (e instanceof Response) return e; throw e; }
   const accessKey = await getUnsplashAccessKey();
   if (!accessKey) {
     return NextResponse.json(
@@ -68,6 +70,7 @@ export async function GET(request: NextRequest) {
 
 // POST to download an image and save it locally as a background
 export async function POST(request: NextRequest) {
+  try { await requireSession(request); } catch (e) { if (e instanceof Response) return e; throw e; }
   const accessKey = await getUnsplashAccessKey();
 
   const body = await request.json();

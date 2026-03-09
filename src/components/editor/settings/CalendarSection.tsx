@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { editorFetch } from '@/lib/editor-fetch';
 import Slider from '@/components/ui/Slider';
 import Button from '@/components/ui/Button';
 
@@ -38,7 +39,7 @@ export default function CalendarSection({ values, onChange }: Props) {
 
   const fetchCalendars = useCallback(async () => {
     try {
-      const res = await fetch('/api/calendars');
+      const res = await editorFetch('/api/calendars');
       if (res.ok) {
         const cals: GoogleCalendar[] = await res.json();
         setGoogleCalendars(cals);
@@ -55,7 +56,7 @@ export default function CalendarSection({ values, onChange }: Props) {
   useEffect(() => {
     async function checkAuth() {
       try {
-        const res = await fetch('/api/auth/google/status');
+        const res = await editorFetch('/api/auth/google/status');
         const data = await res.json();
         setCredentialsConfigured(!!data.credentialsConfigured);
         setGoogleConnected(data.connected);
@@ -77,7 +78,7 @@ export default function CalendarSection({ values, onChange }: Props) {
   }
 
   async function disconnectGoogle() {
-    await fetch('/api/auth/google/status', { method: 'DELETE' });
+    await editorFetch('/api/auth/google/status', { method: 'DELETE' });
     setGoogleConnected(false);
     setGoogleCalendars([]);
     onChange({ selectedCalendarIds: [] });
@@ -87,7 +88,7 @@ export default function CalendarSection({ values, onChange }: Props) {
     setDeviceFlowError(null);
     setUserCode(null);
     try {
-      const res = await fetch('/api/auth/google/device', { method: 'POST' });
+      const res = await editorFetch('/api/auth/google/device', { method: 'POST' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to start device flow');
       setDeviceCode(data.device_code);
@@ -112,7 +113,7 @@ export default function CalendarSection({ values, onChange }: Props) {
         return;
       }
       try {
-        const res = await fetch('/api/auth/google/device', {
+        const res = await editorFetch('/api/auth/google/device', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ device_code: code }),

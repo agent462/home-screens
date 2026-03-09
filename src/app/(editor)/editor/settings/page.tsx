@@ -14,6 +14,7 @@ import {
   Plug,
   Server,
   Database,
+  Shield,
 } from 'lucide-react';
 
 import HomeScreensLogo from '@/components/brand/HomeScreensLogo';
@@ -25,6 +26,7 @@ import WeatherSection from '@/components/editor/settings/WeatherSection';
 import IntegrationsSection from '@/components/editor/settings/IntegrationsSection';
 import CalendarSection from '@/components/editor/settings/CalendarSection';
 import SystemSection from '@/components/editor/settings/SystemSection';
+import SecuritySection from '@/components/editor/settings/SecuritySection';
 import UpgradeModal from '@/components/editor/UpgradeModal';
 
 /* ─── Tab definitions ─────────────────────────────── */
@@ -36,6 +38,7 @@ const TABS = [
   { id: 'weather', label: 'Weather', icon: CloudSun },
   { id: 'calendar', label: 'Calendar', icon: Calendar },
   { id: 'integrations', label: 'Integrations', icon: Plug },
+  { id: 'security', label: 'Security', icon: Shield },
   { id: 'data', label: 'Data', icon: Database },
   { id: 'system', label: 'System', icon: Server },
 ] as const;
@@ -249,7 +252,7 @@ export default function SettingsPage() {
     );
   }
 
-  const showSaveButton = activeTab !== 'system' && activeTab !== 'data' && activeTab !== 'integrations';
+  const showSaveButton = activeTab !== 'system' && activeTab !== 'data' && activeTab !== 'integrations' && activeTab !== 'security';
 
   return (
     <div className="h-screen flex flex-col">
@@ -379,6 +382,10 @@ export default function SettingsPage() {
 
             {activeTab === 'integrations' && (
               <IntegrationsSection />
+            )}
+
+            {activeTab === 'security' && (
+              <SecuritySection />
             )}
 
             {activeTab === 'data' && (

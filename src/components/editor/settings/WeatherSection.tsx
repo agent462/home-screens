@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { editorFetch } from '@/lib/editor-fetch';
 import { useEditorStore } from '@/stores/editor-store';
 import Button from '@/components/ui/Button';
 
@@ -35,7 +36,7 @@ export default function WeatherSection({ values, onChange }: Props) {
 
   const fetchKeyStatus = useCallback(async () => {
     try {
-      const res = await fetch('/api/secrets');
+      const res = await editorFetch('/api/secrets');
       if (res.ok) {
         const data: Partial<Record<string, boolean>> = await res.json();
         const key = providerSecretKey(provider);
@@ -58,7 +59,7 @@ export default function WeatherSection({ values, onChange }: Props) {
     setSaveStatus('saving');
     setSaveError('');
     try {
-      const res = await fetch('/api/secrets', {
+      const res = await editorFetch('/api/secrets', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key: providerSecretKey(provider), value: apiKey.trim() }),
@@ -83,7 +84,7 @@ export default function WeatherSection({ values, onChange }: Props) {
 
   async function handleDeleteKey() {
     try {
-      const res = await fetch('/api/secrets', {
+      const res = await editorFetch('/api/secrets', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key: providerSecretKey(provider) }),

@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runRollback, isUpgradeRunning } from '@/lib/upgrade';
+import { requireSession } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
+  try { await requireSession(request); } catch (e) { if (e instanceof Response) return e; throw e; }
   if (isUpgradeRunning()) {
     return NextResponse.json(
       { error: 'An upgrade is already in progress' },

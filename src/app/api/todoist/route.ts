@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { errorResponse } from '@/lib/api-utils';
+import { requireSession } from '@/lib/auth';
 import { getSecret, setSecret } from '@/lib/secrets';
 
 export const dynamic = 'force-dynamic';
@@ -88,6 +89,7 @@ async function fetchTodoistList(endpoint: string, token: string): Promise<Record
 
 export async function PUT(request: NextRequest) {
   try {
+    await requireSession(request);
     const body = await request.json();
     const token = typeof body.token === 'string' ? body.token.trim() : '';
 
@@ -107,6 +109,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
+    if (error instanceof Response) return error;
     return errorResponse(error, 'Failed to save Todoist token');
   }
 }

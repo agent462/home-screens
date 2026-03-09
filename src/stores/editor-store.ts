@@ -12,6 +12,7 @@ import type {
 } from '@/types/config';
 import { DEFAULT_MODULE_STYLE as defaultStyle } from '@/types/config';
 import { getModuleDefinition } from '@/lib/module-registry';
+import { editorFetch } from '@/lib/editor-fetch';
 
 interface EditorState {
   config: ScreenConfiguration | null;
@@ -63,13 +64,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   loadConfig: async () => {
     try {
-      const res = await fetch('/api/config');
+      const res = await editorFetch('/api/config');
       if (!res.ok) throw new Error(`Load failed: ${res.status}`);
       const config: ScreenConfiguration = await res.json();
       if (!config.screens) throw new Error('Invalid config');
+      // Restore selected screen from URL if present, otherwise default to first
+      const params = new URLSearchParams(window.location.search);
+      const screenParam = params.get('screen');
+      const restoredScreen = screenParam && config.screens.find((s) => s.id === screenParam);
       set({
         config,
-        selectedScreenId: config.screens[0]?.id ?? null,
+        selectedScreenId: restoredScreen ? restoredScreen.id : config.screens[0]?.id ?? null,
         selectedModuleId: null,
         isDirty: false,
       });
@@ -83,7 +88,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (!config) return;
     set({ isSaving: true });
     try {
-      const res = await fetch('/api/config', {
+      const res = await editorFetch('/api/config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config),
@@ -96,7 +101,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
   },
 
-  selectScreen: (id) => set({ selectedScreenId: id, selectedModuleId: null }),
+  selectScreen: (id) => {
+    set({ selectedScreenId: id, selectedModuleId: null });
+    const url = new URL(window.location.href);
+    url.searchParams.set('screen', id);
+    window.history.replaceState(null, '', url.toString());
+  },
 
   selectModule: (id) => set({ selectedModuleId: id }),
 
@@ -193,18 +203,27 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedModuleId: null,
       isDirty: true,
     });
+    const url = new URL(window.location.href);
+    url.searchParams.set('screen', newScreen.id);
+    window.history.replaceState(null, '', url.toString());
   },
 
   removeScreen: (id) => {
     const { config, selectedScreenId } = get();
     if (!config || config.screens.length <= 1) return;
     const screens = config.screens.filter((s) => s.id !== id);
+    const newSelectedId = selectedScreenId === id ? screens[0]?.id ?? null : selectedScreenId;
     set({
       config: { ...config, screens },
-      selectedScreenId: selectedScreenId === id ? screens[0]?.id ?? null : selectedScreenId,
+      selectedScreenId: newSelectedId,
       selectedModuleId: null,
       isDirty: true,
     });
+    if (newSelectedId) {
+      const url = new URL(window.location.href);
+      url.searchParams.set('screen', newSelectedId);
+      window.history.replaceState(null, '', url.toString());
+    }
   },
 
   updateScreen: (id, updates) => {
@@ -245,11 +264,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (!config.screens || !Array.isArray(config.screens) || !config.settings) {
       throw new Error('Invalid config file: missing screens or settings');
     }
+    const firstId = config.screens[0]?.id ?? null;
     set({
       config,
-      selectedScreenId: config.screens[0]?.id ?? null,
+      selectedScreenId: firstId,
       selectedModuleId: null,
       isDirty: true,
     });
+    if (firstId) {
+      const url = new URL(window.location.href);
+      url.searchParams.set('screen', firstId);
+      window.history.replaceState(null, '', url.toString());
+    }
   },
 }));
