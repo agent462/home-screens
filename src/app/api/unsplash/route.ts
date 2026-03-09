@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
     await fs.mkdir(BGS, { recursive: true });
     await fs.writeFile(path.join(BGS, safeName), buffer);
 
-    return NextResponse.json({ path: `/backgrounds/${safeName}` }, { status: 201 });
+    return NextResponse.json({ path: `/api/backgrounds/serve?file=${encodeURIComponent(safeName)}` }, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to download image';
     return NextResponse.json({ error: message }, { status: 500 });

@@ -6,6 +6,11 @@ import { errorResponse } from '@/lib/api-utils';
 
 const BGS = path.join(process.cwd(), BACKGROUNDS_DIR);
 
+/** Helper: resolve a background filename to its serve URL */
+function serveUrl(filename: string) {
+  return `/api/backgrounds/serve?file=${encodeURIComponent(filename)}`;
+}
+
 export async function GET() {
   try {
     const dir = BGS;
@@ -14,7 +19,7 @@ export async function GET() {
     const images = files.filter((f) =>
       /\.(jpe?g|png|webp|gif|svg|avif)$/i.test(f),
     );
-    const paths = images.map((f) => `/backgrounds/${f}`);
+    const paths = images.map((f) => serveUrl(f));
     return NextResponse.json(paths);
   } catch (error) {
     return errorResponse(error, 'Failed to list backgrounds');
@@ -48,8 +53,32 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(await file.arrayBuffer());
     await fs.writeFile(filePath, buffer);
 
-    return NextResponse.json({ path: `/backgrounds/${safeName}` }, { status: 201 });
+    return NextResponse.json({ path: serveUrl(safeName) }, { status: 201 });
   } catch (error) {
     return errorResponse(error, 'Failed to upload background');
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { file } = await request.json();
+    if (!file || typeof file !== 'string') {
+      return NextResponse.json({ error: 'file parameter required' }, { status: 400 });
+    }
+
+    // Prevent directory traversal
+    const safe = path.basename(file);
+    const filePath = path.join(BGS, safe);
+
+    try {
+      await fs.access(filePath);
+    } catch {
+      return NextResponse.json({ error: 'File not found' }, { status: 404 });
+    }
+
+    await fs.unlink(filePath);
+    return NextResponse.json({ deleted: safe });
+  } catch (error) {
+    return errorResponse(error, 'Failed to delete background');
   }
 }
