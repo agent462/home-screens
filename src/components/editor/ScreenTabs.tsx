@@ -82,7 +82,7 @@ export default function ScreenTabs() {
       <div className="relative min-w-0 flex-1">
         <div
           ref={scrollContainerRef}
-          className="flex min-w-0 items-center gap-1 overflow-x-auto overflow-y-hidden px-9"
+          className="scrollbar-none flex min-w-0 items-center gap-1 overflow-x-auto overflow-y-hidden px-9"
         >
           {config.screens.map((screen) => (
             <div

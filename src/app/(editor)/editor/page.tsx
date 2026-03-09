@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useCallback, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   DndContext,
   DragEndEvent,
@@ -19,8 +20,6 @@ import ScreenTabs from '@/components/editor/ScreenTabs';
 import ModulePalette from '@/components/editor/ModulePalette';
 import EditorCanvas from '@/components/editor/EditorCanvas';
 import PropertyPanel from '@/components/editor/PropertyPanel';
-import SettingsPanel from '@/components/editor/SettingsPanel';
-import SystemPanel from '@/components/editor/SystemPanel';
 import HomeScreensLogo from '@/components/brand/HomeScreensLogo';
 import Button from '@/components/ui/Button';
 
@@ -34,30 +33,11 @@ export default function EditorPage() {
     saveConfig,
     addModule,
     moveModule,
-    exportConfig,
-    importConfig,
   } = useEditorStore();
 
-  const [showSettings, setShowSettings] = useState(false);
-  const [showSystem, setShowSystem] = useState(false);
   const [activePaletteType, setActivePaletteType] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
   const canvasScaleRef = useRef(0.4);
-
-  const handleImport = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        importConfig(reader.result as string);
-      } catch {
-        alert('Invalid config file.');
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
-  }, [importConfig]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -136,30 +116,11 @@ export default function EditorPage() {
             <ScreenTabs />
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".json"
-              className="hidden"
-              onChange={handleImport}
-            />
-            <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>
-              Import Config
-            </Button>
-            <Button variant="secondary" onClick={exportConfig}>
-              Export Config
-            </Button>
             <Button
               variant="secondary"
-              onClick={() => setShowSettings(true)}
+              onClick={() => router.push('/editor/settings')}
             >
               Settings
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => setShowSystem(true)}
-            >
-              System
             </Button>
             <Button
               variant="secondary"
@@ -184,8 +145,6 @@ export default function EditorPage() {
           <PropertyPanel />
         </div>
       </div>
-      {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
-      {showSystem && <SystemPanel onClose={() => setShowSystem(false)} />}
       <DragOverlay dropAnimation={null}>
         {activePaletteType && (() => {
           const def = getModuleDefinition(activePaletteType as ModuleType);

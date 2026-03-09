@@ -108,13 +108,16 @@ export function useSleepManager(
         return;
       }
 
-      // Idle-based transitions (outside any schedule window)
-      const idle = Date.now() - lastActivityRef.current;
+      // Idle-based transitions (only when no dim schedule is configured)
+      // If the user set a dim schedule, dimming is controlled by the schedule alone.
+      if (!sleep.dimSchedule) {
+        const idle = Date.now() - lastActivityRef.current;
 
-      if (sleepMs > 0 && idle >= dimMs + sleepMs) {
-        setDisplayState('asleep');
-      } else if (idle >= dimMs) {
-        setDisplayState('dimmed');
+        if (sleepMs > 0 && idle >= dimMs + sleepMs) {
+          setDisplayState('asleep');
+        } else if (idle >= dimMs) {
+          setDisplayState('dimmed');
+        }
       }
       // Don't reset to 'active' here — that's handled by the activity listener
     }, 10_000); // check every 10 seconds
