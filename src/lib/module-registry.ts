@@ -8,10 +8,30 @@ import {
 } from 'lucide-react';
 import { DEFAULT_MODULE_SIZES } from './constants';
 
+export type ModuleCategory =
+  | 'Time & Date'
+  | 'Weather & Environment'
+  | 'News & Finance'
+  | 'Knowledge & Fun'
+  | 'Personal'
+  | 'Media & Display'
+  | 'Travel';
+
+export const MODULE_CATEGORIES: ModuleCategory[] = [
+  'Time & Date',
+  'Weather & Environment',
+  'News & Finance',
+  'Knowledge & Fun',
+  'Personal',
+  'Media & Display',
+  'Travel',
+];
+
 export interface ModuleDefinition {
   type: ModuleType;
   label: string;
   icon: LucideIcon;
+  category: ModuleCategory;
   defaultConfig: Record<string, unknown>;
   defaultSize: { w: number; h: number };
 }
@@ -30,11 +50,23 @@ export function getAllModuleDefinitions(): ModuleDefinition[] {
   return Array.from(registry.values());
 }
 
+export function getModulesByCategory(): Map<ModuleCategory, ModuleDefinition[]> {
+  const grouped = new Map<ModuleCategory, ModuleDefinition[]>();
+  for (const cat of MODULE_CATEGORIES) {
+    grouped.set(cat, []);
+  }
+  for (const def of registry.values()) {
+    grouped.get(def.category)!.push(def);
+  }
+  return grouped;
+}
+
 // Register all modules
 registerModule({
   type: 'clock',
   label: 'Clock',
   icon: Clock,
+  category: 'Time & Date',
   defaultConfig: {
     format24h: false,
     showSeconds: true,
@@ -50,6 +82,7 @@ registerModule({
   type: 'calendar',
   label: 'Calendar',
   icon: CalendarDays,
+  category: 'Time & Date',
   defaultConfig: {
     daysToShow: 3,
     showTime: true,
@@ -62,6 +95,7 @@ registerModule({
   type: 'weather-hourly',
   label: 'Hourly Weather',
   icon: CloudSun,
+  category: 'Weather & Environment',
   defaultConfig: {
     hoursToShow: 8,
     showFeelsLike: true,
@@ -76,6 +110,7 @@ registerModule({
   type: 'weather-forecast',
   label: 'Weather Forecast',
   icon: Sun,
+  category: 'Weather & Environment',
   defaultConfig: {
     daysToShow: 5,
     showHighLow: true,
@@ -91,6 +126,7 @@ registerModule({
   type: 'countdown',
   label: 'Countdown',
   icon: Hourglass,
+  category: 'Time & Date',
   defaultConfig: {
     events: [],
     showPastEvents: false,
@@ -103,6 +139,7 @@ registerModule({
   type: 'dad-joke',
   label: 'Dad Joke',
   icon: Laugh,
+  category: 'Knowledge & Fun',
   defaultConfig: {
     refreshIntervalMs: 60000,
   },
@@ -113,6 +150,7 @@ registerModule({
   type: 'text',
   label: 'Text',
   icon: Type,
+  category: 'Media & Display',
   defaultConfig: {
     content: 'Hello, World!',
     alignment: 'center',
@@ -124,6 +162,7 @@ registerModule({
   type: 'image',
   label: 'Image',
   icon: ImageIcon,
+  category: 'Media & Display',
   defaultConfig: {
     src: '',
     objectFit: 'cover',
@@ -136,6 +175,7 @@ registerModule({
   type: 'quote',
   label: 'Quote of the Day',
   icon: Quote,
+  category: 'Knowledge & Fun',
   defaultConfig: {
     refreshIntervalMs: 300000,
   },
@@ -146,6 +186,7 @@ registerModule({
   type: 'todo',
   label: 'To-Do List',
   icon: ListTodo,
+  category: 'Personal',
   defaultConfig: {
     title: 'To Do',
     items: [],
@@ -157,6 +198,7 @@ registerModule({
   type: 'sticky-note',
   label: 'Sticky Note',
   icon: StickyNote,
+  category: 'Personal',
   defaultConfig: {
     content: 'Write something here...',
     noteColor: '#fef08a',
@@ -168,6 +210,7 @@ registerModule({
   type: 'greeting',
   label: 'Greeting',
   icon: HandMetal,
+  category: 'Personal',
   defaultConfig: {
     name: 'Friend',
   },
@@ -178,6 +221,7 @@ registerModule({
   type: 'news',
   label: 'News Headlines',
   icon: Newspaper,
+  category: 'News & Finance',
   defaultConfig: {
     feedUrl: '',
     refreshIntervalMs: 300000,
@@ -190,6 +234,7 @@ registerModule({
   type: 'stock-ticker',
   label: 'Stock Ticker',
   icon: TrendingUp,
+  category: 'News & Finance',
   defaultConfig: {
     symbols: 'AAPL,GOOGL,MSFT',
     refreshIntervalMs: 60000,
@@ -201,6 +246,7 @@ registerModule({
   type: 'crypto',
   label: 'Crypto Price',
   icon: Bitcoin,
+  category: 'News & Finance',
   defaultConfig: {
     ids: 'bitcoin,ethereum',
     refreshIntervalMs: 60000,
@@ -212,6 +258,7 @@ registerModule({
   type: 'word-of-day',
   label: 'Word of the Day',
   icon: BookOpen,
+  category: 'Knowledge & Fun',
   defaultConfig: {},
   defaultSize: DEFAULT_MODULE_SIZES['word-of-day'],
 });
@@ -220,6 +267,7 @@ registerModule({
   type: 'history',
   label: 'This Day in History',
   icon: History,
+  category: 'Knowledge & Fun',
   defaultConfig: {
     refreshIntervalMs: 3600000,
     rotationIntervalSec: 10,
@@ -231,6 +279,7 @@ registerModule({
   type: 'moon-phase',
   label: 'Moon Phase',
   icon: Moon,
+  category: 'Weather & Environment',
   defaultConfig: {
     showIllumination: true,
     showMoonTimes: true,
@@ -242,6 +291,7 @@ registerModule({
   type: 'sunrise-sunset',
   label: 'Sunrise / Sunset',
   icon: Sunrise,
+  category: 'Weather & Environment',
   defaultConfig: {
     showDayLength: true,
     showGoldenHour: false,
@@ -253,6 +303,7 @@ registerModule({
   type: 'photo-slideshow',
   label: 'Photo Slideshow',
   icon: Image,
+  category: 'Media & Display',
   defaultConfig: {
     directory: '',
     intervalMs: 30000,
@@ -266,6 +317,7 @@ registerModule({
   type: 'qr-code',
   label: 'QR Code',
   icon: QrCode,
+  category: 'Media & Display',
   defaultConfig: {
     data: '',
     label: '',
@@ -279,6 +331,7 @@ registerModule({
   type: 'year-progress',
   label: 'Year Progress',
   icon: BarChart3,
+  category: 'Time & Date',
   defaultConfig: {
     showYear: true,
     showMonth: true,
@@ -293,6 +346,7 @@ registerModule({
   type: 'traffic',
   label: 'Traffic / Commute',
   icon: Car,
+  category: 'Travel',
   defaultConfig: {
     routes: [],
     refreshIntervalMs: 300000,
@@ -304,6 +358,7 @@ registerModule({
   type: 'sports',
   label: 'Sports Scores',
   icon: Trophy,
+  category: 'News & Finance',
   defaultConfig: {
     leagues: ['nba', 'nfl'],
     refreshIntervalMs: 60000,
@@ -315,6 +370,7 @@ registerModule({
   type: 'air-quality',
   label: 'Air Quality',
   icon: Wind,
+  category: 'Weather & Environment',
   defaultConfig: {
     showAQI: true,
     showPollutants: false,
