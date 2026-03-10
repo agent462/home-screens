@@ -5,7 +5,7 @@ import { editorFetch } from '@/lib/editor-fetch';
 import { useEditorStore } from '@/stores/editor-store';
 import Button from '@/components/ui/Button';
 
-type SecretKey = 'openweathermap_key' | 'weatherapi_key';
+type SecretKey = 'openweathermap_key' | 'weatherapi_key' | 'pirateweather_key';
 
 interface WeatherSettings {
   provider: string;
@@ -20,7 +20,9 @@ interface Props {
 }
 
 function providerSecretKey(provider: string): SecretKey {
-  return provider === 'openweathermap' ? 'openweathermap_key' : 'weatherapi_key';
+  if (provider === 'openweathermap') return 'openweathermap_key';
+  if (provider === 'pirateweather') return 'pirateweather_key';
+  return 'weatherapi_key';
 }
 
 export default function WeatherSection({ values, onChange }: Props) {
@@ -110,7 +112,7 @@ export default function WeatherSection({ values, onChange }: Props) {
         latitude: testLat,
         longitude: testLon,
         weather: {
-          provider: provider as 'openweathermap' | 'weatherapi',
+          provider: provider as 'openweathermap' | 'weatherapi' | 'pirateweather',
           latitude: testLat,
           longitude: testLon,
           units: units as 'metric' | 'imperial',
@@ -153,6 +155,7 @@ export default function WeatherSection({ values, onChange }: Props) {
           >
             <option value="weatherapi">WeatherAPI.com (free, no credit card)</option>
             <option value="openweathermap">OpenWeatherMap (One Call 3.0)</option>
+            <option value="pirateweather">Pirate Weather (Dark Sky replacement)</option>
           </select>
         </label>
 
@@ -168,6 +171,11 @@ export default function WeatherSection({ values, onChange }: Props) {
               {provider === 'openweathermap' && (
                 <span className="text-neutral-500 ml-1">
                   — requires One Call 3.0 subscription
+                </span>
+              )}
+              {provider === 'pirateweather' && (
+                <span className="text-neutral-500 ml-1">
+                  — free at pirateweather.net
                 </span>
               )}
             </span>

@@ -5,6 +5,13 @@ import { DEFAULT_MODULE_STYLE } from '@/types/config';
 // Must import the module registry so modules are registered before store operations
 import '@/lib/module-registry';
 
+// Mock browser APIs not available in node test environment
+const mockReplaceState = vi.fn();
+vi.stubGlobal('window', {
+  location: { href: 'http://localhost/editor', search: '' },
+  history: { replaceState: mockReplaceState },
+});
+
 // Dynamic import to reset store state between tests
 let useEditorStore: typeof import('@/stores/editor-store').useEditorStore;
 

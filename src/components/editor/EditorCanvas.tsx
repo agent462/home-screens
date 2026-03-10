@@ -20,7 +20,7 @@ function ModulePreview({ mod, previewData, settings }: { mod: ModuleInstance; pr
   }
 
   // Pass global location to location-aware modules
-  if (['moon-phase', 'sunrise-sunset'].includes(mod.type) && settings) {
+  if (['moon-phase', 'sunrise-sunset', 'rain-map'].includes(mod.type) && settings) {
     extraProps.latitude = settings.latitude;
     extraProps.longitude = settings.longitude;
   }
@@ -35,6 +35,8 @@ function ModulePreview({ mod, previewData, settings }: { mod: ModuleInstance; pr
   if (mod.type === 'weather' && wd) {
     extraProps.hourly = wd.hourly ?? [];
     extraProps.forecast = wd.forecast ?? [];
+    extraProps.minutely = wd.minutely ?? undefined;
+    extraProps.alerts = wd.alerts ?? undefined;
     extraProps.units = settings?.units;
   } else if (mod.type === 'calendar') {
     extraProps.events = previewData.calendarEvents;
@@ -54,6 +56,8 @@ interface PreviewSettings {
 interface ProviderWeatherData {
   hourly: unknown[] | null;
   forecast: unknown[] | null;
+  minutely: unknown[] | null;
+  alerts: unknown[] | null;
 }
 
 interface PreviewData {
@@ -318,13 +322,13 @@ export default function EditorCanvas({ onScaleChange }: { onScaleChange?: (scale
     async function fetchPreviewData() {
       // Fetch both providers in parallel; the server-side cache + secrets
       // check means unconfigured providers will simply fail gracefully
-      const providers = ['openweathermap', 'weatherapi'] as const;
+      const providers = ['openweathermap', 'weatherapi', 'pirateweather'] as const;
       const results = await Promise.allSettled(
         providers.map(async (p) => {
           const res = await fetch(`/api/weather?provider=${p}`);
           if (!res.ok) return null;
           const data = await res.json();
-          return { provider: p, hourly: data.hourly ?? null, forecast: data.forecast ?? null };
+          return { provider: p, hourly: data.hourly ?? null, forecast: data.forecast ?? null, minutely: data.minutely ?? null, alerts: data.alerts ?? null };
         }),
       );
 
@@ -334,6 +338,8 @@ export default function EditorCanvas({ onScaleChange }: { onScaleChange?: (scale
           byProvider[result.value.provider] = {
             hourly: result.value.hourly,
             forecast: result.value.forecast,
+            minutely: result.value.minutely,
+            alerts: result.value.alerts,
           };
         }
       }

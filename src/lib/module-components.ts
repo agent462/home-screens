@@ -31,4 +31,5 @@ export const moduleComponents = {
   sports: dynamic(() => import('@/components/modules/sports/SportsModule')),
   'air-quality': dynamic(() => import('@/components/modules/AirQualityModule')),
   todoist: dynamic(() => import('@/components/modules/TodoistModule')),
+  'rain-map': dynamic(() => import('@/components/modules/RainMapModule')),
 } as unknown as Record<ModuleType, ComponentType<Record<string, unknown>>>;

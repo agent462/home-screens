@@ -135,25 +135,29 @@ function useSharedDisplayData(screens: Screen[], settings: GlobalSettings): Shar
   const baseParams = `lat=${lat}&lon=${lon}&units=${settings.weather.units}`;
 
   // Determine which weather providers are needed across ALL screens
-  const { needsOWM, needsWAPI } = useMemo(() => {
+  const { needsOWM, needsWAPI, needsPirate } = useMemo(() => {
     let owm = false;
     let wapi = false;
+    let pirate = false;
     for (const screen of screens) {
       for (const mod of screen.modules) {
         if (mod.type === 'weather') {
           const p = resolveProvider(mod, globalProvider);
           if (p === 'openweathermap') owm = true;
           if (p === 'weatherapi') wapi = true;
+          if (p === 'pirateweather') pirate = true;
         }
       }
     }
-    return { needsOWM: owm, needsWAPI: wapi };
+    return { needsOWM: owm, needsWAPI: wapi, needsPirate: pirate };
   }, [screens, globalProvider]);
 
   const owmUrl = needsOWM ? `/api/weather?${baseParams}&provider=openweathermap` : '';
   const wapiUrl = needsWAPI ? `/api/weather?${baseParams}&provider=weatherapi` : '';
+  const pirateUrl = needsPirate ? `/api/weather?${baseParams}&provider=pirateweather` : '';
   const owmData = useFetchData(owmUrl, WEATHER_REFRESH_MS);
   const wapiData = useFetchData(wapiUrl, WEATHER_REFRESH_MS);
+  const pirateData = useFetchData(pirateUrl, WEATHER_REFRESH_MS);
 
   const calendarIdList = settings.calendar.googleCalendarIds?.length
     ? settings.calendar.googleCalendarIds
@@ -163,7 +167,7 @@ function useSharedDisplayData(screens: Screen[], settings: GlobalSettings): Shar
     : '';
   const calendarData = useFetchData(calendarUrl, CALENDAR_REFRESH_MS);
 
-  return { owmData, wapiData, calendarData };
+  return { owmData, wapiData, pirateData, calendarData };
 }
 
 export default function ScreenRotator({ screens: initialScreens, settings: initialSettings }: ScreenRotatorProps) {

@@ -23,7 +23,8 @@ export type ModuleType =
   | 'traffic'
   | 'sports'
   | 'air-quality'
-  | 'todoist';
+  | 'todoist'
+  | 'rain-map';
 
 export interface ModuleStyle {
   opacity: number;
@@ -71,7 +72,7 @@ export interface Screen {
 }
 
 export interface WeatherSettings {
-  provider: 'openweathermap' | 'weatherapi';
+  provider: 'openweathermap' | 'weatherapi' | 'pirateweather';
   latitude: number;
   longitude: number;
   units: 'metric' | 'imperial';
@@ -161,10 +162,10 @@ export interface CalendarConfig {
 }
 
 // Unified weather module config
-export type WeatherView = 'current' | 'hourly' | 'daily' | 'combined' | 'compact' | 'table';
+export type WeatherView = 'current' | 'hourly' | 'daily' | 'combined' | 'compact' | 'table' | 'precipitation' | 'alerts';
 
 export type WeatherIconSet = 'outline' | 'color';
-export type WeatherProviderOption = 'global' | 'openweathermap' | 'weatherapi';
+export type WeatherProviderOption = 'global' | 'openweathermap' | 'weatherapi' | 'pirateweather';
 
 export interface WeatherConfig {
   view: WeatherView;
@@ -374,5 +375,24 @@ export interface AirQualityConfig {
   showPollutants: boolean;
   showUV: boolean;
   refreshIntervalMs: number;
+}
+
+// Rain map module config
+export type RainMapStyle = 'dark' | 'standard';
+
+export interface RainMapConfig {
+  latitude: number;
+  longitude: number;
+  zoom: number;
+  animationSpeedMs: number;
+  extraDelayLastFrameMs: number;
+  colorScheme: number;
+  smooth: boolean;
+  showSnow: boolean;
+  opacity: number;
+  showTimestamp: boolean;
+  showTimeline: boolean;
+  refreshIntervalMs: number;
+  mapStyle: RainMapStyle;
 }
 

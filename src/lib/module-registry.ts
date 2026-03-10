@@ -5,7 +5,7 @@ import {
   Quote, ListTodo, StickyNote, HandMetal,
   Newspaper, TrendingUp, Bitcoin, BookOpen, History,
   Moon, Sunrise, Image, QrCode, BarChart3, Car, Trophy, Wind,
-  ListChecks,
+  ListChecks, CloudRain,
 } from 'lucide-react';
 import { DEFAULT_MODULE_SIZES } from './constants';
 
@@ -409,4 +409,27 @@ registerModule({
     title: 'Todoist',
   },
   defaultSize: DEFAULT_MODULE_SIZES.todoist,
+});
+
+registerModule({
+  type: 'rain-map',
+  label: 'Rain Map',
+  icon: CloudRain,
+  category: 'Weather & Environment',
+  defaultConfig: {
+    latitude: 0,
+    longitude: 0,
+    zoom: 6,
+    animationSpeedMs: 500,
+    extraDelayLastFrameMs: 2000,
+    colorScheme: 2,
+    smooth: true,
+    showSnow: true,
+    opacity: 0.7,
+    showTimestamp: true,
+    showTimeline: true,
+    refreshIntervalMs: 600000,
+    mapStyle: 'dark',
+  },
+  defaultSize: DEFAULT_MODULE_SIZES['rain-map'],
 });

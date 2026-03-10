@@ -13,7 +13,7 @@ const ALL_MODULE_TYPES: ModuleType[] = [
   'sticky-note', 'greeting', 'news', 'stock-ticker', 'crypto',
   'word-of-day', 'history', 'moon-phase', 'sunrise-sunset',
   'photo-slideshow', 'qr-code', 'year-progress', 'traffic',
-  'sports', 'air-quality', 'todoist',
+  'sports', 'air-quality', 'todoist', 'rain-map',
 ];
 
 describe('MODULE_CATEGORIES', () => {
@@ -150,8 +150,8 @@ describe('getModuleDefinition', () => {
 });
 
 describe('getAllModuleDefinitions', () => {
-  it('returns an array of length 25', () => {
-    expect(getAllModuleDefinitions()).toHaveLength(25);
+  it('returns an array of length 26', () => {
+    expect(getAllModuleDefinitions()).toHaveLength(26);
   });
 
   it('all items have required fields', () => {
@@ -268,8 +268,8 @@ describe('getModulesByCategory', () => {
         total++;
       }
     }
-    expect(total).toBe(25);
-    expect(allTypes.size).toBe(25);
+    expect(total).toBe(26);
+    expect(allTypes.size).toBe(26);
   });
 });
 

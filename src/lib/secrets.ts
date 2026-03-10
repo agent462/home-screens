@@ -8,6 +8,7 @@ function getSecretsPath(): string {
 export type SecretKey =
   | 'openweathermap_key'
   | 'weatherapi_key'
+  | 'pirateweather_key'
   | 'unsplash_access_key'
   | 'todoist_token'
   | 'google_maps_key'
@@ -20,6 +21,7 @@ export type SecretsStore = Partial<Record<SecretKey, string>>;
 const ALL_KEYS: SecretKey[] = [
   'openweathermap_key',
   'weatherapi_key',
+  'pirateweather_key',
   'unsplash_access_key',
   'todoist_token',
   'google_maps_key',

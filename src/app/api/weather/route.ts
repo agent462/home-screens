@@ -59,11 +59,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(cached);
   }
 
-  const apiKey = await getSecret(provider === 'weatherapi' ? 'weatherapi_key' : 'openweathermap_key') ?? undefined;
+  const secretKeyMap: Record<string, 'openweathermap_key' | 'weatherapi_key' | 'pirateweather_key'> = {
+    openweathermap: 'openweathermap_key',
+    weatherapi: 'weatherapi_key',
+    pirateweather: 'pirateweather_key',
+  };
+  const apiKey = await getSecret(secretKeyMap[provider] ?? 'openweathermap_key') ?? undefined;
 
   try {
     const weatherProvider = createWeatherProvider(provider, apiKey);
-    let result: unknown;
+    let result: Record<string, unknown>;
 
     if (type === 'forecast') {
       const forecast = await weatherProvider.getForecast(Number(lat), Number(lon), units);
@@ -77,6 +82,14 @@ export async function GET(request: NextRequest) {
         weatherProvider.getForecast(Number(lat), Number(lon), units),
       ]);
       result = { hourly, forecast };
+    }
+
+    // Include minutely and alerts if the provider supports them
+    if (weatherProvider.getMinutely) {
+      result.minutely = await weatherProvider.getMinutely(Number(lat), Number(lon), units);
+    }
+    if (weatherProvider.getAlerts) {
+      result.alerts = await weatherProvider.getAlerts(Number(lat), Number(lon), units);
     }
 
     setCache(cacheKey, result);

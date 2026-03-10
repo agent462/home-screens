@@ -8,6 +8,7 @@ import { moduleComponents } from '@/lib/module-components';
 export interface SharedDisplayData {
   owmData: unknown;
   wapiData: unknown;
+  pirateData: unknown;
   calendarData: unknown;
 }
 
@@ -53,6 +54,7 @@ export default function ScreenRenderer({ screen, settings, rotatingBackground, s
     const p = resolveProvider(mod, globalProvider);
     if (p === 'openweathermap') return sharedData.owmData as Record<string, unknown> | null;
     if (p === 'weatherapi') return sharedData.wapiData as Record<string, unknown> | null;
+    if (p === 'pirateweather') return sharedData.pirateData as Record<string, unknown> | null;
     return null;
   }
 
@@ -90,7 +92,7 @@ export default function ScreenRenderer({ screen, settings, rotatingBackground, s
         const extraProps: Record<string, unknown> = {};
         extraProps.timezone = settings.timezone;
 
-        if (['moon-phase', 'sunrise-sunset'].includes(mod.type)) {
+        if (['moon-phase', 'sunrise-sunset', 'rain-map'].includes(mod.type)) {
           extraProps.latitude = settings.latitude ?? settings.weather.latitude;
           extraProps.longitude = settings.longitude ?? settings.weather.longitude;
         }
@@ -102,6 +104,8 @@ export default function ScreenRenderer({ screen, settings, rotatingBackground, s
         } else if (mod.type === 'weather' && weatherData) {
           extraProps.hourly = weatherData.hourly ?? [];
           extraProps.forecast = weatherData.forecast ?? [];
+          extraProps.minutely = weatherData.minutely;
+          extraProps.alerts = weatherData.alerts;
           extraProps.units = settings.weather.units;
         }
 
