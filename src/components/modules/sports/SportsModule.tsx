@@ -2,6 +2,7 @@
 
 import type { SportsConfig, ModuleStyle } from '@/types/config';
 import ModuleWrapper from '../ModuleWrapper';
+import { ModuleLoadingState, ModuleEmptyState } from '../ModuleStates';
 import { useFetchData } from '@/hooks/useFetchData';
 import { ScoreboardView } from './ScoreboardView';
 import { CardsView } from './CardsView';
@@ -16,7 +17,7 @@ interface SportsModuleProps {
 
 export default function SportsModule({ config, style }: SportsModuleProps) {
   const leagues = (config.leagues ?? ['nfl', 'nba']).join(',');
-  const data = useFetchData<{ games: Game[] }>(
+  const [data] = useFetchData<{ games: Game[] }>(
     `/api/sports?leagues=${encodeURIComponent(leagues)}`,
     config.refreshIntervalMs ?? 60000,
   );
@@ -24,23 +25,11 @@ export default function SportsModule({ config, style }: SportsModuleProps) {
   const view = config.view ?? 'scoreboard';
 
   if (data === null) {
-    return (
-      <ModuleWrapper style={style}>
-        <div className="flex items-center justify-center h-full">
-          <p className="text-center opacity-50">Loading scores…</p>
-        </div>
-      </ModuleWrapper>
-    );
+    return <ModuleLoadingState style={style} message="Loading scores\u2026" />;
   }
 
   if (games.length === 0) {
-    return (
-      <ModuleWrapper style={style}>
-        <div className="flex items-center justify-center h-full">
-          <p className="text-center opacity-60">No games found</p>
-        </div>
-      </ModuleWrapper>
-    );
+    return <ModuleEmptyState style={style} message="No games found" />;
   }
 
   return (

@@ -249,13 +249,13 @@ export type NewsView = 'headline' | 'list' | 'ticker' | 'compact';
 
 export interface NewsConfig {
   feedUrl: string;
-  view: NewsView;
+  view?: NewsView;
   refreshIntervalMs: number;
   rotateIntervalMs: number;
   maxItems: number;
   showTimestamp: boolean;
   showDescription: boolean;
-  tickerSpeed: number;
+  tickerSpeed?: number;
 }
 
 // Stock ticker module config
@@ -282,7 +282,7 @@ export interface CryptoConfig {
 
 // Word of the day module config
 export interface WordOfDayConfig {
-  refreshIntervalMs: number;
+  // No config fields — word is computed from a hardcoded list based on the date
 }
 
 // This day in history module config
@@ -352,9 +352,9 @@ export interface SportsConfig {
 }
 
 // Todoist module config
-export type TodoistViewMode = 'list' | 'board' | 'focus';
+type TodoistViewMode = 'list' | 'board' | 'focus';
 export type TodoistGroupBy = 'none' | 'project' | 'priority' | 'date' | 'label';
-export type TodoistSortBy = 'default' | 'priority' | 'due_date' | 'alphabetical';
+type TodoistSortBy = 'default' | 'priority' | 'due_date' | 'alphabetical';
 
 export interface TodoistConfig {
   viewMode: TodoistViewMode;
@@ -381,7 +381,7 @@ export interface AirQualityConfig {
 }
 
 // Multi-month calendar config
-export type MultiMonthView = 'vertical' | 'horizontal';
+type MultiMonthView = 'vertical' | 'horizontal';
 
 export interface MultiMonthConfig {
   view: MultiMonthView;
@@ -413,7 +413,7 @@ export interface GarbageDayConfig {
 }
 
 // Rain map module config
-export type RainMapStyle = 'dark' | 'standard';
+type RainMapStyle = 'dark' | 'standard';
 
 export interface RainMapConfig {
   latitude: number;

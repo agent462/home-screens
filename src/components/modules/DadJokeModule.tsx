@@ -10,7 +10,7 @@ interface DadJokeModuleProps {
 }
 
 export default function DadJokeModule({ config, style }: DadJokeModuleProps) {
-  const data = useFetchData<{ joke: string }>('/api/jokes', config.refreshIntervalMs);
+  const [data] = useFetchData<{ joke: string }>('/api/jokes', config.refreshIntervalMs);
 
   return (
     <ModuleWrapper style={style}>

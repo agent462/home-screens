@@ -12,18 +12,23 @@ export const dynamic = 'force-dynamic';
  * Both actions use a short delay so the API can respond before the process dies.
  */
 export async function POST(request: NextRequest) {
-  try { await requireSession(request); } catch (e) { if (e instanceof Response) return e; throw e; }
-  const { action } = await request.json();
+  try {
+    await requireSession(request);
+    const { action } = await request.json();
 
-  if (action === 'restart-service') {
-    return restartService();
+    if (action === 'restart-service') {
+      return restartService();
+    }
+
+    if (action === 'reboot') {
+      return rebootSystem();
+    }
+
+    return NextResponse.json({ error: 'Invalid action. Use "reboot" or "restart-service".' }, { status: 400 });
+  } catch (error) {
+    if (error instanceof Response) return error;
+    return errorResponse(error, 'Power action failed');
   }
-
-  if (action === 'reboot') {
-    return rebootSystem();
-  }
-
-  return NextResponse.json({ error: 'Invalid action. Use "reboot" or "restart-service".' }, { status: 400 });
 }
 
 function restartService(): NextResponse {

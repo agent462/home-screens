@@ -2,6 +2,7 @@
 
 import type { AirQualityConfig, ModuleStyle } from '@/types/config';
 import ModuleWrapper from './ModuleWrapper';
+import { ModuleLoadingState } from './ModuleStates';
 import { useFetchData } from '@/hooks/useFetchData';
 
 interface AirQualityModuleProps {
@@ -51,17 +52,13 @@ function getUVColor(uv: number): string {
 }
 
 export default function AirQualityModule({ config, style }: AirQualityModuleProps) {
-  const data = useFetchData<AirQualityData>(
+  const [data] = useFetchData<AirQualityData>(
     '/api/air-quality',
     config.refreshIntervalMs ?? 600000,
   );
 
   if (!data) {
-    return (
-      <ModuleWrapper style={style}>
-        <p className="text-center opacity-50">Loading air quality...</p>
-      </ModuleWrapper>
-    );
+    return <ModuleLoadingState style={style} message="Loading air quality..." />;
   }
 
   const aqiLabel = AQI_LABELS[data.aqi] ?? 'Unknown';

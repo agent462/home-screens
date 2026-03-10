@@ -1,8 +1,9 @@
 'use client';
 
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo } from 'react';
 import type { TodoistConfig, TodoistGroupBy, ModuleStyle } from '@/types/config';
 import ModuleWrapper from './ModuleWrapper';
+import { useFetchData } from '@/hooks/useFetchData';
 
 // ─── Types ───
 
@@ -744,37 +745,8 @@ function FocusView({
 
 // ─── Main Component ───
 
-// Custom fetch hook that surfaces errors instead of silently swallowing them.
-function useTodoistData(refreshMs: number) {
-  const [data, setData] = useState<TodoistData | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchData = useCallback(async () => {
-    try {
-      const res = await fetch('/api/todoist');
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error ?? `API error ${res.status}`);
-        return;
-      }
-      setData(json);
-      setError(null);
-    } catch {
-      setError('Failed to connect to Todoist');
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchData();
-    const id = setInterval(fetchData, refreshMs);
-    return () => clearInterval(id);
-  }, [refreshMs, fetchData]);
-
-  return { data, error, refetch: fetchData };
-}
-
 export default function TodoistModule({ config, style }: TodoistModuleProps) {
-  const { data, error } = useTodoistData(config.refreshIntervalMs ?? 300000);
+  const [data, error] = useFetchData<TodoistData>('/api/todoist', config.refreshIntervalMs ?? 300000);
 
   const { tasks, filteredAll, totalCount } = useMemo(() => {
     if (!data?.tasks) return { tasks: [] as TodoistTask[], filteredAll: [] as TodoistTask[], totalCount: 0 };

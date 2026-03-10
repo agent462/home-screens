@@ -1,5 +1,4 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { google } from 'googleapis';
 import { getAuthenticatedClient } from '@/lib/google-auth';
 import { requireSession } from '@/lib/auth';
@@ -8,13 +7,13 @@ import { errorResponse } from '@/lib/api-utils';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
-  try { await requireSession(request); } catch (e) { if (e instanceof Response) return e; throw e; }
-  const auth = await getAuthenticatedClient();
-  if (!auth) {
-    return NextResponse.json({ error: 'Not authenticated with Google' }, { status: 401 });
-  }
-
   try {
+    await requireSession(request);
+    const auth = await getAuthenticatedClient();
+    if (!auth) {
+      return NextResponse.json({ error: 'Not authenticated with Google' }, { status: 401 });
+    }
+
     const calendar = google.calendar({ version: 'v3', auth });
     const res = await calendar.calendarList.list();
     const items = res.data.items ?? [];
@@ -28,6 +27,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(calendars);
   } catch (error) {
+    if (error instanceof Response) return error;
     return errorResponse(error, 'Failed to list calendars');
   }
 }

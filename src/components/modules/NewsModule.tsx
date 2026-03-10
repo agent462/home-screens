@@ -2,6 +2,8 @@
 
 import type { NewsConfig, ModuleStyle } from '@/types/config';
 import ModuleWrapper from './ModuleWrapper';
+import TickerMarquee from './TickerMarquee';
+import { ModuleLoadingState, ModuleEmptyState } from './ModuleStates';
 import { useFetchData } from '@/hooks/useFetchData';
 import { useRotatingIndex } from '@/hooks/useRotatingIndex';
 
@@ -83,25 +85,15 @@ function ListView({ items, showTimestamp, showDescription }: {
 
 /** Ticker view — horizontal scrolling marquee */
 function TickerView({ items, speed }: { items: NewsItem[]; speed: number }) {
-  const duration = Math.max(1, items.length) * speed;
-
-  const headlines = items.map((item, i) => (
-    <span key={i} className="inline-flex items-center gap-3 whitespace-nowrap" style={{ fontSize: '0.9em' }}>
-      <span className="opacity-30">•</span>
-      <span>{item.title}</span>
-    </span>
-  ));
-
   return (
-    <div className="flex items-center h-full w-full overflow-hidden">
-      <div
-        className="flex w-max animate-ticker-scroll whitespace-nowrap"
-        style={{ animationDuration: `${duration}s` }}
-      >
-        <div className="flex gap-8 pr-8 shrink-0">{headlines}</div>
-        <div className="flex gap-8 pr-8 shrink-0">{headlines}</div>
-      </div>
-    </div>
+    <TickerMarquee itemCount={items.length} speed={speed} gap={8}>
+      {items.map((item, i) => (
+        <span key={i} className="inline-flex items-center gap-3 whitespace-nowrap" style={{ fontSize: '0.9em' }}>
+          <span className="opacity-30">•</span>
+          <span>{item.title}</span>
+        </span>
+      ))}
+    </TickerMarquee>
   );
 }
 
@@ -128,7 +120,7 @@ function CompactView({ items, showTimestamp }: { items: NewsItem[]; showTimestam
 }
 
 export default function NewsModule({ config, style }: NewsModuleProps) {
-  const data = useFetchData<{ items: NewsItem[] }>(
+  const [data] = useFetchData<{ items: NewsItem[] }>(
     `/api/news?feed=${encodeURIComponent(config.feedUrl)}`,
     config.refreshIntervalMs ?? 300000,
   );
@@ -138,19 +130,11 @@ export default function NewsModule({ config, style }: NewsModuleProps) {
   const items = view === 'headline' ? allItems : allItems.slice(0, maxItems);
 
   if (data === null) {
-    return (
-      <ModuleWrapper style={style}>
-        <p className="text-center opacity-50">Loading news…</p>
-      </ModuleWrapper>
-    );
+    return <ModuleLoadingState style={style} message="Loading news\u2026" />;
   }
 
   if (allItems.length === 0) {
-    return (
-      <ModuleWrapper style={style}>
-        <p className="text-center opacity-50">No headlines</p>
-      </ModuleWrapper>
-    );
+    return <ModuleEmptyState style={style} message="No headlines" />;
   }
 
   return (

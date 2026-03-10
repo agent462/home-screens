@@ -106,23 +106,6 @@ async function createOAuth2Client(requestUrl?: string) {
   return new google.auth.OAuth2(clientId, clientSecret, getRedirectUri(requestUrl));
 }
 
-export async function getAuthUrl(requestUrl?: string, state?: string): Promise<string> {
-  const client = await createOAuth2Client(requestUrl);
-  return client.generateAuthUrl({
-    access_type: 'offline',
-    prompt: 'consent',
-    scope: SCOPES,
-    ...(state ? { state } : {}),
-  });
-}
-
-export async function handleCallback(code: string, requestUrl?: string) {
-  const client = await createOAuth2Client(requestUrl);
-  const { tokens } = await client.getToken(code);
-  await writeFile(TOKENS_PATH, JSON.stringify(tokens, null, 2));
-  return tokens;
-}
-
 interface StoredTokens {
   access_token?: string | null;
   refresh_token?: string | null;

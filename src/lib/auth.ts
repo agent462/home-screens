@@ -157,11 +157,6 @@ export async function setPassword(newPassword: string): Promise<string> {
   return createSessionCookie(cookieSecret);
 }
 
-export async function changePassword(newPassword: string): Promise<string> {
-  // Regenerates cookieSecret → invalidates all existing sessions
-  return setPassword(newPassword);
-}
-
 export async function clearPassword(): Promise<void> {
   await writeAuthState(DISABLED_STATE);
 }

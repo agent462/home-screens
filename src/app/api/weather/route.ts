@@ -2,31 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createWeatherProvider } from '@/lib/weather';
 import { readConfig } from '@/lib/config';
 import { getSecret } from '@/lib/secrets';
-import { errorResponse } from '@/lib/api-utils';
+import { errorResponse, createTTLCache, getLocationFromConfig } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
 
 // Server-side cache: avoids redundant external API calls when multiple
 // modules (or page reloads) request the same provider within the TTL.
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
-const cache = new Map<string, { data: unknown; expires: number }>();
-
-function getCached(key: string): unknown | null {
-  const entry = cache.get(key);
-  if (entry && Date.now() < entry.expires) return entry.data;
-  if (entry) cache.delete(key);
-  return null;
-}
-
-function setCache(key: string, data: unknown) {
-  if (cache.size > 20) {
-    const now = Date.now();
-    for (const [k, v] of cache) {
-      if (now >= v.expires) cache.delete(k);
-    }
-  }
-  cache.set(key, { data, expires: Date.now() + CACHE_TTL_MS });
-}
+const cache = createTTLCache<unknown>(5 * 60 * 1000); // 5 minutes
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -42,19 +24,20 @@ export async function GET(request: NextRequest) {
   const ws = config?.settings?.weather;
 
   const provider = searchParams.get('provider') ?? ws?.provider ?? 'openweathermap';
-  const lat = searchParams.get('lat') ?? ws?.latitude?.toString();
-  const lon = searchParams.get('lon') ?? ws?.longitude?.toString();
+  const location = await getLocationFromConfig(searchParams, config);
   const units = searchParams.get('units') ?? ws?.units ?? 'imperial';
 
-  if (!lat || !lon) {
+  if (!location) {
     return NextResponse.json(
       { error: 'Missing required query params: lat, lon' },
       { status: 400 },
     );
   }
 
+  const { lat, lon } = location;
+
   const cacheKey = `${provider}:${lat}:${lon}:${units}:${type}`;
-  const cached = getCached(cacheKey);
+  const cached = cache.get(cacheKey);
   if (cached) {
     return NextResponse.json(cached);
   }
@@ -92,7 +75,7 @@ export async function GET(request: NextRequest) {
       result.alerts = await weatherProvider.getAlerts(Number(lat), Number(lon), units);
     }
 
-    setCache(cacheKey, result);
+    cache.set(cacheKey, result);
     return NextResponse.json(result);
   } catch (error) {
     return errorResponse(error, 'Failed to fetch weather');

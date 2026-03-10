@@ -264,9 +264,7 @@ registerModule({
   label: 'Word of the Day',
   icon: BookOpen,
   category: 'Knowledge & Fun',
-  defaultConfig: {
-    refreshIntervalMs: 86400000,
-  },
+  defaultConfig: {},
   defaultSize: DEFAULT_MODULE_SIZES['word-of-day'],
 });
 

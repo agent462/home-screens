@@ -32,7 +32,7 @@ export async function GET() {
 
     const res = await fetch('https://api.rainviewer.com/public/weather-maps.json');
     if (!res.ok) {
-      throw new Error(`RainViewer API returned ${res.status}`);
+      return NextResponse.json({ error: `RainViewer API returned ${res.status}` }, { status: 502 });
     }
 
     const data: RainViewerResponse = await res.json();

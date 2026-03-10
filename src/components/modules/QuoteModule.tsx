@@ -10,7 +10,7 @@ interface QuoteModuleProps {
 }
 
 export default function QuoteModule({ config, style }: QuoteModuleProps) {
-  const data = useFetchData<{ quote: string; author: string }>('/api/quote', config.refreshIntervalMs ?? 300000);
+  const [data] = useFetchData<{ quote: string; author: string }>('/api/quote', config.refreshIntervalMs ?? 300000);
 
   return (
     <ModuleWrapper style={style}>

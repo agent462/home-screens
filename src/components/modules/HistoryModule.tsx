@@ -16,7 +16,7 @@ interface HistoryEvent {
 }
 
 export default function HistoryModule({ config, style }: HistoryModuleProps) {
-  const data = useFetchData<{ events: HistoryEvent[] }>('/api/history', config.refreshIntervalMs ?? 86400000);
+  const [data] = useFetchData<{ events: HistoryEvent[] }>('/api/history', config.refreshIntervalMs ?? 86400000);
   const events = data?.events ?? [];
 
   const rotationMs = config.rotationIntervalMs ?? 10000;

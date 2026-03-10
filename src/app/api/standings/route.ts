@@ -1,25 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { errorResponse, createTTLCache } from '@/lib/api-utils';
+import { LEAGUE_MAP } from '@/lib/espn';
 
 export const dynamic = 'force-dynamic';
 
 const cache = createTTLCache<unknown>(300_000); // 5 minute cache
 const colorCache = createTTLCache<Map<string, string>>(3600_000); // 1 hour for colors
-
-const LEAGUE_MAP: Record<string, string> = {
-  nfl: 'football/nfl',
-  nba: 'basketball/nba',
-  wnba: 'basketball/wnba',
-  mlb: 'baseball/mlb',
-  nhl: 'hockey/nhl',
-  mls: 'soccer/usa.1',
-  epl: 'soccer/eng.1',
-  laliga: 'soccer/esp.1',
-  bundesliga: 'soccer/ger.1',
-  seriea: 'soccer/ita.1',
-  ligue1: 'soccer/fra.1',
-  liga_mx: 'soccer/mex.1',
-};
 
 // Static division mappings for leagues where ESPN doesn't provide division-level data
 const DIVISION_MAP: Record<string, Record<string, string[]>> = {
@@ -102,6 +88,23 @@ function getStatNum(stats: Record<string, unknown>[], name: string): number | un
   if (stat?.value !== undefined) return Number(stat.value);
   if (stat?.displayValue !== undefined) return Number(stat.displayValue);
   return undefined;
+}
+
+/** Sort raw standings entries by playoffSeed, then points (desc), then wins (desc) */
+function sortStandingsEntries(entries: Record<string, unknown>[]): Record<string, unknown>[] {
+  return [...entries].sort((a, b) => {
+    const statsA = (a.stats as Record<string, unknown>[]) ?? [];
+    const statsB = (b.stats as Record<string, unknown>[]) ?? [];
+    const seedA = getStatNum(statsA, 'playoffSeed') ?? 999;
+    const seedB = getStatNum(statsB, 'playoffSeed') ?? 999;
+    if (seedA !== seedB) return seedA - seedB;
+    const ptsA = getStatNum(statsA, 'points') ?? 0;
+    const ptsB = getStatNum(statsB, 'points') ?? 0;
+    if (ptsA !== ptsB) return ptsB - ptsA;
+    const winsA = getStatNum(statsA, 'wins') ?? 0;
+    const winsB = getStatNum(statsB, 'wins') ?? 0;
+    return winsB - winsA;
+  });
 }
 
 function parseEntry(
@@ -191,19 +194,7 @@ function parseStandings(data: Record<string, unknown>, league: string): ParsedGr
     const standings = data.standings as Record<string, unknown> | undefined;
     const entries = (standings?.entries as Record<string, unknown>[]) ?? [];
     if (entries.length > 0) {
-      const sorted = [...entries].sort((a, b) => {
-        const statsA = (a.stats as Record<string, unknown>[]) ?? [];
-        const statsB = (b.stats as Record<string, unknown>[]) ?? [];
-        const seedA = getStatNum(statsA, 'playoffSeed') ?? 999;
-        const seedB = getStatNum(statsB, 'playoffSeed') ?? 999;
-        if (seedA !== seedB) return seedA - seedB;
-        const ptsA = getStatNum(statsA, 'points') ?? 0;
-        const ptsB = getStatNum(statsB, 'points') ?? 0;
-        if (ptsA !== ptsB) return ptsB - ptsA;
-        const winsA = getStatNum(statsA, 'wins') ?? 0;
-        const winsB = getStatNum(statsB, 'wins') ?? 0;
-        return winsB - winsA;
-      });
+      const sorted = sortStandingsEntries(entries);
       groups.push({
         name: (data.name as string) ?? leagueUpper,
         league: leagueUpper,
@@ -224,19 +215,7 @@ function parseStandings(data: Record<string, unknown>, league: string): ParsedGr
         const divName = (div.name as string) ?? 'Division';
         const standings = div.standings as Record<string, unknown> | undefined;
         const entries = (standings?.entries as Record<string, unknown>[]) ?? [];
-        const sorted = [...entries].sort((a, b) => {
-          const statsA = (a.stats as Record<string, unknown>[]) ?? [];
-          const statsB = (b.stats as Record<string, unknown>[]) ?? [];
-          const seedA = getStatNum(statsA, 'playoffSeed') ?? 999;
-          const seedB = getStatNum(statsB, 'playoffSeed') ?? 999;
-          if (seedA !== seedB) return seedA - seedB;
-          const ptsA = getStatNum(statsA, 'points') ?? 0;
-          const ptsB = getStatNum(statsB, 'points') ?? 0;
-          if (ptsA !== ptsB) return ptsB - ptsA;
-          const winsA = getStatNum(statsA, 'wins') ?? 0;
-          const winsB = getStatNum(statsB, 'wins') ?? 0;
-          return winsB - winsA;
-        });
+        const sorted = sortStandingsEntries(entries);
         groups.push({
           name: divName,
           league: leagueUpper,
@@ -247,19 +226,7 @@ function parseStandings(data: Record<string, unknown>, league: string): ParsedGr
       // Conference level only
       const standings = conf.standings as Record<string, unknown> | undefined;
       const entries = (standings?.entries as Record<string, unknown>[]) ?? [];
-      const sorted = [...entries].sort((a, b) => {
-        const statsA = (a.stats as Record<string, unknown>[]) ?? [];
-        const statsB = (b.stats as Record<string, unknown>[]) ?? [];
-        const seedA = getStatNum(statsA, 'playoffSeed') ?? 999;
-        const seedB = getStatNum(statsB, 'playoffSeed') ?? 999;
-        if (seedA !== seedB) return seedA - seedB;
-        const ptsA = getStatNum(statsA, 'points') ?? 0;
-        const ptsB = getStatNum(statsB, 'points') ?? 0;
-        if (ptsA !== ptsB) return ptsB - ptsA;
-        const winsA = getStatNum(statsA, 'wins') ?? 0;
-        const winsB = getStatNum(statsB, 'wins') ?? 0;
-        return winsB - winsA;
-      });
+      const sorted = sortStandingsEntries(entries);
       groups.push({
         name: confName,
         league: leagueUpper,
@@ -313,7 +280,12 @@ export async function GET(request: NextRequest) {
 
     const url = `https://site.api.espn.com/apis/v2/sports/${path}/standings`;
     const res = await fetch(url);
-    if (!res.ok) throw new Error(`Failed to fetch ${league} standings: ${res.status}`);
+    if (!res.ok) {
+      return NextResponse.json(
+        { error: `Failed to fetch ${league} standings: ${res.status}` },
+        { status: 502 },
+      );
+    }
 
     const [data, teamColors] = await Promise.all([
       res.json(),

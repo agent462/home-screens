@@ -31,7 +31,7 @@ export default function CalendarSection({ values, onChange }: Props) {
   const [googleCalendars, setGoogleCalendars] = useState<GoogleCalendar[]>([]);
   const [googleLoading, setGoogleLoading] = useState(true);
 
-  const [deviceCode, setDeviceCode] = useState<string | null>(null);
+  const [, setDeviceCode] = useState<string | null>(null);
   const [userCode, setUserCode] = useState<string | null>(null);
   const [verificationUrl, setVerificationUrl] = useState<string | null>(null);
   const [deviceFlowError, setDeviceFlowError] = useState<string | null>(null);

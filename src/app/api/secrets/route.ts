@@ -1,5 +1,4 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getSecretStatus, setSecret, deleteSecret, isValidSecretKey } from '@/lib/secrets';
 import { requireSession } from '@/lib/auth';
 import { errorResponse } from '@/lib/api-utils';

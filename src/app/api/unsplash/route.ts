@@ -10,22 +10,22 @@ export const dynamic = 'force-dynamic';
 const BGS = path.join(process.cwd(), BACKGROUNDS_DIR);
 
 export async function GET(request: NextRequest) {
-  try { await requireSession(request); } catch (e) { if (e instanceof Response) return e; throw e; }
-  const accessKey = await getUnsplashAccessKey();
-  if (!accessKey) {
-    return NextResponse.json(
-      { error: 'Unsplash API key not configured. Add it in Settings.' },
-      { status: 400 },
-    );
-  }
-
-  const { searchParams } = request.nextUrl;
-  const query = searchParams.get('query') || 'nature landscape';
-  const page = searchParams.get('page') || '1';
-  const perPage = searchParams.get('per_page') || '20';
-  const orientation = searchParams.get('orientation') || 'portrait';
-
   try {
+    await requireSession(request);
+    const accessKey = await getUnsplashAccessKey();
+    if (!accessKey) {
+      return NextResponse.json(
+        { error: 'Unsplash API key not configured. Add it in Settings.' },
+        { status: 400 },
+      );
+    }
+
+    const { searchParams } = request.nextUrl;
+    const query = searchParams.get('query') || 'nature landscape';
+    const page = searchParams.get('page') || '1';
+    const perPage = searchParams.get('per_page') || '20';
+    const orientation = searchParams.get('orientation') || 'portrait';
+
     const url = `${UNSPLASH_API}/search/photos?query=${encodeURIComponent(query)}&page=${page}&per_page=${perPage}&orientation=${orientation}`;
     const res = await fetch(url, {
       headers: { Authorization: `Client-ID ${accessKey}` },
@@ -64,32 +64,33 @@ export async function GET(request: NextRequest) {
       total: data.total ?? 0,
     });
   } catch (error) {
+    if (error instanceof Response) return error;
     return errorResponse(error, 'Failed to search Unsplash');
   }
 }
 
 // POST to download an image and save it locally as a background
 export async function POST(request: NextRequest) {
-  try { await requireSession(request); } catch (e) { if (e instanceof Response) return e; throw e; }
-  const accessKey = await getUnsplashAccessKey();
-
-  const body = await request.json();
-  const { imageUrl, downloadUrl, filename } = body as {
-    imageUrl?: string;
-    downloadUrl?: string;
-    filename?: string;
-  };
-
-  if (!imageUrl) {
-    return NextResponse.json({ error: 'Missing imageUrl' }, { status: 400 });
-  }
-
-  // Trigger Unsplash download tracking (required by their API guidelines)
-  if (downloadUrl && accessKey) {
-    trackDownload(downloadUrl, accessKey);
-  }
-
   try {
+    await requireSession(request);
+    const accessKey = await getUnsplashAccessKey();
+
+    const body = await request.json();
+    const { imageUrl, downloadUrl, filename } = body as {
+      imageUrl?: string;
+      downloadUrl?: string;
+      filename?: string;
+    };
+
+    if (!imageUrl) {
+      return NextResponse.json({ error: 'Missing imageUrl' }, { status: 400 });
+    }
+
+    // Trigger Unsplash download tracking (required by their API guidelines)
+    if (downloadUrl && accessKey) {
+      trackDownload(downloadUrl, accessKey);
+    }
+
     // Download the image
     const res = await fetch(imageUrl);
     if (!res.ok) throw new Error(`Failed to fetch image: ${res.status}`);
@@ -106,6 +107,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ path: `/api/backgrounds/serve?file=${encodeURIComponent(safeName)}` }, { status: 201 });
   } catch (error) {
+    if (error instanceof Response) return error;
     return errorResponse(error, 'Failed to download image');
   }
 }

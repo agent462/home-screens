@@ -224,12 +224,137 @@ async function runPipeline(steps: PipelineStep[]): Promise<void> {
   }
 }
 
-export async function runUpgrade(targetTag: string): Promise<void> {
+// ─── Step Factories ───
+// Reusable builders for common pipeline steps. Each returns a PipelineStep with
+// the shared logic baked in; callers only supply progress/message overrides.
+
+function installStep(progress: number, message = 'Installing dependencies...'): PipelineStep {
+  return {
+    step: 'install',
+    progress,
+    message,
+    run: async () => {
+      await runUpgradeScript('install', [], streamTo('install'));
+    },
+  };
+}
+
+function buildStep(progress: number, message = 'Building application...'): PipelineStep {
+  return {
+    step: 'build',
+    progress,
+    message,
+    run: async () => {
+      await runUpgradeScript('build', [], streamTo('build'));
+    },
+  };
+}
+
+function migrateStep(progress: number, extraEmit = false): PipelineStep {
+  return {
+    step: 'migrate',
+    progress,
+    message: 'Migrating configuration...',
+    run: async () => {
+      const config = await readConfig();
+      const targetSchemaVersion = getLatestSchemaVersion();
+      if ((config.version ?? 0) < targetSchemaVersion) {
+        const { config: migrated, migrationsRun } = migrateUp(config, targetSchemaVersion);
+        await writeConfig(migrated);
+        emitOutput('migrate', `Ran ${migrationsRun.length} migration(s): ${migrationsRun.join(', ')}`);
+        if (extraEmit) {
+          emit({
+            step: 'migrate',
+            progress: progress + 5,
+            message: `Ran ${migrationsRun.length} migration(s): ${migrationsRun.join(', ')}`,
+          });
+        }
+      } else {
+        emitOutput('migrate', 'Schema is up to date — no migration needed');
+        if (extraEmit) {
+          emit({ step: 'migrate', progress: progress + 5, message: 'No config migration needed' });
+        }
+      }
+    },
+  };
+}
+
+function setupSystemStep(progress: number): PipelineStep {
+  return {
+    step: 'setup-system',
+    progress,
+    message: 'Applying system configuration...',
+    run: async () => {
+      await runUpgradeScript('setup-system', [], streamTo('setup-system'));
+      // Clear marker before restart — the build has provably succeeded at this point,
+      // and the restart step may kill the process before 'complete' runs
+      await clearBuildPending();
+    },
+  };
+}
+
+function restartStep(progress: number): PipelineStep {
+  return {
+    step: 'restart',
+    progress,
+    message: 'Restarting service...',
+    run: async () => {
+      const restartOut = await runUpgradeScript('restart', [], streamTo('restart'));
+      const restart = parseResult(restartOut);
+      if (restart.method === 'systemctl') {
+        // The delayed nohup restart kills this process ~3s from now, so we
+        // cannot run a meaningful health check here (it would just verify the
+        // OLD server that's still alive). The client polls for the new server.
+        emit({ step: 'health-check', progress: 95, message: 'Server will restart momentarily...' });
+        emitOutput('health-check', 'Server restart scheduled — client will reconnect automatically');
+      }
+    },
+  };
+}
+
+function completeStep(message: string): PipelineStep {
+  return {
+    step: 'complete',
+    progress: 100,
+    message,
+    run: async () => {},
+  };
+}
+
+// ─── Pipeline Guard ───
+// Shared try/catch/finally wrapper for pipeline execution. Handles the running
+// guard, error emission, optional error-phase cleanup, and the finally block.
+
+interface GuardedPipelineOptions {
+  steps: PipelineStep[];
+  onError?: () => Promise<void>;
+}
+
+async function runGuardedPipeline({ steps, onError }: GuardedPipelineOptions): Promise<void> {
   if (currentUpgrade.running) {
     throw new Error('An upgrade is already in progress');
   }
-
   currentUpgrade.running = true;
+
+  try {
+    await runPipeline(steps);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    emit({ step: 'error', progress: 0, message, error: message });
+
+    if (onError) {
+      await onError();
+    }
+
+    throw error;
+  } finally {
+    currentUpgrade.running = false;
+  }
+}
+
+// ─── Public Pipeline Functions ───
+
+export async function runUpgrade(targetTag: string): Promise<void> {
   let stashed = false;
 
   // Shared state across steps
@@ -294,44 +419,9 @@ export async function runUpgrade(targetTag: string): Promise<void> {
         await writeBuildPending(targetTag);
       },
     },
-    {
-      step: 'install',
-      progress: 40,
-      message: 'Installing dependencies...',
-      run: async () => {
-        await runUpgradeScript('install', [], streamTo('install'));
-      },
-    },
-    {
-      step: 'build',
-      progress: 55,
-      message: 'Building application (this may take a few minutes)...',
-      run: async () => {
-        await runUpgradeScript('build', [], streamTo('build'));
-      },
-    },
-    {
-      step: 'migrate',
-      progress: 80,
-      message: 'Migrating configuration...',
-      run: async () => {
-        const config = await readConfig();
-        const targetSchemaVersion = getLatestSchemaVersion();
-        if ((config.version ?? 0) < targetSchemaVersion) {
-          const { config: migrated, migrationsRun } = migrateUp(config, targetSchemaVersion);
-          await writeConfig(migrated);
-          emitOutput('migrate', `Ran ${migrationsRun.length} migration(s): ${migrationsRun.join(', ')}`);
-          emit({
-            step: 'migrate',
-            progress: 85,
-            message: `Ran ${migrationsRun.length} migration(s): ${migrationsRun.join(', ')}`,
-          });
-        } else {
-          emitOutput('migrate', 'Schema is up to date — no migration needed');
-          emit({ step: 'migrate', progress: 85, message: 'No config migration needed' });
-        }
-      },
-    },
+    installStep(40),
+    buildStep(55, 'Building application (this may take a few minutes)...'),
+    migrateStep(80, true),
     {
       step: 'cleanup',
       progress: 85,
@@ -341,77 +431,35 @@ export async function runUpgrade(targetTag: string): Promise<void> {
         await runUpgradeScript('stash-pop', [], streamTo('cleanup'));
       },
     },
-    {
-      step: 'setup-system',
-      progress: 88,
-      message: 'Applying system configuration...',
-      run: async () => {
-        await runUpgradeScript('setup-system', [], streamTo('setup-system'));
-        // Clear marker before restart — the build has provably succeeded at this point,
-        // and the restart step may kill the process before 'complete' runs
-        await clearBuildPending();
-      },
-    },
-    {
-      step: 'restart',
-      progress: 92,
-      message: 'Restarting service...',
-      run: async () => {
-        const restartOut = await runUpgradeScript('restart', [], streamTo('restart'));
-        const restart = parseResult(restartOut);
-        if (restart.method === 'systemctl') {
-          // The delayed nohup restart kills this process ~3s from now, so we
-          // cannot run a meaningful health check here (it would just verify the
-          // OLD server that's still alive). The client polls for the new server.
-          emit({ step: 'health-check', progress: 95, message: 'Server will restart momentarily...' });
-          emitOutput('health-check', 'Server restart scheduled — client will reconnect automatically');
-        }
-      },
-    },
-    {
-      step: 'complete',
-      progress: 100,
-      message: `Upgrade to ${targetTag} complete!`,
-      run: async () => {},
-    },
+    setupSystemStep(88),
+    restartStep(92),
+    completeStep(`Upgrade to ${targetTag} complete!`),
   ];
 
-  try {
-    await runPipeline(steps);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    emit({ step: 'error', progress: 0, message, error: message });
-
-    // Attempt to pop stash even on error
-    if (stashed) {
-      try {
-        await runUpgradeScript('stash-pop');
-      } catch (stashErr) {
-        const stashMsg = stashErr instanceof Error ? stashErr.message : String(stashErr);
-        emitOutput(
-          currentUpgrade.progress.step,
-          `Warning: failed to restore stashed changes: ${stashMsg}`,
-        );
-        emitOutput(
-          currentUpgrade.progress.step,
-          'Your local changes are saved in git stash. Run "git stash pop" manually to recover them.',
-        );
+  await runGuardedPipeline({
+    steps,
+    onError: async () => {
+      // Attempt to pop stash even on error
+      if (stashed) {
+        try {
+          await runUpgradeScript('stash-pop');
+        } catch (stashErr) {
+          const stashMsg = stashErr instanceof Error ? stashErr.message : String(stashErr);
+          emitOutput(
+            currentUpgrade.progress.step,
+            `Warning: failed to restore stashed changes: ${stashMsg}`,
+          );
+          emitOutput(
+            currentUpgrade.progress.step,
+            'Your local changes are saved in git stash. Run "git stash pop" manually to recover them.',
+          );
+        }
       }
-    }
-
-    throw error;
-  } finally {
-    currentUpgrade.running = false;
-  }
+    },
+  });
 }
 
 export async function runRollback(targetTag: string): Promise<void> {
-  if (currentUpgrade.running) {
-    throw new Error('An upgrade is already in progress');
-  }
-
-  currentUpgrade.running = true;
-
   const steps: PipelineStep[] = [
     {
       step: 'backup',
@@ -430,148 +478,30 @@ export async function runRollback(targetTag: string): Promise<void> {
         await writeBuildPending(targetTag);
       },
     },
-    {
-      step: 'install',
-      progress: 45,
-      message: 'Installing dependencies...',
-      run: async () => {
-        await runUpgradeScript('install', [], streamTo('install'));
-      },
-    },
-    {
-      step: 'build',
-      progress: 60,
-      message: 'Building application...',
-      run: async () => {
-        await runUpgradeScript('build', [], streamTo('build'));
-      },
-    },
-    {
-      step: 'setup-system',
-      progress: 78,
-      message: 'Applying system configuration...',
-      run: async () => {
-        await runUpgradeScript('setup-system', [], streamTo('setup-system'));
-        await clearBuildPending();
-      },
-    },
-    {
-      step: 'restart',
-      progress: 85,
-      message: 'Restarting service...',
-      run: async () => {
-        const restartOut = await runUpgradeScript('restart', [], streamTo('restart'));
-        const restart = parseResult(restartOut);
-        if (restart.method === 'systemctl') {
-          emit({ step: 'health-check', progress: 95, message: 'Server will restart momentarily...' });
-          emitOutput('health-check', 'Server restart scheduled — client will reconnect automatically');
-        }
-      },
-    },
-    {
-      step: 'complete',
-      progress: 100,
-      message: `Rolled back to ${targetTag} successfully!`,
-      run: async () => {},
-    },
+    installStep(45),
+    buildStep(60),
+    setupSystemStep(78),
+    restartStep(85),
+    completeStep(`Rolled back to ${targetTag} successfully!`),
   ];
 
-  try {
-    await runPipeline(steps);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    emit({ step: 'error', progress: 0, message, error: message });
-    throw error;
-  } finally {
-    currentUpgrade.running = false;
-  }
+  await runGuardedPipeline({ steps });
 }
 
 export async function runRebuild(): Promise<void> {
-  if (currentUpgrade.running) {
-    throw new Error('An upgrade is already in progress');
-  }
-
-  currentUpgrade.running = true;
-
   const pendingTag = await getBuildPendingTag();
   if (!pendingTag) {
-    currentUpgrade.running = false;
     throw new Error('No pending build found');
   }
 
   const steps: PipelineStep[] = [
-    {
-      step: 'install',
-      progress: 10,
-      message: 'Verifying dependencies...',
-      run: async () => {
-        await runUpgradeScript('install', [], streamTo('install'));
-      },
-    },
-    {
-      step: 'build',
-      progress: 30,
-      message: 'Building application (this may take a few minutes)...',
-      run: async () => {
-        await runUpgradeScript('build', [], streamTo('build'));
-      },
-    },
-    {
-      step: 'migrate',
-      progress: 70,
-      message: 'Migrating configuration...',
-      run: async () => {
-        const config = await readConfig();
-        const targetSchemaVersion = getLatestSchemaVersion();
-        if ((config.version ?? 0) < targetSchemaVersion) {
-          const { config: migrated, migrationsRun } = migrateUp(config, targetSchemaVersion);
-          await writeConfig(migrated);
-          emitOutput('migrate', `Ran ${migrationsRun.length} migration(s): ${migrationsRun.join(', ')}`);
-        } else {
-          emitOutput('migrate', 'Schema is up to date — no migration needed');
-        }
-      },
-    },
-    {
-      step: 'setup-system',
-      progress: 80,
-      message: 'Applying system configuration...',
-      run: async () => {
-        await runUpgradeScript('setup-system', [], streamTo('setup-system'));
-        // Clear marker before restart — the build has provably succeeded at this point,
-        // and the restart step may kill the process before 'complete' runs
-        await clearBuildPending();
-      },
-    },
-    {
-      step: 'restart',
-      progress: 90,
-      message: 'Restarting service...',
-      run: async () => {
-        const restartOut = await runUpgradeScript('restart', [], streamTo('restart'));
-        const restart = parseResult(restartOut);
-        if (restart.method === 'systemctl') {
-          emit({ step: 'health-check', progress: 95, message: 'Server will restart momentarily...' });
-          emitOutput('health-check', 'Server restart scheduled — client will reconnect automatically');
-        }
-      },
-    },
-    {
-      step: 'complete',
-      progress: 100,
-      message: `Rebuild for ${pendingTag} complete!`,
-      run: async () => {},
-    },
+    installStep(10, 'Verifying dependencies...'),
+    buildStep(30, 'Building application (this may take a few minutes)...'),
+    migrateStep(70),
+    setupSystemStep(80),
+    restartStep(90),
+    completeStep(`Rebuild for ${pendingTag} complete!`),
   ];
 
-  try {
-    await runPipeline(steps);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    emit({ step: 'error', progress: 0, message, error: message });
-    throw error;
-  } finally {
-    currentUpgrade.running = false;
-  }
+  await runGuardedPipeline({ steps });
 }

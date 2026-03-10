@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import type { RainMapConfig, ModuleStyle } from '@/types/config';
 import ModuleWrapper from './ModuleWrapper';
+import { ModuleLoadingState, ModuleEmptyState } from './ModuleStates';
 import { useFetchData } from '@/hooks/useFetchData';
 
 interface RainMapModuleProps {
@@ -75,7 +76,7 @@ export default function RainMapModule({
   const colorScheme = config.colorScheme ?? 2;
   const refreshMs = config.refreshIntervalMs ?? 600000;
 
-  const data = useFetchData<RainViewerData>('/api/rain-map', refreshMs);
+  const [data] = useFetchData<RainViewerData>('/api/rain-map', refreshMs);
 
   const [displayIndex, setDisplayIndex] = useState(0);
   const [imagesReady, setImagesReady] = useState(false);
@@ -222,19 +223,11 @@ export default function RainMapModule({
   }, [frames, imagesReady, animationSpeedMs, extraDelayLastFrameMs]);
 
   if (!data) {
-    return (
-      <ModuleWrapper style={style}>
-        <p className="text-center opacity-50">Loading rain map...</p>
-      </ModuleWrapper>
-    );
+    return <ModuleLoadingState style={style} message="Loading rain map..." />;
   }
 
   if (!frames.length) {
-    return (
-      <ModuleWrapper style={style}>
-        <p className="text-center opacity-50">No radar data available</p>
-      </ModuleWrapper>
-    );
+    return <ModuleEmptyState style={style} message="No radar data available" />;
   }
 
   const currentFrame = frames[displayIndex];

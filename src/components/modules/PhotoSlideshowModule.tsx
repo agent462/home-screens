@@ -15,7 +15,7 @@ export default function PhotoSlideshowModule({ config, style }: PhotoSlideshowMo
   const url = config.directory
     ? `/api/backgrounds?directory=${encodeURIComponent(config.directory)}`
     : '/api/backgrounds';
-  const data = useFetchData<string[]>(url, 600000);
+  const [data] = useFetchData<string[]>(url, 600000);
   const files = data ?? [];
   const intervalMs = config.intervalMs ?? 30000;
   const index = useRotatingIndex(files.length, intervalMs);

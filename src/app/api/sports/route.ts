@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { errorResponse, createTTLCache } from '@/lib/api-utils';
+import { LEAGUE_MAP } from '@/lib/espn';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,15 +28,6 @@ interface GameResult {
 }
 
 const cache = createTTLCache<unknown>(60_000);
-
-const LEAGUE_MAP: Record<string, string> = {
-  nfl: 'football/nfl',
-  nba: 'basketball/nba',
-  mlb: 'baseball/mlb',
-  nhl: 'hockey/nhl',
-  mls: 'soccer/usa.1',
-  epl: 'soccer/eng.1',
-};
 
 async function fetchLeague(league: string): Promise<GameResult[]> {
   const path = LEAGUE_MAP[league.toLowerCase()];

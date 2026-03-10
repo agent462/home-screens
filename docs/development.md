@@ -205,7 +205,7 @@ src/app/api/my-data/route.ts
 Then fetch it in your component using the `useFetchData` hook:
 
 ```tsx
-const { data } = useFetchData('/api/my-data?param=value', 60000)
+const [data] = useFetchData('/api/my-data?param=value', 60000)
 ```
 
 ## Custom Hooks

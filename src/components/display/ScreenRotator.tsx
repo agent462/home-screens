@@ -155,9 +155,9 @@ function useSharedDisplayData(screens: Screen[], settings: GlobalSettings): Shar
   const owmUrl = needsOWM ? `/api/weather?${baseParams}&provider=openweathermap` : '';
   const wapiUrl = needsWAPI ? `/api/weather?${baseParams}&provider=weatherapi` : '';
   const pirateUrl = needsPirate ? `/api/weather?${baseParams}&provider=pirateweather` : '';
-  const owmData = useFetchData(owmUrl, WEATHER_REFRESH_MS);
-  const wapiData = useFetchData(wapiUrl, WEATHER_REFRESH_MS);
-  const pirateData = useFetchData(pirateUrl, WEATHER_REFRESH_MS);
+  const [owmData] = useFetchData(owmUrl, WEATHER_REFRESH_MS);
+  const [wapiData] = useFetchData(wapiUrl, WEATHER_REFRESH_MS);
+  const [pirateData] = useFetchData(pirateUrl, WEATHER_REFRESH_MS);
 
   const calendarIdList = settings.calendar.googleCalendarIds?.length
     ? settings.calendar.googleCalendarIds
@@ -165,7 +165,7 @@ function useSharedDisplayData(screens: Screen[], settings: GlobalSettings): Shar
   const calendarUrl = calendarIdList.length
     ? `/api/calendar?calendarIds=${encodeURIComponent(calendarIdList.join(','))}`
     : '';
-  const calendarData = useFetchData(calendarUrl, CALENDAR_REFRESH_MS);
+  const [calendarData] = useFetchData(calendarUrl, CALENDAR_REFRESH_MS);
 
   return { owmData, wapiData, pirateData, calendarData };
 }
@@ -174,7 +174,7 @@ export default function ScreenRotator({ screens: initialScreens, settings: initi
   const { screens, settings } = useLiveConfig(initialScreens, initialSettings);
   const [currentIndex, setCurrentIndex] = useState(0);
   const rotatingBackgrounds = useBackgroundRotation(screens);
-  const { displayState, dimOpacity } = useSleepManager(settings.sleep, settings.screensaver);
+  const { displayState, dimOpacity } = useSleepManager(settings.sleep);
   const sharedData = useSharedDisplayData(screens, settings);
 
   const advance = useCallback(() => {

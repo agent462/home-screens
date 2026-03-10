@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { SleepSettings, ScreensaverSettings } from '@/types/config';
+import type { SleepSettings } from '@/types/config';
 
 export type DisplayState = 'active' | 'dimmed' | 'asleep';
 
@@ -35,7 +35,6 @@ interface UseSleepManagerResult {
 
 export function useSleepManager(
   sleep?: SleepSettings,
-  screensaver?: ScreensaverSettings,
 ): UseSleepManagerResult {
   const [displayState, setDisplayState] = useState<DisplayState>('active');
   const lastActivityRef = useRef(Date.now());

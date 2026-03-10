@@ -4,7 +4,7 @@ import { parseItems } from '@/lib/rss';
 
 vi.mock('@/lib/rss', () => ({
   parseItems: vi.fn(() => [
-    { title: 'Test Article', link: 'https://test.com/article', pubDate: '2026-03-08' },
+    { title: 'Test Article', link: 'https://test.com/article', pubDate: '2026-03-08', description: '' },
   ]),
 }));
 
@@ -17,7 +17,7 @@ beforeEach(() => {
   vi.restoreAllMocks();
   // Re-apply the default parseItems return after restoreAllMocks clears it
   mockParseItems.mockReturnValue([
-    { title: 'Test Article', link: 'https://test.com/article', pubDate: '2026-03-08' },
+    { title: 'Test Article', link: 'https://test.com/article', pubDate: '2026-03-08', description: '' },
   ]);
 });
 
@@ -32,7 +32,7 @@ describe('GET /api/news', () => {
 
     expect(res.status).toBe(200);
     expect(json).toEqual({
-      items: [{ title: 'Test Article', link: 'https://test.com/article', pubDate: '2026-03-08' }],
+      items: [{ title: 'Test Article', link: 'https://test.com/article', pubDate: '2026-03-08', description: '' }],
     });
     expect(global.fetch).toHaveBeenCalledWith('https://example.com/rss');
     expect(mockParseItems).toHaveBeenCalledWith(xml);
@@ -108,8 +108,8 @@ describe('GET /api/news', () => {
 
   it('returns whatever parseItems produces without modification', async () => {
     const customItems = [
-      { title: 'A', link: 'https://a.com', pubDate: 'Mon' },
-      { title: 'B', link: 'https://b.com', pubDate: 'Tue' },
+      { title: 'A', link: 'https://a.com', pubDate: 'Mon', description: 'Desc A' },
+      { title: 'B', link: 'https://b.com', pubDate: 'Tue', description: 'Desc B' },
     ];
     mockParseItems.mockReturnValue(customItems);
     global.fetch = vi.fn().mockResolvedValue({ ok: true, text: async () => '<xml/>' });

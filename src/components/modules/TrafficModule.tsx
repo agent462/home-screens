@@ -34,7 +34,7 @@ export default function TrafficModule({ config, style }: TrafficModuleProps) {
       ? `/api/traffic?routes=${encodeURIComponent(JSON.stringify(routes))}`
       : '';
 
-  const data = useFetchData<TrafficData>(url, config.refreshIntervalMs ?? 300000);
+  const [data] = useFetchData<TrafficData>(url, config.refreshIntervalMs ?? 300000);
 
   return (
     <ModuleWrapper style={style}>
