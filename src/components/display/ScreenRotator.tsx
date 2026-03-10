@@ -135,10 +135,11 @@ function useSharedDisplayData(screens: Screen[], settings: GlobalSettings): Shar
   const baseParams = `lat=${lat}&lon=${lon}&units=${settings.weather.units}`;
 
   // Determine which weather providers are needed across ALL screens
-  const { needsOWM, needsWAPI, needsPirate } = useMemo(() => {
+  const { needsOWM, needsWAPI, needsPirate, needsNOAA } = useMemo(() => {
     let owm = false;
     let wapi = false;
     let pirate = false;
+    let noaa = false;
     for (const screen of screens) {
       for (const mod of screen.modules) {
         if (mod.type === 'weather') {
@@ -146,18 +147,21 @@ function useSharedDisplayData(screens: Screen[], settings: GlobalSettings): Shar
           if (p === 'openweathermap') owm = true;
           if (p === 'weatherapi') wapi = true;
           if (p === 'pirateweather') pirate = true;
+          if (p === 'noaa') noaa = true;
         }
       }
     }
-    return { needsOWM: owm, needsWAPI: wapi, needsPirate: pirate };
+    return { needsOWM: owm, needsWAPI: wapi, needsPirate: pirate, needsNOAA: noaa };
   }, [screens, globalProvider]);
 
   const owmUrl = needsOWM ? `/api/weather?${baseParams}&provider=openweathermap` : '';
   const wapiUrl = needsWAPI ? `/api/weather?${baseParams}&provider=weatherapi` : '';
   const pirateUrl = needsPirate ? `/api/weather?${baseParams}&provider=pirateweather` : '';
+  const noaaUrl = needsNOAA ? `/api/weather?${baseParams}&provider=noaa` : '';
   const [owmData] = useFetchData(owmUrl, WEATHER_REFRESH_MS);
   const [wapiData] = useFetchData(wapiUrl, WEATHER_REFRESH_MS);
   const [pirateData] = useFetchData(pirateUrl, WEATHER_REFRESH_MS);
+  const [noaaData] = useFetchData(noaaUrl, WEATHER_REFRESH_MS);
 
   const calendarIdList = settings.calendar.googleCalendarIds?.length
     ? settings.calendar.googleCalendarIds
@@ -167,7 +171,7 @@ function useSharedDisplayData(screens: Screen[], settings: GlobalSettings): Shar
     : '';
   const [calendarData] = useFetchData(calendarUrl, CALENDAR_REFRESH_MS);
 
-  return { owmData, wapiData, pirateData, calendarData };
+  return { owmData, wapiData, pirateData, noaaData, calendarData };
 }
 
 export default function ScreenRotator({ screens: initialScreens, settings: initialSettings }: ScreenRotatorProps) {

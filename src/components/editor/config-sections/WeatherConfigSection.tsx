@@ -5,8 +5,17 @@ import Toggle from '@/components/ui/Toggle';
 import Slider from '@/components/ui/Slider';
 import { editorFetch } from '@/lib/editor-fetch';
 import { useModuleConfig } from '@/hooks/useModuleConfig';
+import { useEditorStore } from '@/stores/editor-store';
 import { INPUT_CLASS } from '@/components/editor/PropertyPanel';
 import type { ModuleInstance, WeatherView, WeatherIconSet, WeatherProviderOption } from '@/types/config';
+
+// Provider capabilities — controls which toggles and views are visible
+const PROVIDER_CAPS: Record<string, { minutely?: boolean; alerts?: boolean; pressure?: boolean; visibility?: boolean; dewPoint?: boolean }> = {
+  openweathermap: {},
+  weatherapi: {},
+  pirateweather: { minutely: true, alerts: true },
+  noaa: { alerts: true, pressure: true, visibility: true, dewPoint: true },
+};
 
 const WEATHER_VIEWS: { value: WeatherView; label: string }[] = [
   { value: 'current', label: 'Current Only' },
@@ -15,8 +24,8 @@ const WEATHER_VIEWS: { value: WeatherView; label: string }[] = [
   { value: 'combined', label: 'Combined' },
   { value: 'compact', label: 'Compact' },
   { value: 'table', label: 'Table' },
-  { value: 'precipitation', label: 'Precipitation (Pirate Weather)' },
-  { value: 'alerts', label: 'Weather Alerts (Pirate Weather)' },
+  { value: 'precipitation', label: 'Precipitation' },
+  { value: 'alerts', label: 'Weather Alerts' },
 ];
 
 export function WeatherConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
@@ -32,7 +41,12 @@ export function WeatherConfigSection({ mod, screenId }: { mod: ModuleInstance; s
     showPrecipAmount?: boolean;
     showHumidity?: boolean;
     showWind?: boolean;
+    showPressure?: boolean;
+    showVisibility?: boolean;
+    showDewPoint?: boolean;
   }>(mod, screenId);
+
+  const globalProvider = useEditorStore((s) => s.config?.settings?.weather?.provider);
 
   const [configuredProviders, setConfiguredProviders] = useState<string[]>([]);
   useEffect(() => {
@@ -45,6 +59,7 @@ export function WeatherConfigSection({ mod, screenId }: { mod: ModuleInstance; s
           if (data.openweathermap_key) providers.push('openweathermap');
           if (data.weatherapi_key) providers.push('weatherapi');
           if (data.pirateweather_key) providers.push('pirateweather');
+          providers.push('noaa'); // NOAA always available (no key needed)
           setConfiguredProviders(providers);
         }
       } catch { /* ignore */ }
@@ -52,10 +67,16 @@ export function WeatherConfigSection({ mod, screenId }: { mod: ModuleInstance; s
     check();
   }, []);
 
+  // Resolve effective provider for capability gating
+  const effectiveProvider = (c.provider && c.provider !== 'global') ? c.provider : (globalProvider ?? 'openweathermap');
+  const caps = PROVIDER_CAPS[effectiveProvider] ?? {};
+
   const view = c.view ?? 'hourly';
   const showsHours = view === 'hourly' || view === 'combined';
   const showsDays = view === 'daily' || view === 'combined' || view === 'table';
   const showsCurrent = ['current', 'hourly', 'combined', 'compact'].includes(view);
+  // Alerts and precipitation views have no configurable data toggles
+  const showsStats = !['alerts', 'precipitation'].includes(view);
 
   return (
     <>
@@ -71,17 +92,19 @@ export function WeatherConfigSection({ mod, screenId }: { mod: ModuleInstance; s
           ))}
         </select>
       </label>
-      <label className="flex flex-col gap-0.5">
-        <span className="text-xs text-neutral-400">Icon Style</span>
-        <select
-          value={c.iconSet ?? 'color'}
-          onChange={(e) => set({ iconSet: e.target.value as WeatherIconSet })}
-          className={INPUT_CLASS}
-        >
-          <option value="outline">Outline</option>
-          <option value="color">Color</option>
-        </select>
-      </label>
+      {showsStats && (
+        <label className="flex flex-col gap-0.5">
+          <span className="text-xs text-neutral-400">Icon Style</span>
+          <select
+            value={c.iconSet ?? 'color'}
+            onChange={(e) => set({ iconSet: e.target.value as WeatherIconSet })}
+            className={INPUT_CLASS}
+          >
+            <option value="outline">Outline</option>
+            <option value="color">Color</option>
+          </select>
+        </label>
+      )}
       {configuredProviders.length > 0 && (
         <label className="flex flex-col gap-0.5">
           <span className="text-xs text-neutral-400">Data Provider</span>
@@ -99,6 +122,9 @@ export function WeatherConfigSection({ mod, screenId }: { mod: ModuleInstance; s
             )}
             {configuredProviders.includes('pirateweather') && (
               <option value="pirateweather">Pirate Weather</option>
+            )}
+            {configuredProviders.includes('noaa') && (
+              <option value="noaa">NOAA / NWS (US only)</option>
             )}
           </select>
         </label>
@@ -131,12 +157,25 @@ export function WeatherConfigSection({ mod, screenId }: { mod: ModuleInstance; s
       {showsDays && (
         <Toggle label="High / Low" checked={c.showHighLow !== false} onChange={(v) => set({ showHighLow: v })} />
       )}
-      <Toggle label="Precipitation" checked={c.showPrecipitation !== false} onChange={(v) => set({ showPrecipitation: v })} />
-      {showsDays && (
-        <Toggle label="Precipitation Amount" checked={!!c.showPrecipAmount} onChange={(v) => set({ showPrecipAmount: v })} />
+      {showsStats && (
+        <>
+          <Toggle label="Precipitation" checked={c.showPrecipitation !== false} onChange={(v) => set({ showPrecipitation: v })} />
+          {showsDays && (
+            <Toggle label="Precipitation Amount" checked={!!c.showPrecipAmount} onChange={(v) => set({ showPrecipAmount: v })} />
+          )}
+          <Toggle label="Humidity" checked={!!c.showHumidity} onChange={(v) => set({ showHumidity: v })} />
+          <Toggle label="Wind Speed" checked={!!c.showWind} onChange={(v) => set({ showWind: v })} />
+          {caps.pressure && (
+            <Toggle label="Pressure" checked={!!c.showPressure} onChange={(v) => set({ showPressure: v })} />
+          )}
+          {caps.visibility && (
+            <Toggle label="Visibility" checked={!!c.showVisibility} onChange={(v) => set({ showVisibility: v })} />
+          )}
+          {caps.dewPoint && (
+            <Toggle label="Dew Point" checked={!!c.showDewPoint} onChange={(v) => set({ showDewPoint: v })} />
+          )}
+        </>
       )}
-      <Toggle label="Humidity" checked={!!c.showHumidity} onChange={(v) => set({ showHumidity: v })} />
-      <Toggle label="Wind Speed" checked={!!c.showWind} onChange={(v) => set({ showWind: v })} />
     </>
   );
 }

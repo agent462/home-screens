@@ -58,8 +58,14 @@ describe('GET /api/secrets', () => {
     vi.mocked(requireSession).mockResolvedValue(undefined);
     const mockStatus = {
       openweathermap_key: true,
-      google_maps_key: false,
+      weatherapi_key: false,
+      pirateweather_key: false,
+      unsplash_access_key: false,
       todoist_token: true,
+      google_maps_key: false,
+      tomtom_key: false,
+      google_client_id: false,
+      google_client_secret: false,
     };
     vi.mocked(getSecretStatus).mockResolvedValue(mockStatus);
 

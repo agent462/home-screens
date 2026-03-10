@@ -47,7 +47,10 @@ export async function GET(request: NextRequest) {
     weatherapi: 'weatherapi_key',
     pirateweather: 'pirateweather_key',
   };
-  const apiKey = await getSecret(secretKeyMap[provider] ?? 'openweathermap_key') ?? undefined;
+  // NOAA requires no API key — skip the secret lookup
+  const apiKey = secretKeyMap[provider]
+    ? (await getSecret(secretKeyMap[provider]) ?? undefined)
+    : undefined;
 
   try {
     const weatherProvider = createWeatherProvider(provider, apiKey);

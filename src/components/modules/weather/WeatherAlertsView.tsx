@@ -29,7 +29,7 @@ export default function WeatherAlertsView({ alerts, scaledFontSize, containerRef
         <div className="flex-1 flex flex-col items-center justify-center gap-2">
           <ShieldCheck size="2.5em" className="opacity-30" />
           <p className="opacity-40" style={{ fontSize: '0.85em' }}>
-            {alerts !== undefined ? 'No active alerts' : 'Alert data requires Pirate Weather'}
+            {alerts !== undefined ? 'No active alerts' : 'Alert data requires Pirate Weather or NOAA'}
           </p>
         </div>
       ) : (

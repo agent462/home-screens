@@ -5,7 +5,7 @@ import { editorFetch } from '@/lib/editor-fetch';
 import { useEditorStore } from '@/stores/editor-store';
 import Button from '@/components/ui/Button';
 
-type SecretKey = 'openweathermap_key' | 'weatherapi_key' | 'pirateweather_key';
+type SecretKey = 'openweathermap_key' | 'weatherapi_key' | 'pirateweather_key' | null;
 
 interface WeatherSettings {
   provider: string;
@@ -22,8 +22,11 @@ interface Props {
 function providerSecretKey(provider: string): SecretKey {
   if (provider === 'openweathermap') return 'openweathermap_key';
   if (provider === 'pirateweather') return 'pirateweather_key';
+  if (provider === 'noaa') return null; // NOAA requires no API key
   return 'weatherapi_key';
 }
+
+const needsApiKey = (provider: string) => provider !== 'noaa';
 
 export default function WeatherSection({ values, onChange }: Props) {
   const { provider, units, lat, lon } = values;
@@ -37,11 +40,17 @@ export default function WeatherSection({ values, onChange }: Props) {
   const [testStatus, setTestStatus] = useState<string | null>(null);
 
   const fetchKeyStatus = useCallback(async () => {
+    const key = providerSecretKey(provider);
+    if (!key) {
+      // NOAA needs no API key — always "configured"
+      setKeyConfigured(true);
+      setKeyLoading(false);
+      return;
+    }
     try {
       const res = await editorFetch('/api/secrets');
       if (res.ok) {
         const data: Partial<Record<string, boolean>> = await res.json();
-        const key = providerSecretKey(provider);
         setKeyConfigured(!!data[key]);
       }
     } catch {
@@ -98,8 +107,8 @@ export default function WeatherSection({ values, onChange }: Props) {
   }
 
   async function testWeather() {
-    // If user typed a key but hasn't saved, save first
-    if (apiKey.trim()) {
+    // If user typed a key but hasn't saved, save first (not needed for NOAA)
+    if (needsApiKey(provider) && apiKey.trim()) {
       const saved = await handleSaveKey();
       if (!saved) return;
     }
@@ -112,7 +121,7 @@ export default function WeatherSection({ values, onChange }: Props) {
         latitude: testLat,
         longitude: testLon,
         weather: {
-          provider: provider as 'openweathermap' | 'weatherapi' | 'pirateweather',
+          provider: provider as 'openweathermap' | 'weatherapi' | 'pirateweather' | 'noaa',
           latitude: testLat,
           longitude: testLon,
           units: units as 'metric' | 'imperial',
@@ -156,78 +165,85 @@ export default function WeatherSection({ values, onChange }: Props) {
             <option value="weatherapi">WeatherAPI.com (free, no credit card)</option>
             <option value="openweathermap">OpenWeatherMap (One Call 3.0)</option>
             <option value="pirateweather">Pirate Weather (Dark Sky replacement)</option>
+            <option value="noaa">NOAA / NWS (free, US only, no key)</option>
           </select>
         </label>
 
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-neutral-400">
-              API Key
-              {provider === 'weatherapi' && (
-                <span className="text-neutral-500 ml-1">
-                  — get one free at weatherapi.com
-                </span>
-              )}
-              {provider === 'openweathermap' && (
-                <span className="text-neutral-500 ml-1">
-                  — requires One Call 3.0 subscription
-                </span>
-              )}
-              {provider === 'pirateweather' && (
-                <span className="text-neutral-500 ml-1">
-                  — free at pirateweather.net
-                </span>
-              )}
-            </span>
-            <div className="flex items-center gap-2">
-              {!keyLoading && (
-                <>
-                  <span className="flex items-center gap-1.5 text-xs">
-                    <span
-                      className={`w-1.5 h-1.5 rounded-full inline-block ${
-                        keyConfigured ? 'bg-green-400' : 'bg-neutral-600'
-                      }`}
-                    />
-                    <span className={keyConfigured ? 'text-green-400' : 'text-neutral-500'}>
-                      {keyConfigured ? 'Configured' : 'Not configured'}
-                    </span>
+        {needsApiKey(provider) ? (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-neutral-400">
+                API Key
+                {provider === 'weatherapi' && (
+                  <span className="text-neutral-500 ml-1">
+                    — get one free at weatherapi.com
                   </span>
-                  {keyConfigured && (
-                    <button
-                      onClick={handleDeleteKey}
-                      className="text-xs text-neutral-500 hover:text-red-400 transition-colors"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </>
-              )}
+                )}
+                {provider === 'openweathermap' && (
+                  <span className="text-neutral-500 ml-1">
+                    — requires One Call 3.0 subscription
+                  </span>
+                )}
+                {provider === 'pirateweather' && (
+                  <span className="text-neutral-500 ml-1">
+                    — free at pirateweather.net
+                  </span>
+                )}
+              </span>
+              <div className="flex items-center gap-2">
+                {!keyLoading && (
+                  <>
+                    <span className="flex items-center gap-1.5 text-xs">
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full inline-block ${
+                          keyConfigured ? 'bg-green-400' : 'bg-neutral-600'
+                        }`}
+                      />
+                      <span className={keyConfigured ? 'text-green-400' : 'text-neutral-500'}>
+                        {keyConfigured ? 'Configured' : 'Not configured'}
+                      </span>
+                    </span>
+                    {keyConfigured && (
+                      <button
+                        onClick={handleDeleteKey}
+                        className="text-xs text-neutral-500 hover:text-red-400 transition-colors"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={apiKey}
+                onChange={(e) => { setApiKey(e.target.value); setSaveStatus('idle'); }}
+                placeholder="Paste your API key here"
+                className="flex-1 rounded-md bg-neutral-800 border border-neutral-600 text-sm text-neutral-200 px-3 py-2 focus:outline-none focus:border-blue-500"
+              />
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleSaveKey}
+                disabled={!apiKey.trim() || saveStatus === 'saving'}
+              >
+                {saveStatus === 'saving' ? '...' : 'Save'}
+              </Button>
+            </div>
+            {saveStatus === 'saved' && (
+              <span className="text-xs text-green-400">Key saved successfully</span>
+            )}
+            {saveStatus === 'error' && (
+              <span className="text-xs text-red-400">{saveError}</span>
+            )}
           </div>
-          <div className="flex gap-2">
-            <input
-              type="password"
-              value={apiKey}
-              onChange={(e) => { setApiKey(e.target.value); setSaveStatus('idle'); }}
-              placeholder="Paste your API key here"
-              className="flex-1 rounded-md bg-neutral-800 border border-neutral-600 text-sm text-neutral-200 px-3 py-2 focus:outline-none focus:border-blue-500"
-            />
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleSaveKey}
-              disabled={!apiKey.trim() || saveStatus === 'saving'}
-            >
-              {saveStatus === 'saving' ? '...' : 'Save'}
-            </Button>
-          </div>
-          {saveStatus === 'saved' && (
-            <span className="text-xs text-green-400">Key saved successfully</span>
-          )}
-          {saveStatus === 'error' && (
-            <span className="text-xs text-red-400">{saveError}</span>
-          )}
-        </div>
+        ) : (
+          <p className="text-xs text-green-400/80">
+            No API key required — NOAA data is free and public (US only).
+          </p>
+        )}
 
         <label className="block">
           <span className="text-xs text-neutral-400">Units</span>

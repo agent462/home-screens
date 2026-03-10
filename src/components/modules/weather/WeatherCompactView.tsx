@@ -1,9 +1,9 @@
-import { CloudRain, Droplets, Wind } from 'lucide-react';
+import { CloudRain, Droplets, Wind, Gauge, Eye, Thermometer } from 'lucide-react';
 import { getWeatherIcon } from '@/lib/weather-icons';
 import { WeatherStat } from '../WeatherStat';
 import type { WeatherViewProps } from './types';
 
-export default function WeatherCompactView({ config, hourly, forecast, scaledFontSize, containerRef }: WeatherViewProps) {
+export default function WeatherCompactView({ config, hourly, forecast, units, scaledFontSize, containerRef }: WeatherViewProps) {
   const current = hourly[0];
   const today = forecast[0];
 
@@ -38,6 +38,9 @@ export default function WeatherCompactView({ config, hourly, forecast, scaledFon
         <WeatherStat icon={CloudRain} value={current.precipProbability} unit="%" visible={config.showPrecipitation !== false} fontSize="0.7em" />
         <WeatherStat icon={Droplets} value={current.humidity} unit="%" visible={config.showHumidity} fontSize="0.7em" />
         <WeatherStat icon={Wind} value={current.windSpeed} visible={config.showWind} fontSize="0.7em" />
+        <WeatherStat icon={Gauge} value={current.pressure} unit=" hPa" visible={config.showPressure} fontSize="0.7em" />
+        <WeatherStat icon={Eye} value={current.visibility} unit={units === 'metric' ? ' km' : ' mi'} visible={config.showVisibility} fontSize="0.7em" />
+        <WeatherStat icon={Thermometer} value={current.dewPoint} unit="°" visible={config.showDewPoint} fontSize="0.7em" />
       </div>
     </div>
   );
