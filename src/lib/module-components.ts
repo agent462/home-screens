@@ -28,7 +28,7 @@ export const moduleComponents = {
   'qr-code': dynamic(() => import('@/components/modules/QRCodeModule')),
   'year-progress': dynamic(() => import('@/components/modules/YearProgressModule')),
   traffic: dynamic(() => import('@/components/modules/TrafficModule')),
-  sports: dynamic(() => import('@/components/modules/SportsModule')),
+  sports: dynamic(() => import('@/components/modules/sports/SportsModule')),
   'air-quality': dynamic(() => import('@/components/modules/AirQualityModule')),
   todoist: dynamic(() => import('@/components/modules/TodoistModule')),
 } as unknown as Record<ModuleType, ComponentType<Record<string, unknown>>>;

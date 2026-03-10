@@ -367,6 +367,7 @@ registerModule({
   icon: Trophy,
   category: 'News & Finance',
   defaultConfig: {
+    view: 'scoreboard',
     leagues: ['nba', 'nfl'],
     refreshIntervalMs: 60000,
   },

@@ -338,9 +338,13 @@ export interface TrafficConfig {
 }
 
 // Sports scores module config
+export type SportsView = 'scoreboard' | 'cards' | 'list' | 'ticker';
+
 export interface SportsConfig {
+  view?: SportsView;
   leagues: string[];
   refreshIntervalMs: number;
+  tickerSpeed?: number;
 }
 
 // Todoist module config

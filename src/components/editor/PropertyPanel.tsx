@@ -12,7 +12,7 @@ import Toggle from '@/components/ui/Toggle';
 import ColorPicker from '@/components/ui/ColorPicker';
 import Button from '@/components/ui/Button';
 import BackgroundPicker from '@/components/editor/BackgroundPicker';
-import type { ModuleInstance, CountdownEvent, TodoItem, WeatherView, WeatherIconSet, WeatherProviderOption, StockTickerView, CryptoView, NewsView } from '@/types/config';
+import type { ModuleInstance, CountdownEvent, TodoItem, WeatherView, WeatherIconSet, WeatherProviderOption, StockTickerView, CryptoView, NewsView, SportsView } from '@/types/config';
 import { v4 as uuidv4 } from 'uuid';
 
 const INPUT_CLASS = 'w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200';
@@ -1060,14 +1060,41 @@ function TrafficConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId
   );
 }
 
+const SPORTS_VIEWS: { value: SportsView; label: string }[] = [
+  { value: 'scoreboard', label: 'Scoreboard' },
+  { value: 'cards', label: 'Cards' },
+  { value: 'list', label: 'List' },
+  { value: 'ticker', label: 'Ticker' },
+];
+
 function SportsConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
-  const { config: c, set } = useModuleConfig<{ leagues?: string[]; refreshIntervalMs?: number }>(mod, screenId);
+  const { config: c, set } = useModuleConfig<{
+    view?: SportsView;
+    leagues?: string[];
+    refreshIntervalMs?: number;
+    tickerSpeed?: number;
+  }>(mod, screenId);
 
   const leagueOptions = ['nfl', 'nba', 'mlb', 'nhl', 'mls', 'epl'];
   const selectedLeagues = c.leagues ?? ['nba', 'nfl'];
+  const view = c.view ?? 'scoreboard';
 
   return (
     <>
+      <div className="space-y-1">
+        <span className="text-xs text-neutral-400">View</span>
+        <select
+          value={view}
+          onChange={(e) => set({ view: e.target.value as SportsView })}
+          className={INPUT_CLASS}
+        >
+          {SPORTS_VIEWS.map((v) => (
+            <option key={v.value} value={v.value}>
+              {v.label}
+            </option>
+          ))}
+        </select>
+      </div>
       <div className="space-y-1">
         <span className="text-xs text-neutral-400">Leagues</span>
         {leagueOptions.map((league) => (
@@ -1084,6 +1111,16 @@ function SportsConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId:
           />
         ))}
       </div>
+      {view === 'ticker' && (
+        <Slider
+          label="Ticker Speed (sec/game)"
+          value={c.tickerSpeed ?? 4}
+          min={2}
+          max={10}
+          step={1}
+          onChange={(v) => set({ tickerSpeed: v })}
+        />
+      )}
       <Slider
         label="Refresh (seconds)"
         value={(c.refreshIntervalMs ?? 60000) / 1000}
