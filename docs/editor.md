@@ -102,10 +102,21 @@ Each screen can have its own background image. Select a screen tab, then choose 
 
 Open the **Settings Panel** to configure system-wide options:
 
+### Integrations
+
+The **Integrations** tab is where you configure all API keys and external service connections. Keys are stored in the config file — no `.env.local` needed.
+
+- **OpenWeatherMap** — API key for weather, air quality, and UV data
+- **WeatherAPI** — alternative weather provider API key
+- **Pirate Weather** — Dark Sky replacement API key
+- **Unsplash** — access key for background photo browsing
+- **Todoist** — API token for task integration
+- **TomTom** — API key for traffic data
+- **Google Calendar** — OAuth device flow sign-in
+
 ### Weather
 
-- **Provider** — choose OpenWeatherMap or WeatherAPI
-- **API Key** — enter your API key (overrides `.env.local`)
+- **Provider** — choose OpenWeatherMap, WeatherAPI, or Pirate Weather
 - **Location** — set latitude/longitude for weather data
 - **Units** — metric or imperial
 
@@ -132,16 +143,22 @@ Open the **Settings Panel** to configure system-wide options:
 
 Set the timezone for all time-aware modules (clock, calendar, sunrise/sunset, etc.).
 
+## Password Protection
+
+The editor can be protected with a password to prevent unauthorized access. Set a password in **Settings > Security**. Once enabled, accessing the editor requires entering the password. The display view remains publicly accessible.
+
 ## System Panel
 
-The **System Panel** provides maintenance features:
+The **System Panel** provides maintenance and system management features:
 
 - **Version** — current app version
 - **Changelog** — recent release notes
 - **Upgrade** — pull and install the latest version
+- **Rebuild** — rebuild the production app without upgrading
 - **Rollback** — revert to the previous version
 - **Backup/Restore** — export and import your configuration
 - **Logs** — view application logs
+- **Power** — restart or shut down the Raspberry Pi from the UI
 
 ## Saving
 

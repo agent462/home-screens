@@ -18,11 +18,13 @@ A custom smart display system built with Next.js. Designed to run on a Raspberry
 
 - **Drag-and-drop editor** — visually arrange modules on a 1080x1920 portrait canvas
 - **Multi-screen rotation** — configure multiple screens that cycle automatically
-- **25 built-in modules** — clock, calendar, weather (hourly + forecast), countdown, dad jokes, text, image, quote, todo, sticky note, greeting, news, stock ticker, crypto, word of the day, this day in history, moon phase, sunrise/sunset, photo slideshow, QR code, year progress, traffic/commute, sports scores, and air quality
-- **Dual weather providers** — OpenWeatherMap and WeatherAPI with a shared interface
+- **29 built-in modules** — clock, calendar, weather (8 views), countdown, dad jokes, text, image, quote, todo, sticky note, greeting, news, stock ticker, crypto, word of the day, this day in history, moon phase, sunrise/sunset, photo slideshow, QR code, year progress, traffic/commute, sports scores, air quality, todoist, rain map, multi-month calendar, garbage day, and sports standings
+- **Triple weather providers** — OpenWeatherMap, WeatherAPI, and Pirate Weather with a shared interface
 - **Google Calendar integration** — display upcoming events from one or more calendars
 - **Background images** — upload custom backgrounds or rotate via Unsplash
 - **Per-module styling** — opacity, blur, colors, fonts, border radius, padding
+- **Password-protected editor** — optional password auth for the configuration editor
+- **System management** — upgrade, rebuild, backup/restore, and power control from the UI
 - **Raspberry Pi kiosk scripts** — one-command setup for a dedicated display
 
 ## Tech Stack
@@ -40,10 +42,6 @@ A custom smart display system built with Next.js. Designed to run on a Raspberry
 # Install dependencies
 npm install
 
-# Copy environment variables
-cp .env.local.example .env.local
-# Edit .env.local with your API keys
-
 # Run development server
 npm run dev
 ```
@@ -54,16 +52,7 @@ Then visit:
 
 ## Environment Variables
 
-| Variable | Description | Required |
-|---|---|---|
-| `GOOGLE_CLIENT_ID` | Google OAuth client ID (for calendar) | For calendar |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | For calendar |
-| `OPENWEATHERMAP_API_KEY` | OpenWeatherMap API key (fallback if not set in editor) | Optional |
-| `WEATHERAPI_KEY` | WeatherAPI.com API key (fallback if not set in editor) | Optional |
-| `GOOGLE_MAPS_API_KEY` | Google Routes API key (for traffic module) | For traffic |
-| `TOMTOM_API_KEY` | TomTom Routing API key (traffic fallback) | For traffic |
-
-Weather API keys can be configured either in `.env.local` or through the editor UI (Settings > Weather). The editor config takes priority.
+All API keys and credentials are configured through the editor UI under **Settings → Integrations**. No `.env.local` file is required for normal use.
 
 ## Google Calendar Setup
 
@@ -73,7 +62,7 @@ Google Calendar uses the **OAuth 2.0 Device Flow**, which means you can authoriz
 2. Click **Create Credentials → OAuth Client ID**
 3. Application type: **TVs and Limited Input devices**
 4. Name it anything (e.g. "Home Screen Display")
-5. Copy the **Client ID** and **Client Secret** into your `.env.local`
+5. In the editor, go to **Settings → Integrations** and enter the **Client ID** and **Client Secret**
 6. Enable the **Google Calendar API** at APIs & Services → Library → search "Google Calendar API" → Enable
 7. In the editor, go to Settings → Google Calendar → **Sign in with Google**
 8. You'll see a code and a link to `google.com/device` — open that link on your phone or computer, enter the code, and grant access
@@ -90,7 +79,6 @@ bash scripts/install.sh
 
 The script handles everything:
 - Installs Node.js 20, Chromium, and system dependencies
-- Prompts for API keys and writes `.env.local`
 - Installs npm packages and builds the app
 - Creates systemd services (`home-screens`, `home-screens-kiosk`)
 - Disables screen blanking and configures autologin
@@ -148,7 +136,7 @@ scripts/
 | `/api/config` | GET, PUT | Read/write screen configuration |
 | `/api/calendar` | GET | Google Calendar event proxy |
 | `/api/calendars` | GET | List available Google Calendars |
-| `/api/weather` | GET | Weather data (dual provider) |
+| `/api/weather` | GET | Weather data (triple provider) |
 | `/api/geocode` | GET | Location geocoding for weather |
 | `/api/jokes` | GET | Dad jokes proxy |
 | `/api/quote` | GET | ZenQuotes daily quote proxy |
@@ -161,12 +149,20 @@ scripts/
 | `/api/traffic` | GET | Traffic/commute times (Google Routes or TomTom) |
 | `/api/sports` | GET | Live sports scores (ESPN) |
 | `/api/air-quality` | GET | Air quality index and UV (OpenWeatherMap) |
+| `/api/todoist` | GET | Todoist tasks proxy |
+| `/api/rain-map` | GET | RainViewer precipitation map tiles |
+| `/api/standings` | GET | ESPN league standings |
+| `/api/time` | GET | Server time |
+| `/api/image-proxy` | GET | Proxy external images |
+| `/api/secrets` | GET, PUT | Manage API keys and credentials |
+| `/api/auth/*` | GET, POST | Authentication (password + Google OAuth) |
+| `/api/system/*` | GET, POST | System management (version, upgrade, rebuild, backups, power) |
 
 ## Documentation
 
 - [Getting Started](docs/getting-started.md) — installation and setup
 - [Editor Guide](docs/editor.md) — how to use the visual editor
-- [Modules Reference](docs/modules.md) — all 25 modules and their options
+- [Modules Reference](docs/modules.md) — all 29 modules and their options
 - [API Reference](docs/api.md) — all API endpoints
 - [Configuration](docs/configuration.md) — config file schema and examples
 - [Raspberry Pi Deployment](docs/raspberry-pi.md) — kiosk setup and troubleshooting

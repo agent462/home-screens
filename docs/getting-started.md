@@ -13,24 +13,20 @@ cd home-screens
 npm install
 ```
 
-## Environment Variables
+## Configuration
 
-Copy the example file and fill in your API keys:
+All API keys and credentials are configured through the editor UI at **Settings > Integrations**. There is no need to manually edit environment files.
 
-```bash
-cp .env.local.example .env.local
-```
+The following integrations can be configured through the editor:
 
-| Variable | Description | Required |
+| Integration | Description | Required |
 |---|---|---|
-| `GOOGLE_CLIENT_ID` | Google OAuth client ID (for calendar) | For calendar |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | For calendar |
-| `OPENWEATHERMAP_API_KEY` | OpenWeatherMap API key | Optional |
-| `WEATHERAPI_KEY` | WeatherAPI.com API key | Optional |
-| `GOOGLE_MAPS_API_KEY` | Google Routes API key (for traffic module) | For traffic |
-| `TOMTOM_API_KEY` | TomTom Routing API key (traffic fallback) | For traffic |
-
-Weather API keys can also be configured through the editor UI under Settings > Weather. Editor config takes priority over environment variables.
+| Google Calendar | OAuth client ID and secret for calendar sync | For calendar module |
+| OpenWeatherMap | Weather data provider | Optional (one of three weather providers) |
+| WeatherAPI | Weather data provider | Optional (one of three weather providers) |
+| Pirate Weather | Weather data provider (Dark Sky replacement) | Optional (one of three weather providers) |
+| Google Maps | Google Routes API key for traffic module | For traffic module |
+| TomTom | TomTom Routing API key (traffic fallback) | For traffic module |
 
 ## Running
 
@@ -45,24 +41,32 @@ npm run start
 
 Then visit:
 
-- **Editor** — `http://localhost:3000/editor` to configure your screens
-- **Display** — `http://localhost:3000/display` for the fullscreen kiosk view
+- **Editor** -- `http://localhost:3000/editor` to configure your screens
+- **Display** -- `http://localhost:3000/display` for the fullscreen kiosk view
+
+## Password Protection
+
+The editor supports optional password protection. Set a password in **Settings > General** to require authentication before accessing the editor.
+
+## System Management
+
+The editor includes a system management panel under **Settings > System** for upgrade, rebuild, backups, and power control -- particularly useful when running on a Raspberry Pi.
 
 ## Google Calendar Setup
 
-Google Calendar uses **OAuth 2.0 Device Flow**, which means you can authorize from any device on your network — no redirect URI or public domain required. This is ideal for headless displays.
+Google Calendar uses **OAuth 2.0 Device Flow**, which means you can authorize from any device on your network -- no redirect URI or public domain required. This is ideal for headless displays.
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com) > **APIs & Services > Credentials**
 2. Click **Create Credentials > OAuth Client ID**
 3. Application type: **TVs and Limited Input devices**
 4. Name it anything (e.g. "Home Screen Display")
-5. Copy the **Client ID** and **Client Secret** into your `.env.local`
+5. Copy the **Client ID** and **Client Secret** into **Settings > Integrations** in the editor
 6. Enable the **Google Calendar API** at APIs & Services > Library
 7. In the editor, go to **Settings > Google Calendar > Sign in with Google**
-8. You'll see a code and a link to `google.com/device` — enter the code on your phone or computer and grant access
+8. You'll see a code and a link to `google.com/device` -- enter the code on your phone or computer and grant access
 
 ## Next Steps
 
-- [Editor Guide](editor.md) — learn how to build your screens
-- [Modules Reference](modules.md) — see all 25 available modules
-- [Raspberry Pi Deployment](raspberry-pi.md) — set up a dedicated kiosk display
+- [Editor Guide](editor.md) -- learn how to build your screens
+- [Modules Reference](modules.md) -- see all 29 available modules
+- [Raspberry Pi Deployment](raspberry-pi.md) -- set up a dedicated kiosk display

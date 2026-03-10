@@ -1,6 +1,6 @@
 # API Reference
 
-All API routes are served under `/api/`. They act as server-side proxies to protect API keys and avoid CORS issues.
+All API routes are served under `/api/`. They act as server-side proxies to protect API keys and avoid CORS issues. API keys and credentials are managed through the editor UI (Settings > Integrations) and stored server-side; no `.env.local` file is needed.
 
 ## Configuration
 
@@ -24,12 +24,12 @@ Saves the screen configuration. Performs an atomic write (temp file + rename) to
 
 ### GET /api/weather
 
-Fetches weather data from the configured provider.
+Fetches weather data from the configured provider. Supports three providers: OpenWeatherMap, WeatherAPI, and Pirate Weather. Results are cached for 5 minutes.
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `type` | string | `"both"` | `hourly`, `forecast`, or `both` |
-| `provider` | string | from config | `openweathermap` or `weatherapi` |
+| `provider` | string | from config | `openweathermap`, `weatherapi`, or `pirateweather` |
 | `lat` | number | from config | Latitude |
 | `lon` | number | from config | Longitude |
 | `units` | string | `"imperial"` | `metric` or `imperial` |
@@ -42,9 +42,13 @@ Fetches weather data from the configured provider.
   ],
   "forecast": [
     { "day": "Mon", "date": "2026-03-09", "high": 75, "low": 55, "icon": "cloud-sun", "precipitation": 20, "humidity": 50, "wind": 12, "precipAmount": 0.1 }
-  ]
+  ],
+  "minutely": [],
+  "alerts": []
 }
 ```
+
+The `minutely` and `alerts` fields are included when the provider supports them (e.g. Pirate Weather).
 
 ---
 
@@ -87,11 +91,73 @@ Lists the authenticated user's Google Calendars.
 
 ---
 
+## Authentication
+
+### GET /api/auth/status
+
+Returns whether password authentication is enabled and whether the current session is authenticated.
+
+**Response:**
+```json
+{ "authEnabled": true, "authenticated": true }
+```
+
+### POST /api/auth/login
+
+Authenticates with a password. Sets a session cookie on success. Rate-limited to 5 failed attempts per 15-minute window.
+
+**Body:** `{ "password": "..." }`
+
+**Response:** `{ "success": true }` (with `Set-Cookie` header)
+
+### POST /api/auth/logout
+
+Clears the session cookie.
+
+**Response:** `{ "success": true }` (with `Set-Cookie` header clearing the session)
+
+### POST /api/auth/password
+
+Sets, changes, or disables the password. Requires a valid session if auth is already enabled.
+
+**Body (set/change):** `{ "currentPassword": "...", "newPassword": "..." }`
+
+**Body (disable):** `{ "currentPassword": "...", "action": "disable" }`
+
+**Constraints:** Password must be at least 8 characters.
+
+**Response:** `{ "success": true, "authEnabled": true }`
+
+---
+
 ## Google Auth
 
-### GET /api/auth/google/device
+### GET /api/auth/google
 
-Initiates the OAuth 2.0 device flow.
+Initiates the OAuth 2.0 web redirect flow. Redirects the browser to Google's consent screen. Requires a valid session.
+
+### GET /api/auth/google/callback
+
+OAuth callback handler. Exchanges the authorization code for tokens and redirects back to the editor with a `google_auth=success` or `google_auth=error` query parameter. Validates a CSRF state cookie.
+
+### GET /api/auth/google/status
+
+Returns whether Google OAuth is currently authenticated and whether client credentials are configured. Requires a valid session.
+
+**Response:**
+```json
+{ "connected": true, "credentialsConfigured": true }
+```
+
+### DELETE /api/auth/google/status
+
+Disconnects the Google OAuth integration. Requires a valid session.
+
+**Response:** `{ "connected": false }`
+
+### POST /api/auth/google/device
+
+Initiates the OAuth 2.0 device flow. Returns a user code for the user to enter at the verification URL. Requires a valid session.
 
 **Response:**
 ```json
@@ -104,17 +170,94 @@ Initiates the OAuth 2.0 device flow.
 }
 ```
 
-### GET /api/auth/google/status
+### PUT /api/auth/google/device
 
-Checks if Google OAuth is currently authenticated.
+Polls for device flow token completion. Requires a valid session.
 
-**Response:** `{ authenticated: true }` or `{ authenticated: false }`
+**Body:** `{ "device_code": "..." }`
 
-### POST /api/auth/google/callback
+---
 
-Completes the device flow authentication.
+## Secrets
 
-**Body:** `{ device_code: string }`
+### GET /api/secrets
+
+Returns which API keys are configured (as booleans, not the actual values). Requires a valid session.
+
+**Response:**
+```json
+{
+  "openweathermap_key": true,
+  "weatherapi_key": false,
+  "pirateweather_key": false,
+  "unsplash_access_key": true,
+  "todoist_token": false,
+  "google_maps_key": false,
+  "tomtom_key": false,
+  "google_client_id": true,
+  "google_client_secret": true
+}
+```
+
+### PUT /api/secrets
+
+Saves an API key or credential. Validates Todoist tokens before saving. Requires a valid session.
+
+**Body:** `{ "key": "openweathermap_key", "value": "abc123..." }`
+
+**Response:** `{ "ok": true }`
+
+### DELETE /api/secrets
+
+Deletes an API key or credential. Requires a valid session.
+
+**Body:** `{ "key": "openweathermap_key" }`
+
+**Response:** `{ "ok": true }`
+
+---
+
+## Todoist
+
+### GET /api/todoist
+
+Fetches all tasks, projects, sections, and labels from the Todoist API. Enriches tasks with project names, colors, section names, and label colors. Requires a Todoist API token to be configured in Settings > Integrations.
+
+**Response:**
+```json
+{
+  "tasks": [
+    {
+      "id": "123",
+      "content": "Buy groceries",
+      "description": "",
+      "priority": 1,
+      "due": { "date": "2026-03-09", "datetime": "2026-03-09T17:00:00Z", "isRecurring": false },
+      "labels": ["errands"],
+      "labelColors": { "errands": "#ff9933" },
+      "projectId": "456",
+      "projectName": "Personal",
+      "projectColor": "#4073ff",
+      "sectionId": "",
+      "sectionName": "",
+      "parentId": null,
+      "order": 1,
+      "commentCount": 0
+    }
+  ],
+  "projects": [
+    { "id": "456", "name": "Personal", "color": "#4073ff", "order": 1 }
+  ]
+}
+```
+
+### PUT /api/todoist
+
+Saves a Todoist API token. Validates the token against the Todoist API before storing. Requires a valid session.
+
+**Body:** `{ "token": "..." }`
+
+**Response:** `{ "ok": true }`
 
 ---
 
@@ -250,6 +393,45 @@ Fetches live scores from ESPN. Results are cached for 1 minute.
 }
 ```
 
+### GET /api/standings
+
+Fetches league standings from ESPN. Results are cached for 5 minutes. Team colors are fetched from the ESPN teams API and cached for 1 hour.
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `league` | string | `"nfl"` | One of: `nfl`, `nba`, `wnba`, `mlb`, `nhl`, `mls`, `epl`, `laliga`, `bundesliga`, `seriea`, `ligue1`, `liga_mx` |
+| `grouping` | string | `"division"` | `division`, `conference`, or `league` |
+
+**Response:**
+```json
+{
+  "groups": [
+    {
+      "name": "NFC North",
+      "league": "NFL",
+      "entries": [
+        {
+          "rank": 1,
+          "team": "Detroit Lions",
+          "teamAbbr": "DET",
+          "teamShort": "Lions",
+          "teamLogo": "https://a.espncdn.com/...",
+          "teamColor": "0076B6",
+          "wins": 14,
+          "losses": 3,
+          "winPct": 0.824,
+          "streak": "W3",
+          "playoffSeed": 1,
+          "clincher": "z"
+        }
+      ]
+    }
+  ]
+}
+```
+
+Entries include sport-specific fields: `ties`, `pointsFor`, `pointsAgainst`, `differential` (NFL); `otLosses`, `points`, `homeRecord`, `awayRecord`, `last10` (NHL); `draws`, `points`, `goalDiff`, `gamesPlayed` (soccer); `gamesBack`, `streak`, `last10`, `homeRecord`, `awayRecord` (NBA/MLB).
+
 ---
 
 ## Air Quality
@@ -272,6 +454,67 @@ Returns air quality and UV data from OpenWeatherMap.
   "o3": 45.2,
   "no2": 15.8,
   "uv": 6.3
+}
+```
+
+---
+
+## Rain Map
+
+### GET /api/rain-map
+
+Returns precipitation map tile data from RainViewer. Results are cached for 5 minutes. No API key required.
+
+**Response:**
+```json
+{
+  "version": "2.0",
+  "generated": 1709913600,
+  "host": "https://tilecache.rainviewer.com",
+  "radar": {
+    "past": [
+      { "time": 1709913000, "path": "/v2/radar/..." }
+    ],
+    "nowcast": [
+      { "time": 1709914200, "path": "/v2/radar/..." }
+    ]
+  },
+  "satellite": {
+    "infrared": [
+      { "time": 1709913000, "path": "/v2/satellite/..." }
+    ]
+  }
+}
+```
+
+---
+
+## Image Proxy
+
+### GET /api/image-proxy
+
+Proxies external images through the server to avoid CORS and mixed-content issues. Responses are cached in-memory for 24 hours (max 200 entries). Only allows requests to whitelisted hosts (currently `a.espncdn.com`).
+
+| Parameter | Type | Description |
+|---|---|---|
+| `url` | string | Full URL of the image to proxy |
+
+**Response:** The image binary with appropriate `Content-Type` header and a 7-day browser cache.
+
+---
+
+## Server Time
+
+### GET /api/time
+
+Returns the current server time. Useful for synchronizing display clocks with the server.
+
+**Response:**
+```json
+{
+  "iso": "2026-03-09T14:30:00.000Z",
+  "timezone": "America/Chicago",
+  "formatted": "2:30:00 PM"
 }
 ```
 
@@ -342,35 +585,107 @@ Returns a random Unsplash photo with optional query filter.
 
 ### GET /api/system/version
 
-Returns the current application version.
+Returns the current application version, available tags, and whether a build is pending. Requires a valid session.
 
-**Response:** `{ version: "0.6.0" }`
+| Parameter | Type | Description |
+|---|---|---|
+| `check` | string | Set to `"true"` to force-fetch remote tags |
+
+**Response:**
+```json
+{
+  "version": "0.10.0",
+  "commit": "a3b2e17",
+  "tags": ["v0.10.0", "v0.9.0", "..."],
+  "buildPending": false,
+  "buildPendingTag": null
+}
+```
 
 ### GET /api/system/build-id
 
 Returns the current build hash. Used by the display to detect new deployments and auto-reload.
 
-**Response:** `{ buildId: "abc123" }`
+**Response:** Plain text build ID (e.g. `abc123`)
 
 ### GET /api/system/status
 
-Returns system information.
+Returns an SSE (Server-Sent Events) stream of upgrade/rollback progress. Used by the editor to display real-time progress during upgrades. Requires a valid session.
+
+**Response:** `text/event-stream` with `progress` and `output` events.
 
 ### GET /api/system/changelog
 
-Returns recent release notes.
+Returns recent release notes from the GitHub repository. Falls back to tags if no releases are published. Requires a valid session.
+
+**Response:**
+```json
+{
+  "releases": [
+    {
+      "tag": "v0.10.0",
+      "name": "v0.10.0",
+      "body": "Release notes markdown...",
+      "published": "2026-03-08T00:00:00Z"
+    }
+  ]
+}
+```
 
 ### POST /api/system/upgrade
 
-Triggers an upgrade to the latest version. Pulls from git, installs dependencies, and rebuilds.
+Triggers an upgrade to a specific version tag. Pulls from git, installs dependencies, and rebuilds. Progress is streamed via the `/api/system/status` SSE endpoint. Requires a valid session.
+
+**Body:** `{ "tag": "v0.10.0" }`
+
+**Response:** `{ "ok": true, "message": "Upgrade to v0.10.0 started" }`
 
 ### POST /api/system/rollback
 
-Reverts to the previous version.
+Reverts to a specific previous version tag. Progress is streamed via the `/api/system/status` SSE endpoint. Requires a valid session.
+
+**Body:** `{ "tag": "v0.9.0" }`
+
+**Response:** `{ "ok": true, "message": "Rollback to v0.9.0 started" }`
+
+### POST /api/system/rebuild
+
+Triggers a rebuild for a pending build (e.g. after an interrupted upgrade). Requires a valid session.
+
+**Response:** `{ "ok": true, "message": "Rebuild for v0.10.0 started" }`
+
+### POST /api/system/power
+
+Performs a system reboot or service restart. Requires a valid session.
+
+**Body:** `{ "action": "reboot" }` or `{ "action": "restart-service" }`
+
+**Response:** `{ "ok": true, "message": "System reboot scheduled" }`
+
+The `restart-service` action requires the app to be managed by systemd (as the `home-screens` service).
 
 ### GET /api/system/backups
 
-Lists available configuration backups.
+Lists available configuration backups. Requires a valid session.
+
+**Response:**
+```json
+{
+  "backups": [
+    { "name": "config-v0.9.0-20260308-120000.json", "size": 4096, "date": "2026-03-08T12:00:00Z" }
+  ]
+}
+```
+
+Pass `?download=config-v0.9.0-20260308-120000.json` to download a specific backup file.
+
+### POST /api/system/backups
+
+Restores a configuration backup. Requires a valid session.
+
+**Body:** `{ "name": "config-v0.9.0-20260308-120000.json" }`
+
+**Response:** `{ "ok": true }`
 
 ---
 

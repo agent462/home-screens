@@ -22,14 +22,13 @@ The script handles everything:
 1. **Node.js 20** — installs via NodeSource
 2. **Chromium** — installs the browser for kiosk mode
 3. **System dependencies** — required packages for building native modules
-4. **Environment setup** — prompts for API keys and writes `.env.local`
-5. **npm install** — installs all dependencies
-6. **Production build** — runs `npm run build`
-7. **systemd services** — creates and enables two services:
+4. **npm install** — installs all dependencies
+5. **Production build** — runs `npm run build`
+6. **systemd services** — creates and enables two services:
    - `home-screens` — the Next.js production server
    - `home-screens-kiosk` — Chromium in fullscreen kiosk mode
-8. **Screen blanking** — disables DPMS/screen saver to keep the display on
-9. **Autologin** — configures automatic login for the kiosk user
+7. **Screen blanking** — disables DPMS/screen saver to keep the display on
+8. **Autologin** — configures automatic login for the kiosk user
 
 ## Post-Install
 
@@ -40,6 +39,10 @@ sudo reboot
 ```
 
 After reboot, the display should automatically show the fullscreen view. To configure your screens, visit `http://<pi-ip>:3000/editor` from another device on your network.
+
+### Configuring API Keys
+
+API keys are configured through the editor UI, not environment files. Open the editor and go to **Settings > Integrations** to enter your API keys for weather providers, Unsplash, Todoist, TomTom, and other services.
 
 ## Display Orientation
 
