@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
 import { editorFetch } from '@/lib/editor-fetch';
@@ -12,6 +12,7 @@ import Toggle from '@/components/ui/Toggle';
 import ColorPicker from '@/components/ui/ColorPicker';
 import Button from '@/components/ui/Button';
 import BackgroundPicker from '@/components/editor/BackgroundPicker';
+import ImageBrowserModal from '@/components/editor/ImageBrowserModal';
 import type { ModuleInstance, CountdownEvent, TodoItem, WeatherView, WeatherIconSet, WeatherProviderOption, StockTickerView, CryptoView, NewsView, SportsView, StandingsView, StandingsGrouping } from '@/types/config';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -456,39 +457,135 @@ function TextConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: s
 
 function ImageConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
   const { config: c, set } = useModuleConfig<{ src?: string; objectFit?: string; alt?: string }>(mod, screenId);
+  const [tab, setTab] = useState<'url' | 'library'>(() => {
+    // Default to library tab if src is a local serve URL
+    const src = (c.src as string) || '';
+    return src.startsWith('/api/backgrounds/serve') ? 'library' : 'url';
+  });
+  const [showBrowser, setShowBrowser] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const handleQuickUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setUploadError(null);
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const res = await editorFetch('/api/backgrounds', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (res.ok && data.path) {
+        set({ src: data.path });
+      } else {
+        setUploadError(data.error || 'Upload failed');
+      }
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Upload failed');
+    }
+    setUploading(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   return (
     <>
-      <label className="flex flex-col gap-0.5">
-        <span className="text-xs text-neutral-400">Image URL</span>
-        <input
-          type="text"
-          value={(c.src as string) || ''}
-          onChange={(e) => set({ src: e.target.value })}
-          className={INPUT_CLASS}
+      {/* Tab toggle */}
+      <div>
+        <span className="text-xs text-neutral-400">Image Source</span>
+        <div className="flex gap-1 bg-neutral-800 rounded-md p-0.5 mt-1">
+          <button
+            onClick={() => setTab('url')}
+            className={`flex-1 text-xs py-1 rounded ${
+              tab === 'url' ? 'bg-neutral-700 text-neutral-100' : 'text-neutral-400 hover:text-neutral-300'
+            }`}
+          >
+            URL
+          </button>
+          <button
+            onClick={() => setTab('library')}
+            className={`flex-1 text-xs py-1 rounded ${
+              tab === 'library' ? 'bg-neutral-700 text-neutral-100' : 'text-neutral-400 hover:text-neutral-300'
+            }`}
+          >
+            Library
+          </button>
+        </div>
+      </div>
+
+      {tab === 'url' ? (
+        <label className="flex flex-col gap-0.5">
+          <span className="text-xs text-neutral-400">Image URL</span>
+          <input
+            type="text"
+            value={(c.src as string) || ''}
+            onChange={(e) => set({ src: e.target.value })}
+            className={INPUT_CLASS}
+            placeholder="https://example.com/photo.jpg"
+          />
+        </label>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          <div className="flex gap-1.5">
+            <Button size="sm" onClick={() => setShowBrowser(true)} className="flex-1">
+              Browse Library...
+            </Button>
+            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleQuickUpload} className="hidden" />
+            <Button size="sm" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="flex-1">
+              {uploading ? 'Uploading...' : 'Upload Image'}
+            </Button>
+          </div>
+          {uploadError && <p className="text-xs text-red-400">{uploadError}</p>}
+        </div>
+      )}
+
+      {/* Preview */}
+      {c.src && (
+        <div>
+          <span className="text-xs text-neutral-400">Preview</span>
+          <div className="mt-1 rounded-md overflow-hidden border border-neutral-700">
+            <img
+              src={c.src as string}
+              alt={(c.alt as string) || ''}
+              className="w-full max-h-28 object-cover"
+            />
+          </div>
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <label className="flex flex-col gap-0.5 flex-1">
+          <span className="text-xs text-neutral-400">Object Fit</span>
+          <select
+            value={(c.objectFit as string) || 'cover'}
+            onChange={(e) => set({ objectFit: e.target.value })}
+            className={INPUT_CLASS}
+          >
+            <option value="cover">Cover</option>
+            <option value="contain">Contain</option>
+            <option value="fill">Fill</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-0.5 flex-1">
+          <span className="text-xs text-neutral-400">Alt Text</span>
+          <input
+            type="text"
+            value={(c.alt as string) || ''}
+            onChange={(e) => set({ alt: e.target.value })}
+            className={INPUT_CLASS}
+          />
+        </label>
+      </div>
+
+      {showBrowser && (
+        <ImageBrowserModal
+          mode="pick-image"
+          onSelectImage={(url) => set({ src: url })}
+          onClose={() => setShowBrowser(false)}
         />
-      </label>
-      <label className="flex flex-col gap-0.5">
-        <span className="text-xs text-neutral-400">Object Fit</span>
-        <select
-          value={(c.objectFit as string) || 'cover'}
-          onChange={(e) => set({ objectFit: e.target.value })}
-          className={INPUT_CLASS}
-        >
-          <option value="cover">Cover</option>
-          <option value="contain">Contain</option>
-          <option value="fill">Fill</option>
-        </select>
-      </label>
-      <label className="flex flex-col gap-0.5">
-        <span className="text-xs text-neutral-400">Alt Text</span>
-        <input
-          type="text"
-          value={(c.alt as string) || ''}
-          onChange={(e) => set({ alt: e.target.value })}
-          className={INPUT_CLASS}
-        />
-      </label>
+      )}
     </>
   );
 }
@@ -913,19 +1010,72 @@ function SunriseSunsetConfigSection({ mod, screenId }: { mod: ModuleInstance; sc
 
 function PhotoSlideshowConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
   const { config: c, set } = useModuleConfig<{ directory?: string; intervalMs?: number; transition?: string; objectFit?: string }>(mod, screenId);
+  const [showBrowser, setShowBrowser] = useState(false);
+  const [previewImages, setPreviewImages] = useState<string[]>([]);
+  const [photoCount, setPhotoCount] = useState(0);
+
+  const directory = (c.directory as string) || '';
+
+  // Fetch preview images when directory changes
+  const fetchPreviews = useCallback(async (dir: string) => {
+    try {
+      const url = dir
+        ? `/api/backgrounds?directory=${encodeURIComponent(dir)}`
+        : '/api/backgrounds';
+      const res = await editorFetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        const images = Array.isArray(data) ? data : [];
+        setPhotoCount(images.length);
+        setPreviewImages(images.slice(0, 4));
+      }
+    } catch {
+      setPreviewImages([]);
+      setPhotoCount(0);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPreviews(directory);
+  }, [directory, fetchPreviews]);
 
   return (
     <>
-      <label className="flex flex-col gap-0.5">
-        <span className="text-xs text-neutral-400">Directory (subfolder in backgrounds)</span>
-        <input
-          type="text"
-          value={(c.directory as string) || ''}
-          onChange={(e) => set({ directory: e.target.value })}
-          placeholder="Leave empty for all backgrounds"
-          className={INPUT_CLASS}
-        />
-      </label>
+      {/* Folder picker */}
+      <div>
+        <span className="text-xs text-neutral-400">Folder</span>
+        <div className="flex gap-1.5 mt-1">
+          <div className="flex-1 px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-300 truncate">
+            {directory || 'All Photos (root)'}
+          </div>
+          <Button size="sm" onClick={() => setShowBrowser(true)}>
+            Browse...
+          </Button>
+        </div>
+        {/* Photo count + preview strip */}
+        {photoCount > 0 && (
+          <div className="mt-1.5">
+            <span className="text-[10px] text-neutral-500">
+              {photoCount} {photoCount === 1 ? 'photo' : 'photos'}
+            </span>
+            <div className="flex gap-1 mt-1 overflow-x-auto">
+              {previewImages.map((img) => (
+                <img
+                  key={img}
+                  src={img}
+                  alt=""
+                  loading="lazy"
+                  className="w-12 h-12 rounded object-cover flex-shrink-0 border border-neutral-700"
+                />
+              ))}
+            </div>
+          </div>
+        )}
+        {photoCount === 0 && (
+          <p className="text-[10px] text-neutral-500 mt-1">No photos in this folder</p>
+        )}
+      </div>
+
       <Slider
         label="Slide Interval (seconds)"
         value={(c.intervalMs ?? 30000) / 1000}
@@ -934,29 +1084,44 @@ function PhotoSlideshowConfigSection({ mod, screenId }: { mod: ModuleInstance; s
         step={5}
         onChange={(v) => set({ intervalMs: v * 1000 })}
       />
-      <label className="flex flex-col gap-0.5">
-        <span className="text-xs text-neutral-400">Transition</span>
-        <select
-          value={(c.transition as string) || 'fade'}
-          onChange={(e) => set({ transition: e.target.value })}
-          className={INPUT_CLASS}
-        >
-          <option value="fade">Fade</option>
-          <option value="none">None</option>
-        </select>
-      </label>
-      <label className="flex flex-col gap-0.5">
-        <span className="text-xs text-neutral-400">Object Fit</span>
-        <select
-          value={(c.objectFit as string) || 'cover'}
-          onChange={(e) => set({ objectFit: e.target.value })}
-          className={INPUT_CLASS}
-        >
-          <option value="cover">Cover</option>
-          <option value="contain">Contain</option>
-          <option value="fill">Fill</option>
-        </select>
-      </label>
+
+      <div className="flex gap-2">
+        <label className="flex flex-col gap-0.5 flex-1">
+          <span className="text-xs text-neutral-400">Transition</span>
+          <select
+            value={(c.transition as string) || 'fade'}
+            onChange={(e) => set({ transition: e.target.value })}
+            className={INPUT_CLASS}
+          >
+            <option value="fade">Fade</option>
+            <option value="none">None</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-0.5 flex-1">
+          <span className="text-xs text-neutral-400">Object Fit</span>
+          <select
+            value={(c.objectFit as string) || 'cover'}
+            onChange={(e) => set({ objectFit: e.target.value })}
+            className={INPUT_CLASS}
+          >
+            <option value="cover">Cover</option>
+            <option value="contain">Contain</option>
+            <option value="fill">Fill</option>
+          </select>
+        </label>
+      </div>
+
+      {showBrowser && (
+        <ImageBrowserModal
+          mode="manage-directory"
+          initialDirectory={directory}
+          onSelectDirectory={(dir) => {
+            set({ directory: dir });
+            fetchPreviews(dir);
+          }}
+          onClose={() => setShowBrowser(false)}
+        />
+      )}
     </>
   );
 }

@@ -15,8 +15,16 @@ const MIME_TYPES: Record<string, string> = {
   '.svg': 'image/svg+xml',
 };
 
+/** Validate and resolve a relative path within BGS, preventing directory traversal */
+function safePath(relativePath: string): string | null {
+  const resolved = path.resolve(BGS, relativePath);
+  if (!resolved.startsWith(BGS + path.sep) && resolved !== BGS) return null;
+  return resolved;
+}
+
 /**
  * GET /api/backgrounds/serve?file=unsplash-xyz.jpg
+ * GET /api/backgrounds/serve?file=themes/christmas/photo.jpg
  *
  * Serves background images directly from the filesystem, bypassing
  * Next.js static file caching (which doesn't pick up files added at runtime).
@@ -28,12 +36,14 @@ export async function GET(request: NextRequest) {
   }
 
   // Prevent directory traversal
-  const safe = path.basename(filename);
-  const filePath = path.join(BGS, safe);
+  const filePath = safePath(filename);
+  if (!filePath) {
+    return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
+  }
 
   try {
     const buffer = await fs.readFile(filePath);
-    const ext = path.extname(safe).toLowerCase();
+    const ext = path.extname(filePath).toLowerCase();
     const contentType = MIME_TYPES[ext] || 'application/octet-stream';
 
     return new NextResponse(buffer, {

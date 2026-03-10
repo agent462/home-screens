@@ -62,6 +62,7 @@ function isPublicAuthRoute(pathname: string): boolean {
 const PROTECTED_GET_ROUTES = [
   '/api/secrets',
   '/api/calendars',
+  '/api/backgrounds/directories',
   '/api/system/backups',
   '/api/system/changelog',
   '/api/system/version',

@@ -9,20 +9,49 @@ export const dynamic = 'force-dynamic';
 
 const BGS = path.join(process.cwd(), BACKGROUNDS_DIR);
 
-/** Helper: resolve a background filename to its serve URL */
-function serveUrl(filename: string) {
-  return `/api/backgrounds/serve?file=${encodeURIComponent(filename)}`;
+/** Validate and resolve a relative path within BGS, preventing directory traversal */
+function safePath(relativePath: string): string | null {
+  const resolved = path.resolve(BGS, relativePath);
+  if (!resolved.startsWith(BGS + path.sep) && resolved !== BGS) return null;
+  return resolved;
 }
 
-export async function GET() {
+/** Helper: resolve a background filename to its serve URL */
+function serveUrl(filename: string, directory?: string) {
+  const filePath = directory ? `${directory}/${filename}` : filename;
+  return `/api/backgrounds/serve?file=${encodeURIComponent(filePath)}`;
+}
+
+export async function GET(request: NextRequest) {
   try {
-    const dir = BGS;
-    await fs.mkdir(dir, { recursive: true });
-    const files = await fs.readdir(dir);
-    const images = files.filter((f) =>
-      /\.(jpe?g|png|webp|gif|svg|avif)$/i.test(f),
-    );
-    const paths = images.map((f) => serveUrl(f));
+    const directory = request.nextUrl.searchParams.get('directory') || '';
+
+    let dir: string;
+    if (directory) {
+      const resolved = safePath(directory);
+      if (!resolved) {
+        return NextResponse.json({ error: 'Invalid directory' }, { status: 400 });
+      }
+      dir = resolved;
+    } else {
+      dir = BGS;
+    }
+
+    // Only auto-create the root directory; subdirectories must already exist
+    if (!directory) {
+      await fs.mkdir(dir, { recursive: true });
+    } else {
+      try {
+        await fs.access(dir);
+      } catch {
+        return NextResponse.json([], { status: 200 });
+      }
+    }
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    const images = entries
+      .filter((e) => e.isFile() && /\.(jpe?g|png|webp|gif|svg|avif)$/i.test(e.name))
+      .map((e) => e.name);
+    const paths = images.map((name) => serveUrl(name, directory || undefined));
     return NextResponse.json(paths);
   } catch (error) {
     return errorResponse(error, 'Failed to list backgrounds');
@@ -33,31 +62,55 @@ export async function POST(request: NextRequest) {
   try {
     await requireSession(request);
     const formData = await request.formData();
-    const file = formData.get('file') as File | null;
+    const directory = (formData.get('directory') as string) || '';
 
-    if (!file) {
+    let dir: string;
+    if (directory) {
+      const resolved = safePath(directory);
+      if (!resolved) {
+        return NextResponse.json({ error: 'Invalid directory' }, { status: 400 });
+      }
+      dir = resolved;
+    } else {
+      dir = BGS;
+    }
+
+    const files = formData.getAll('file') as File[];
+
+    if (files.length === 0 || !files[0]?.name) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
     const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
-    if (file.size > MAX_SIZE) {
-      return NextResponse.json({ error: 'File too large (max 10 MB)' }, { status: 413 });
-    }
-
     const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml', 'image/avif'];
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      return NextResponse.json({ error: 'Invalid file type' }, { status: 400 });
+
+    // Validate all files first
+    for (const file of files) {
+      if (file.size > MAX_SIZE) {
+        return NextResponse.json({ error: `File too large: ${file.name} (max 10 MB)` }, { status: 413 });
+      }
+      if (!ALLOWED_TYPES.includes(file.type)) {
+        return NextResponse.json({ error: `Invalid file type: ${file.name}` }, { status: 400 });
+      }
     }
 
-    const dir = BGS;
     await fs.mkdir(dir, { recursive: true });
 
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const filePath = path.join(dir, safeName);
-    const buffer = Buffer.from(await file.arrayBuffer());
-    await fs.writeFile(filePath, buffer);
+    const uploadedPaths: string[] = [];
 
-    return NextResponse.json({ path: serveUrl(safeName) }, { status: 201 });
+    for (const file of files) {
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const filePath = path.join(dir, safeName);
+      const buffer = Buffer.from(await file.arrayBuffer());
+      await fs.writeFile(filePath, buffer);
+      uploadedPaths.push(serveUrl(safeName, directory || undefined));
+    }
+
+    if (files.length === 1) {
+      return NextResponse.json({ path: uploadedPaths[0] }, { status: 201 });
+    }
+
+    return NextResponse.json({ paths: uploadedPaths }, { status: 201 });
   } catch (error) {
     if (error instanceof Response) return error;
     return errorResponse(error, 'Failed to upload background');
@@ -67,14 +120,17 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     await requireSession(request);
-    const { file } = await request.json();
+    const { file, directory } = await request.json();
     if (!file || typeof file !== 'string') {
       return NextResponse.json({ error: 'file parameter required' }, { status: 400 });
     }
 
-    // Prevent directory traversal
-    const safe = path.basename(file);
-    const filePath = path.join(BGS, safe);
+    // Resolve file within optional directory
+    const relativePath = directory ? `${directory}/${path.basename(file)}` : path.basename(file);
+    const filePath = safePath(relativePath);
+    if (!filePath) {
+      return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
+    }
 
     try {
       await fs.access(filePath);
@@ -83,7 +139,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     await fs.unlink(filePath);
-    return NextResponse.json({ deleted: safe });
+    return NextResponse.json({ deleted: path.basename(file) });
   } catch (error) {
     if (error instanceof Response) return error;
     return errorResponse(error, 'Failed to delete background');
