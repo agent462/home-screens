@@ -122,7 +122,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       size: { ...def.defaultSize },
       zIndex: 1,
       config: { ...def.defaultConfig },
-      style: { ...defaultStyle },
+      style: { ...defaultStyle, ...def.defaultStyle },
     };
     const updated = {
       ...config,

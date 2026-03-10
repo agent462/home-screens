@@ -9,6 +9,7 @@ export function useRotatingIndex(itemCount: number, intervalMs: number): number 
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
+    setIndex(0);
     if (itemCount <= 1) return;
     const id = setInterval(() => {
       setIndex((prev) => (prev + 1) % itemCount);

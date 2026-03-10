@@ -191,7 +191,7 @@ function GridOverlay({ scale }: { scale: number }) {
           height={scaledGrid}
           patternUnits="userSpaceOnUse"
         >
-          <circle cx={scaledGrid} cy={scaledGrid} r={0.5} fill="rgba(255,255,255,0.15)" />
+          <circle cx={scaledGrid} cy={scaledGrid} r={0.5} fill="rgba(255,255,255,0.45)" />
         </pattern>
       </defs>
       <rect width="100%" height="100%" fill="url(#editor-grid)" />
