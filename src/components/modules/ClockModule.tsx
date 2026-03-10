@@ -31,7 +31,7 @@ export default function ClockModule({ config, style, timezone }: ClockModuleProp
   return (
     <ModuleWrapper style={style}>
       <div className="flex flex-col items-center justify-center h-full">
-        <span className="font-light tracking-tight" style={{ fontSize: '3em' }}>
+        <span className="font-light tracking-tight tabular-nums" style={{ fontSize: '3em' }}>
           {format(now, timeFormat)}
         </span>
         {config.showDate && (
