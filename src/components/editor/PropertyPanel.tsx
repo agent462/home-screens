@@ -12,7 +12,7 @@ import Toggle from '@/components/ui/Toggle';
 import ColorPicker from '@/components/ui/ColorPicker';
 import Button from '@/components/ui/Button';
 import BackgroundPicker from '@/components/editor/BackgroundPicker';
-import type { ModuleInstance, CountdownEvent, TodoItem, WeatherView, WeatherIconSet, WeatherProviderOption, StockTickerView, CryptoView, NewsView, SportsView } from '@/types/config';
+import type { ModuleInstance, CountdownEvent, TodoItem, WeatherView, WeatherIconSet, WeatherProviderOption, StockTickerView, CryptoView, NewsView, SportsView, StandingsView, StandingsGrouping } from '@/types/config';
 import { v4 as uuidv4 } from 'uuid';
 
 const INPUT_CLASS = 'w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200';
@@ -1383,6 +1383,225 @@ function RainMapConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId
   );
 }
 
+function GarbageDayConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
+  const { config: c, set } = useModuleConfig<{
+    trashDay?: number; trashFrequency?: string; trashStartDate?: string; trashColor?: string;
+    recyclingDay?: number; recyclingFrequency?: string; recyclingStartDate?: string; recyclingColor?: string;
+    customDay?: number; customFrequency?: string; customStartDate?: string; customColor?: string;
+    customLabel?: string; highlightMode?: string;
+  }>(mod, screenId);
+
+  const dayOptions = [
+    { label: 'Disabled', value: -1 },
+    { label: 'Sunday', value: 0 },
+    { label: 'Monday', value: 1 },
+    { label: 'Tuesday', value: 2 },
+    { label: 'Wednesday', value: 3 },
+    { label: 'Thursday', value: 4 },
+    { label: 'Friday', value: 5 },
+    { label: 'Saturday', value: 6 },
+  ];
+
+  const defaultColors: Record<string, string> = { trash: '#6ee7b7', recycling: '#93c5fd', custom: '#fbbf24' };
+
+  const wasteTypes = [
+    { key: 'trash', label: 'Trash', day: c.trashDay, freq: c.trashFrequency, start: c.trashStartDate, color: c.trashColor },
+    { key: 'recycling', label: 'Recycling', day: c.recyclingDay, freq: c.recyclingFrequency, start: c.recyclingStartDate, color: c.recyclingColor },
+    { key: 'custom', label: c.customLabel || 'Custom', day: c.customDay, freq: c.customFrequency, start: c.customStartDate, color: c.customColor },
+  ] as const;
+
+  return (
+    <>
+      {wasteTypes.map(({ key, label, day, freq, start, color }) => (
+        <div key={key} className="space-y-1.5 pb-2 border-b border-neutral-800 last:border-0">
+          <label className="flex flex-col gap-0.5">
+            <span className="text-xs text-neutral-400">{label} Day</span>
+            <select className={INPUT_CLASS} value={day ?? -1} onChange={(e) => set({ [`${key}Day`]: Number(e.target.value) })}>
+              {dayOptions.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
+            </select>
+          </label>
+          {(day ?? -1) >= 0 && (
+            <>
+              <label className="flex flex-col gap-0.5">
+                <span className="text-xs text-neutral-400">Frequency</span>
+                <select className={INPUT_CLASS} value={freq ?? 'weekly'} onChange={(e) => set({ [`${key}Frequency`]: e.target.value })}>
+                  <option value="weekly">Every week</option>
+                  <option value="biweekly">Every other week</option>
+                </select>
+              </label>
+              {freq === 'biweekly' && (
+                <label className="flex flex-col gap-0.5">
+                  <span className="text-xs text-neutral-400">A known {label.toLowerCase()} date</span>
+                  <input type="date" className={INPUT_CLASS} value={start ?? ''} onChange={(e) => set({ [`${key}StartDate`]: e.target.value })} />
+                  <span className="text-[10px] text-neutral-500">Pick any date when {label.toLowerCase()} was/will be collected</span>
+                </label>
+              )}
+              <ColorPicker label="Icon Color" value={color || defaultColors[key]} onChange={(v) => set({ [`${key}Color`]: v })} />
+            </>
+          )}
+        </div>
+      ))}
+      {(c.customDay ?? -1) >= 0 && (
+        <label className="flex flex-col gap-0.5">
+          <span className="text-xs text-neutral-400">Custom Category Name</span>
+          <input type="text" className={INPUT_CLASS} value={c.customLabel ?? 'Yard Waste'} onChange={(e) => set({ customLabel: e.target.value })} />
+        </label>
+      )}
+      <label className="flex flex-col gap-0.5">
+        <span className="text-xs text-neutral-400">Highlight When</span>
+        <select className={INPUT_CLASS} value={c.highlightMode ?? 'day-before'} onChange={(e) => set({ highlightMode: e.target.value })}>
+          <option value="day-before">Day Before (put bins out)</option>
+          <option value="day-of">Day Of (collection day)</option>
+        </select>
+      </label>
+    </>
+  );
+}
+
+function MultiMonthConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
+  const { config: c, set } = useModuleConfig<{ view?: string; monthCount?: number; startDay?: string; showWeekNumbers?: boolean; highlightWeekends?: boolean; showAdjacentDays?: boolean }>(mod, screenId);
+
+  return (
+    <>
+      <label className="flex flex-col gap-0.5">
+        <span className="text-xs text-neutral-400">Layout</span>
+        <select
+          value={c.view ?? 'vertical'}
+          onChange={(e) => set({ view: e.target.value })}
+          className={INPUT_CLASS}
+        >
+          <option value="vertical">Vertical (stacked)</option>
+          <option value="horizontal">Horizontal (side by side)</option>
+        </select>
+      </label>
+      <Slider label="Months to Show" value={c.monthCount ?? 3} min={1} max={6} step={1} onChange={(v) => set({ monthCount: v })} />
+      <label className="flex flex-col gap-0.5">
+        <span className="text-xs text-neutral-400">Week Starts On</span>
+        <select
+          value={c.startDay ?? 'sunday'}
+          onChange={(e) => set({ startDay: e.target.value })}
+          className={INPUT_CLASS}
+        >
+          <option value="sunday">Sunday</option>
+          <option value="monday">Monday</option>
+        </select>
+      </label>
+      <Toggle label="Show Week Numbers" checked={c.showWeekNumbers === true} onChange={(v) => set({ showWeekNumbers: v })} />
+      <Toggle label="Highlight Weekends" checked={c.highlightWeekends !== false} onChange={(v) => set({ highlightWeekends: v })} />
+      <Toggle label="Show Adjacent Days" checked={c.showAdjacentDays !== false} onChange={(v) => set({ showAdjacentDays: v })} />
+    </>
+  );
+}
+
+const STANDINGS_VIEWS: { value: StandingsView; label: string }[] = [
+  { value: 'table', label: 'Table' },
+  { value: 'compact', label: 'Compact' },
+  { value: 'conference', label: 'Conference' },
+];
+
+const STANDINGS_GROUPINGS: { value: StandingsGrouping; label: string }[] = [
+  { value: 'division', label: 'By Division' },
+  { value: 'conference', label: 'By Conference' },
+  { value: 'league', label: 'Full League' },
+];
+
+const STANDINGS_LEAGUES: { value: string; label: string }[] = [
+  { value: 'nfl', label: 'NFL' },
+  { value: 'nba', label: 'NBA' },
+  { value: 'mlb', label: 'MLB' },
+  { value: 'nhl', label: 'NHL' },
+  { value: 'wnba', label: 'WNBA' },
+  { value: 'mls', label: 'MLS' },
+  { value: 'epl', label: 'Premier League' },
+  { value: 'laliga', label: 'La Liga' },
+  { value: 'bundesliga', label: 'Bundesliga' },
+  { value: 'seriea', label: 'Serie A' },
+  { value: 'ligue1', label: 'Ligue 1' },
+  { value: 'liga_mx', label: 'Liga MX' },
+];
+
+function StandingsConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
+  const { config: c, set } = useModuleConfig<{
+    view?: StandingsView;
+    league?: string;
+    grouping?: StandingsGrouping;
+    teamsToShow?: number;
+    showPlayoffLine?: boolean;
+    rotationIntervalMs?: number;
+    refreshIntervalMs?: number;
+  }>(mod, screenId);
+
+  return (
+    <>
+      <div className="space-y-1">
+        <span className="text-xs text-neutral-400">View</span>
+        <select
+          value={c.view ?? 'table'}
+          onChange={(e) => set({ view: e.target.value as StandingsView })}
+          className={INPUT_CLASS}
+        >
+          {STANDINGS_VIEWS.map((v) => (
+            <option key={v.value} value={v.value}>{v.label}</option>
+          ))}
+        </select>
+      </div>
+      <div className="space-y-1">
+        <span className="text-xs text-neutral-400">League</span>
+        <select
+          value={c.league ?? 'nba'}
+          onChange={(e) => set({ league: e.target.value })}
+          className={INPUT_CLASS}
+        >
+          {STANDINGS_LEAGUES.map((l) => (
+            <option key={l.value} value={l.value}>{l.label}</option>
+          ))}
+        </select>
+      </div>
+      <div className="space-y-1">
+        <span className="text-xs text-neutral-400">Grouping</span>
+        <select
+          value={c.grouping ?? 'conference'}
+          onChange={(e) => set({ grouping: e.target.value as StandingsGrouping })}
+          className={INPUT_CLASS}
+        >
+          {STANDINGS_GROUPINGS.map((g) => (
+            <option key={g.value} value={g.value}>{g.label}</option>
+          ))}
+        </select>
+      </div>
+      <Toggle
+        label="Playoff Cutoff Line"
+        checked={c.showPlayoffLine !== false}
+        onChange={(v) => set({ showPlayoffLine: v })}
+      />
+      <Slider
+        label="Teams to Show (0 = all)"
+        value={c.teamsToShow ?? 0}
+        min={0}
+        max={32}
+        step={1}
+        onChange={(v) => set({ teamsToShow: v })}
+      />
+      <Slider
+        label="Rotation (seconds)"
+        value={(c.rotationIntervalMs ?? 10000) / 1000}
+        min={5}
+        max={60}
+        step={5}
+        onChange={(v) => set({ rotationIntervalMs: v * 1000 })}
+      />
+      <Slider
+        label="Refresh (minutes)"
+        value={(c.refreshIntervalMs ?? 300000) / 60000}
+        min={1}
+        max={60}
+        step={1}
+        onChange={(v) => set({ refreshIntervalMs: v * 60000 })}
+      />
+    </>
+  );
+}
+
 const CONFIG_SECTIONS: Record<string, React.FC<{ mod: ModuleInstance; screenId: string }>> = {
   clock: ClockConfigSection,
   calendar: CalendarConfigSection,
@@ -1409,6 +1628,9 @@ const CONFIG_SECTIONS: Record<string, React.FC<{ mod: ModuleInstance; screenId: 
   'air-quality': AirQualityConfigSection,
   todoist: TodoistConfigSection,
   'rain-map': RainMapConfigSection,
+  'multi-month': MultiMonthConfigSection,
+  'garbage-day': GarbageDayConfigSection,
+  standings: StandingsConfigSection,
 };
 
 export default function PropertyPanel() {

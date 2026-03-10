@@ -5,7 +5,7 @@ import {
   Quote, ListTodo, StickyNote, HandMetal,
   Newspaper, TrendingUp, Bitcoin, BookOpen, History,
   Moon, Sunrise, Image, QrCode, BarChart3, Car, Trophy, Wind,
-  ListChecks, CloudRain,
+  ListChecks, CloudRain, CalendarRange, Trash2, Medal,
 } from 'lucide-react';
 import { DEFAULT_MODULE_SIZES } from './constants';
 
@@ -35,6 +35,7 @@ export interface ModuleDefinition {
   category: ModuleCategory;
   defaultConfig: Record<string, unknown>;
   defaultSize: { w: number; h: number };
+  defaultStyle?: Partial<import('@/types/config').ModuleStyle>;
 }
 
 const registry = new Map<ModuleType, ModuleDefinition>();
@@ -432,4 +433,62 @@ registerModule({
     mapStyle: 'dark',
   },
   defaultSize: DEFAULT_MODULE_SIZES['rain-map'],
+});
+
+registerModule({
+  type: 'garbage-day',
+  label: 'Garbage Day',
+  icon: Trash2,
+  category: 'Personal',
+  defaultConfig: {
+    trashDay: 1,       // Monday
+    trashFrequency: 'weekly',
+    trashStartDate: '',
+    trashColor: '#6ee7b7',
+    recyclingDay: 1,
+    recyclingFrequency: 'weekly',
+    recyclingStartDate: '',
+    recyclingColor: '#93c5fd',
+    customDay: -1,     // disabled
+    customFrequency: 'weekly',
+    customStartDate: '',
+    customColor: '#fbbf24',
+    customLabel: 'Yard Waste',
+    highlightMode: 'day-before',
+  },
+  defaultSize: DEFAULT_MODULE_SIZES['garbage-day'],
+});
+
+registerModule({
+  type: 'multi-month',
+  label: 'Multi-Month Calendar',
+  icon: CalendarRange,
+  category: 'Time & Date',
+  defaultConfig: {
+    view: 'vertical',
+    monthCount: 3,
+    startDay: 'sunday',
+    showWeekNumbers: false,
+    highlightWeekends: true,
+    showAdjacentDays: true,
+  },
+  defaultSize: DEFAULT_MODULE_SIZES['multi-month'],
+  defaultStyle: { fontSize: 26 },
+});
+
+registerModule({
+  type: 'standings',
+  label: 'Sports Standings',
+  icon: Medal,
+  category: 'News & Finance',
+  defaultConfig: {
+    view: 'table',
+    league: 'nba',
+    grouping: 'conference',
+    teamsToShow: 0,
+    showPlayoffLine: true,
+    rotationIntervalMs: 10000,
+    refreshIntervalMs: 300000,
+  },
+  defaultSize: DEFAULT_MODULE_SIZES.standings,
 });

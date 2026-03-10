@@ -24,7 +24,10 @@ export type ModuleType =
   | 'sports'
   | 'air-quality'
   | 'todoist'
-  | 'rain-map';
+  | 'rain-map'
+  | 'multi-month'
+  | 'garbage-day'
+  | 'standings';
 
 export interface ModuleStyle {
   opacity: number;
@@ -377,6 +380,38 @@ export interface AirQualityConfig {
   refreshIntervalMs: number;
 }
 
+// Multi-month calendar config
+export type MultiMonthView = 'vertical' | 'horizontal';
+
+export interface MultiMonthConfig {
+  view: MultiMonthView;
+  monthCount: number;
+  startDay: 'sunday' | 'monday';
+  showWeekNumbers: boolean;
+  highlightWeekends: boolean;
+  showAdjacentDays: boolean;
+}
+
+// Garbage day module config
+export type GarbageFrequency = 'weekly' | 'biweekly';
+
+export interface GarbageDayConfig {
+  trashDay: number;            // 0=Sun, 1=Mon, ..., 6=Sat, -1=disabled
+  trashFrequency: GarbageFrequency;
+  trashStartDate: string;      // ISO date anchor for biweekly calculation
+  trashColor: string;
+  recyclingDay: number;
+  recyclingFrequency: GarbageFrequency;
+  recyclingStartDate: string;
+  recyclingColor: string;
+  customDay: number;
+  customFrequency: GarbageFrequency;
+  customStartDate: string;
+  customColor: string;
+  customLabel: string;
+  highlightMode: 'day-of' | 'day-before';
+}
+
 // Rain map module config
 export type RainMapStyle = 'dark' | 'standard';
 
@@ -394,5 +429,19 @@ export interface RainMapConfig {
   showTimeline: boolean;
   refreshIntervalMs: number;
   mapStyle: RainMapStyle;
+}
+
+// Standings module config
+export type StandingsView = 'table' | 'compact' | 'conference';
+export type StandingsGrouping = 'division' | 'conference' | 'league';
+
+export interface StandingsConfig {
+  view: StandingsView;
+  league: string;
+  grouping: StandingsGrouping;
+  teamsToShow: number;
+  showPlayoffLine: boolean;
+  rotationIntervalMs: number;
+  refreshIntervalMs: number;
 }
 

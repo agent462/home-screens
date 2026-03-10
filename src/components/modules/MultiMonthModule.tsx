@@ -1,0 +1,250 @@
+'use client';
+
+import { useTZClock } from '@/hooks/useTZClock';
+import type { MultiMonthConfig, ModuleStyle } from '@/types/config';
+import ModuleWrapper from './ModuleWrapper';
+
+interface MultiMonthModuleProps {
+  config: MultiMonthConfig;
+  style: ModuleStyle;
+  timezone?: string;
+}
+
+const DAY_HEADERS_SUN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAY_HEADERS_MON = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+function getMonthGrid(year: number, month: number, startDay: 'sunday' | 'monday') {
+  const firstOfMonth = new Date(year, month, 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+  let startOffset = firstOfMonth.getDay();
+  if (startDay === 'monday') {
+    startOffset = startOffset === 0 ? 6 : startOffset - 1;
+  }
+
+  const cells: { day: number; current: boolean }[] = [];
+
+  for (let i = startOffset - 1; i >= 0; i--) {
+    cells.push({ day: daysInPrevMonth - i, current: false });
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    cells.push({ day: d, current: true });
+  }
+  const remainder = cells.length % 7;
+  if (remainder > 0) {
+    const fill = 7 - remainder;
+    for (let d = 1; d <= fill; d++) {
+      cells.push({ day: d, current: false });
+    }
+  }
+
+  return cells;
+}
+
+function getISOWeek(date: Date): number {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+}
+
+function MonthGrid({
+  year,
+  month,
+  today,
+  startDay,
+  showWeekNumbers,
+  highlightWeekends,
+  showAdjacentDays,
+}: {
+  year: number;
+  month: number;
+  today: { year: number; month: number; day: number };
+  startDay: 'sunday' | 'monday';
+  showWeekNumbers: boolean;
+  highlightWeekends: boolean;
+  showAdjacentDays: boolean;
+}) {
+  const cells = getMonthGrid(year, month, startDay);
+  const headers = startDay === 'monday' ? DAY_HEADERS_MON : DAY_HEADERS_SUN;
+  const monthName = new Date(year, month, 1).toLocaleString('default', { month: 'long' });
+  const isCurrentMonth = year === today.year && month === today.month;
+  const gridCols = showWeekNumbers ? '1.4em repeat(7, 1fr)' : 'repeat(7, 1fr)';
+
+  // Week numbers for each row
+  const weeks: number[] = [];
+  if (showWeekNumbers) {
+    for (let row = 0; row < cells.length / 7; row++) {
+      const thursdayIdx = row * 7 + 3;
+      const cell = cells[thursdayIdx];
+      let cellMonth = month;
+      let cellYear = year;
+      if (!cell.current && thursdayIdx < 7) {
+        cellMonth = month - 1;
+        if (cellMonth < 0) { cellMonth = 11; cellYear = year - 1; }
+      } else if (!cell.current && thursdayIdx >= 7) {
+        cellMonth = month + 1;
+        if (cellMonth > 11) { cellMonth = 0; cellYear = year + 1; }
+      }
+      weeks.push(getISOWeek(new Date(cellYear, cellMonth, cell.day)));
+    }
+  }
+
+  const rows = cells.length / 7;
+
+  return (
+    <div className="flex flex-col min-h-0 flex-1">
+      {/* Month header */}
+      <div className="shrink-0" style={{ paddingBottom: '0.3em' }}>
+        <span style={{ fontWeight: 600, fontSize: '0.85em', opacity: isCurrentMonth ? 1 : 0.7 }}>
+          {monthName}
+        </span>
+        <span style={{ fontWeight: 400, fontSize: '0.7em', opacity: 0.4, marginLeft: '0.4em' }}>
+          {year}
+        </span>
+      </div>
+
+      {/* Thin separator line */}
+      <div className="shrink-0" style={{ height: '1px', background: 'currentColor', opacity: 0.1, marginBottom: '0.35em' }} />
+
+      {/* Day-of-week headers */}
+      <div style={{ display: 'grid', gridTemplateColumns: gridCols, gap: '1px' }} className="shrink-0">
+        {showWeekNumbers && <div />}
+        {headers.map((d, i) => {
+          const isWeekend = startDay === 'sunday' ? (i === 0 || i === 6) : (i === 5 || i === 6);
+          return (
+            <div
+              key={i}
+              className="text-center"
+              style={{
+                fontSize: '0.55em',
+                lineHeight: '2',
+                opacity: highlightWeekends && isWeekend ? 0.25 : 0.4,
+                fontWeight: 500,
+                letterSpacing: '0.05em',
+                textTransform: 'uppercase',
+              }}
+            >
+              {d}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Day rows */}
+      {Array.from({ length: rows }, (_, row) => (
+        <div
+          key={row}
+          style={{ display: 'grid', gridTemplateColumns: gridCols, gap: '1px', flex: 1, minHeight: 0 }}
+        >
+          {showWeekNumbers && (
+            <div
+              className="flex items-center justify-center"
+              style={{ fontSize: '0.45em', opacity: 0.2, fontVariantNumeric: 'tabular-nums' }}
+            >
+              {weeks[row]}
+            </div>
+          )}
+          {cells.slice(row * 7, row * 7 + 7).map((cell, col) => {
+            const isToday =
+              cell.current &&
+              year === today.year &&
+              month === today.month &&
+              cell.day === today.day;
+
+            const isWeekend = startDay === 'sunday' ? (col === 0 || col === 6) : (col === 5 || col === 6);
+            const visible = cell.current || showAdjacentDays;
+
+            return (
+              <div
+                key={col}
+                className="flex items-center justify-center"
+                style={{ minHeight: 0 }}
+              >
+                <div
+                  className="flex items-center justify-center"
+                  style={{
+                    fontSize: '0.65em',
+                    fontVariantNumeric: 'tabular-nums',
+                    opacity: !visible ? 0 : !cell.current ? 0.15 : highlightWeekends && isWeekend ? 0.45 : 0.85,
+                    fontWeight: isToday ? 700 : 400,
+                    background: isToday ? 'rgba(59,130,246,0.85)' : 'transparent',
+                    color: isToday ? '#fff' : 'inherit',
+                    borderRadius: '50%',
+                    width: '1.75em',
+                    height: '1.75em',
+                  }}
+                >
+                  {visible ? cell.day : ''}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default function MultiMonthModule({ config, style, timezone }: MultiMonthModuleProps) {
+  const now = useTZClock(timezone);
+
+  const view = config.view ?? 'vertical';
+  const monthCount = config.monthCount ?? 3;
+  const startDay = config.startDay ?? 'sunday';
+  const showWeekNumbers = config.showWeekNumbers ?? false;
+  const highlightWeekends = config.highlightWeekends ?? true;
+  const showAdjacentDays = config.showAdjacentDays ?? true;
+
+  const today = {
+    year: now.getFullYear(),
+    month: now.getMonth(),
+    day: now.getDate(),
+  };
+
+  const months: [number, number][] = [];
+  for (let i = 0; i < monthCount; i++) {
+    const d = new Date(today.year, today.month + i, 1);
+    months.push([d.getFullYear(), d.getMonth()]);
+  }
+
+  const isHorizontal = view === 'horizontal';
+
+  return (
+    <ModuleWrapper style={style}>
+      <div
+        className="h-full"
+        style={{
+          display: 'flex',
+          flexDirection: isHorizontal ? 'row' : 'column',
+          gap: isHorizontal ? '1.2em' : '0.6em',
+        }}
+      >
+        {months.map(([y, m], idx) => (
+          <div
+            key={`${y}-${m}`}
+            className="flex min-h-0 min-w-0"
+            style={{
+              flex: 1,
+              borderLeft: isHorizontal && idx > 0 ? '1px solid rgba(255,255,255,0.15)' : undefined,
+              paddingLeft: isHorizontal && idx > 0 ? '1.2em' : undefined,
+              borderTop: !isHorizontal && idx > 0 ? '1px solid rgba(255,255,255,0.08)' : undefined,
+              paddingTop: !isHorizontal && idx > 0 ? '0.6em' : undefined,
+            }}
+          >
+            <MonthGrid
+              year={y}
+              month={m}
+              today={today}
+              startDay={startDay}
+              showWeekNumbers={showWeekNumbers}
+              highlightWeekends={highlightWeekends}
+              showAdjacentDays={showAdjacentDays}
+            />
+          </div>
+        ))}
+      </div>
+    </ModuleWrapper>
+  );
+}
