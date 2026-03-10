@@ -283,10 +283,8 @@ export interface CryptoConfig {
   tickerSpeed?: number;
 }
 
-// Word of the day module config
-export interface WordOfDayConfig {
-  // No config fields — word is computed from a hardcoded list based on the date
-}
+// Word of the day module config (no fields — word is computed from a hardcoded list based on the date)
+export type WordOfDayConfig = Record<string, never>;
 
 // This day in history module config
 export interface HistoryConfig {

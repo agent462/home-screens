@@ -13,6 +13,31 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  {
+    rules: {
+      // Kiosk app — no benefit from next/image optimization
+      "@next/next/no-img-element": "off",
+      // React 19 lint rules that are too strict for common valid patterns:
+      // - setState in useEffect for data fetching / state sync
+      // - Date.now() in useRef initial value
+      // - getWeatherIcon() returning a component reference
+      "react-hooks/set-state-in-effect": "off",
+      "react-hooks/purity": "off",
+      "react-hooks/static-components": "off",
+      // Allow _prefixed unused vars (interface implementations, destructuring)
+      "@typescript-eslint/no-unused-vars": ["warn", {
+        argsIgnorePattern: "^_",
+        varsIgnorePattern: "^_",
+      }],
+    },
+  },
+  {
+    files: ["**/__tests__/**"],
+    rules: {
+      // Tests use require() for dynamic mocking patterns
+      "@typescript-eslint/no-require-imports": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

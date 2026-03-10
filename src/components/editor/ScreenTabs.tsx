@@ -16,24 +16,7 @@ export default function ScreenTabs() {
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
 
-  useEffect(() => {
-    if (editingId && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
-    }
-  }, [editingId]);
-
-  if (!config) return null;
-
-  const screenSignature = config.screens.map((screen) => `${screen.id}:${screen.name}`).join('|');
-
-  const commitRename = (screenId: string) => {
-    const trimmed = editValue.trim();
-    if (trimmed && trimmed !== config.screens.find((s) => s.id === screenId)?.name) {
-      updateScreen(screenId, { name: trimmed });
-    }
-    setEditingId(null);
-  };
+  const screenSignature = config?.screens.map((screen) => `${screen.id}:${screen.name}`).join('|') ?? '';
 
   const updateScrollState = () => {
     const container = scrollContainerRef.current;
@@ -44,15 +27,12 @@ export default function ScreenTabs() {
     setCanScrollRight(maxScrollLeft > 8 && container.scrollLeft < maxScrollLeft - 8);
   };
 
-  const scrollTabs = (direction: 'left' | 'right') => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    container.scrollBy({
-      left: direction === 'left' ? -220 : 220,
-      behavior: 'smooth',
-    });
-  };
+  useEffect(() => {
+    if (editingId && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editingId]);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -77,6 +57,26 @@ export default function ScreenTabs() {
     activeTab?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     updateScrollState();
   }, [selectedScreenId, editingId, screenSignature]);
+
+  if (!config) return null;
+
+  const commitRename = (screenId: string) => {
+    const trimmed = editValue.trim();
+    if (trimmed && trimmed !== config.screens.find((s) => s.id === screenId)?.name) {
+      updateScreen(screenId, { name: trimmed });
+    }
+    setEditingId(null);
+  };
+
+  const scrollTabs = (direction: 'left' | 'right') => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    container.scrollBy({
+      left: direction === 'left' ? -220 : 220,
+      behavior: 'smooth',
+    });
+  };
 
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2">

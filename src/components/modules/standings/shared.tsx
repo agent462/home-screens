@@ -1,5 +1,3 @@
-/* eslint-disable @next/next/no-img-element */
-
 import type { StandingsEntry } from './types';
 
 export function TeamLogo({ src, alt, size = 20 }: { src: string; alt: string; size?: number }) {

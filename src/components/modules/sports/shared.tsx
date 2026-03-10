@@ -1,5 +1,3 @@
-/* eslint-disable @next/next/no-img-element */
-
 export function TeamLogo({ src, alt, size = 24 }: { src: string; alt: string; size?: number }) {
   if (!src) return <div style={{ width: size, height: size }} className="shrink-0" />;
   return (

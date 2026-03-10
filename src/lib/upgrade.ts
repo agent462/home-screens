@@ -135,7 +135,7 @@ function parseResult(output: string): Record<string, unknown> {
 }
 
 // Global upgrade state — only one upgrade can run at a time
-let currentUpgrade: {
+const currentUpgrade: {
   running: boolean;
   progress: UpgradeProgress;
   listeners: Set<EventCallback>;

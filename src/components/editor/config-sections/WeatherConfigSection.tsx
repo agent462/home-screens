@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import Toggle from '@/components/ui/Toggle';
-import Slider from '@/components/ui/Slider';
 import { editorFetch } from '@/lib/editor-fetch';
 import { useModuleConfig } from '@/hooks/useModuleConfig';
 import { useEditorStore } from '@/stores/editor-store';

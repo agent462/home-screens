@@ -315,6 +315,7 @@ export default function EditorCanvas({ onScaleChange }: { onScaleChange?: (scale
     fetchActive();
     const id = setInterval(fetchActive, 30_000);
     return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run when screen ID or rotation toggle changes
   }, [currentScreen?.id, currentScreen?.backgroundRotation?.enabled]);
 
   // Fetch live data for previews — fetch all configured providers
