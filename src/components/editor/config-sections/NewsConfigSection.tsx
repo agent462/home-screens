@@ -16,8 +16,8 @@ const NEWS_VIEWS: { value: NewsView; label: string }[] = [
 const NEWS_FEED_PRESETS = [
   { label: 'BBC News', url: '' },
   { label: 'NPR', url: 'https://feeds.npr.org/1001/rss.xml' },
-  { label: 'Associated Press', url: 'https://rsshub.app/apnews/topics/apf-topnews' },
-  { label: 'Reuters', url: 'https://feeds.reuters.com/reuters/topNews' },
+  { label: 'Associated Press', url: 'https://feedx.net/rss/ap.xml' },
+  { label: 'Reuters', url: 'https://news.google.com/rss/search?q=source:reuters&hl=en-US&gl=US&ceid=US:en' },
   { label: 'ABC News', url: 'https://feeds.abcnews.com/abcnews/topstories' },
   { label: 'CBS News', url: 'https://www.cbsnews.com/latest/rss/main' },
   { label: 'Ars Technica', url: 'https://feeds.arstechnica.com/arstechnica/index' },
