@@ -4,6 +4,7 @@ import type { AirQualityConfig, ModuleStyle } from '@/types/config';
 import ModuleWrapper from './ModuleWrapper';
 import { ModuleLoadingState } from './ModuleStates';
 import { useFetchData } from '@/hooks/useFetchData';
+import { airQualityUrl } from '@/lib/fetch-keys';
 
 interface AirQualityModuleProps {
   config: AirQualityConfig;
@@ -53,7 +54,7 @@ function getUVColor(uv: number): string {
 
 export default function AirQualityModule({ config, style }: AirQualityModuleProps) {
   const [data] = useFetchData<AirQualityData>(
-    '/api/air-quality',
+    airQualityUrl(),
     config.refreshIntervalMs ?? 600000,
   );
 

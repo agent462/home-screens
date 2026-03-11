@@ -8,6 +8,7 @@ import { ModuleLoadingState, ModuleEmptyState } from './ModuleStates';
 import { formatPercent, ChangeColor, FinancialTableView, FinancialCompactView } from './financial/shared';
 import type { TableColumn } from './financial/shared';
 import { useFetchData } from '@/hooks/useFetchData';
+import { stocksUrl } from '@/lib/fetch-keys';
 
 interface StockTickerModuleProps {
   config: StockTickerConfig;
@@ -105,7 +106,7 @@ const stockTableColumns: TableColumn<StockData>[] = [
 
 export default function StockTickerModule({ config, style }: StockTickerModuleProps) {
   const [data] = useFetchData<{ stocks: StockData[] }>(
-    `/api/stocks?symbols=${encodeURIComponent(config.symbols)}`,
+    stocksUrl(config) ?? '',
     config.refreshIntervalMs ?? 60000,
   );
   const stocks = data?.stocks ?? [];

@@ -4,6 +4,7 @@ import type { HistoryConfig, ModuleStyle } from '@/types/config';
 import { useRotatingIndex } from '@/hooks/useRotatingIndex';
 import ModuleWrapper from './ModuleWrapper';
 import { useFetchData } from '@/hooks/useFetchData';
+import { historyUrl } from '@/lib/fetch-keys';
 
 interface HistoryModuleProps {
   config: HistoryConfig;
@@ -16,7 +17,7 @@ interface HistoryEvent {
 }
 
 export default function HistoryModule({ config, style }: HistoryModuleProps) {
-  const [data] = useFetchData<{ events: HistoryEvent[] }>('/api/history', config.refreshIntervalMs ?? 86400000);
+  const [data] = useFetchData<{ events: HistoryEvent[] }>(historyUrl(), config.refreshIntervalMs ?? 86400000);
   const events = data?.events ?? [];
 
   const rotationMs = config.rotationIntervalMs ?? 10000;

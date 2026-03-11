@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getSecret } from '@/lib/secrets';
-import { errorResponse, getLocationFromConfig } from '@/lib/api-utils';
+import { errorResponse, getLocationFromConfig, createTTLCache } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
+
+/** @internal exported for test cleanup */
+export const cache = createTTLCache<unknown>(5 * 60 * 1000); // 5 minutes
 
 export async function GET() {
   const location = await getLocationFromConfig();
@@ -23,6 +26,10 @@ export async function GET() {
       { status: 400 },
     );
   }
+
+  const cacheKey = `${lat}:${lon}`;
+  const cached = cache.get(cacheKey);
+  if (cached) return NextResponse.json(cached);
 
   try {
     const [airRes, uvRes] = await Promise.all([
@@ -55,14 +62,16 @@ export async function GET() {
       uv = uvData.value ?? 0;
     }
 
-    return NextResponse.json({
+    const result = {
       aqi,
       pm25: components.pm2_5 ?? 0,
       pm10: components.pm10 ?? 0,
       o3: components.o3 ?? 0,
       no2: components.no2 ?? 0,
       uv,
-    });
+    };
+    cache.set(cacheKey, result);
+    return NextResponse.json(result);
   } catch (error) {
     return errorResponse(error, 'Failed to fetch air quality data');
   }

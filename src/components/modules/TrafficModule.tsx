@@ -3,6 +3,7 @@
 import type { TrafficConfig, ModuleStyle } from '@/types/config';
 import ModuleWrapper from './ModuleWrapper';
 import { useFetchData } from '@/hooks/useFetchData';
+import { trafficUrl } from '@/lib/fetch-keys';
 
 interface TrafficModuleProps {
   config: TrafficConfig;
@@ -29,12 +30,7 @@ function delayColor(delayMinutes: number): string {
 
 export default function TrafficModule({ config, style }: TrafficModuleProps) {
   const routes = config.routes ?? [];
-  const url =
-    routes.length > 0
-      ? `/api/traffic?routes=${encodeURIComponent(JSON.stringify(routes))}`
-      : '';
-
-  const [data] = useFetchData<TrafficData>(url, config.refreshIntervalMs ?? 300000);
+  const [data] = useFetchData<TrafficData>(trafficUrl(config) ?? '', config.refreshIntervalMs ?? 300000);
 
   return (
     <ModuleWrapper style={style}>

@@ -4,6 +4,7 @@ import type { SportsConfig, ModuleStyle } from '@/types/config';
 import ModuleWrapper from '../ModuleWrapper';
 import { ModuleLoadingState, ModuleEmptyState } from '../ModuleStates';
 import { useFetchData } from '@/hooks/useFetchData';
+import { sportsUrl } from '@/lib/fetch-keys';
 import { ScoreboardView } from './ScoreboardView';
 import { CardsView } from './CardsView';
 import { ListView } from './ListView';
@@ -16,9 +17,8 @@ interface SportsModuleProps {
 }
 
 export default function SportsModule({ config, style }: SportsModuleProps) {
-  const leagues = (config.leagues ?? ['nfl', 'nba']).join(',');
   const [data] = useFetchData<{ games: Game[] }>(
-    `/api/sports?leagues=${encodeURIComponent(leagues)}`,
+    sportsUrl(config),
     config.refreshIntervalMs ?? 60000,
   );
   const games = data?.games ?? [];

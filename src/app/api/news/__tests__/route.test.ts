@@ -11,10 +11,11 @@ vi.mock('@/lib/rss', () => ({
 const mockParseItems = vi.mocked(parseItems);
 
 // Lazily import GET so the rss mock is in place before module evaluation
-const { GET } = await import('@/app/api/news/route');
+const { GET, cache } = await import('@/app/api/news/route');
 
 beforeEach(() => {
   vi.restoreAllMocks();
+  cache.clear();
   // Re-apply the default parseItems return after restoreAllMocks clears it
   mockParseItems.mockReturnValue([
     { title: 'Test Article', link: 'https://test.com/article', pubDate: '2026-03-08', description: '' },

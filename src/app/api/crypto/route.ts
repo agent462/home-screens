@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { errorResponse } from '@/lib/api-utils';
+import { errorResponse, createTTLCache } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
+
+/** @internal exported for test cleanup */
+export const cache = createTTLCache<unknown>(30 * 1000); // 30 seconds
 
 export async function GET(request: NextRequest) {
   try {
     const idsParam = request.nextUrl.searchParams.get('ids') || 'bitcoin,ethereum';
     const ids = idsParam.split(',').map((s) => s.trim()).filter(Boolean).join(',');
+
+    const cached = cache.get(ids);
+    if (cached) return NextResponse.json(cached);
 
     const url = `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(ids)}&vs_currencies=usd&include_24hr_change=true`;
     const res = await fetch(url);
@@ -24,7 +30,9 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    return NextResponse.json({ prices });
+    const result = { prices };
+    cache.set(ids, result);
+    return NextResponse.json(result);
   } catch (error) {
     return errorResponse(error, 'Failed to fetch crypto prices');
   }

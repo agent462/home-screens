@@ -4,6 +4,7 @@ import type { StandingsConfig, ModuleStyle } from '@/types/config';
 import ModuleWrapper from '../ModuleWrapper';
 import { ModuleLoadingState, ModuleEmptyState } from '../ModuleStates';
 import { useFetchData } from '@/hooks/useFetchData';
+import { standingsUrl } from '@/lib/fetch-keys';
 import { TableView } from './TableView';
 import { CompactView } from './CompactView';
 import { ConferenceView } from './ConferenceView';
@@ -15,12 +16,11 @@ interface StandingsModuleProps {
 }
 
 export default function StandingsModule({ config, style }: StandingsModuleProps) {
-  const league = config.league ?? 'nfl';
   const grouping = config.grouping ?? 'division';
   const view = config.view ?? 'table';
 
   const [data] = useFetchData<{ groups: StandingsGroup[] }>(
-    `/api/standings?league=${encodeURIComponent(league)}&grouping=${encodeURIComponent(grouping)}`,
+    standingsUrl(config),
     config.refreshIntervalMs ?? 300000,
   );
 

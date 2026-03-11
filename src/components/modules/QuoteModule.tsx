@@ -3,6 +3,7 @@
 import type { QuoteConfig, ModuleStyle } from '@/types/config';
 import ModuleWrapper from './ModuleWrapper';
 import { useFetchData } from '@/hooks/useFetchData';
+import { quoteUrl } from '@/lib/fetch-keys';
 
 interface QuoteModuleProps {
   config: QuoteConfig;
@@ -10,7 +11,7 @@ interface QuoteModuleProps {
 }
 
 export default function QuoteModule({ config, style }: QuoteModuleProps) {
-  const [data] = useFetchData<{ quote: string; author: string }>('/api/quote', config.refreshIntervalMs ?? 300000);
+  const [data] = useFetchData<{ quote: string; author: string }>(quoteUrl(), config.refreshIntervalMs ?? 300000);
 
   return (
     <ModuleWrapper style={style}>

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { GET } from '@/app/api/quote/route';
+import { GET, cache } from '@/app/api/quote/route';
 
 function makeZenQuotesResponse(quote: string, author: string) {
   return [{ q: quote, a: author, h: '<blockquote>...</blockquote>' }];
@@ -40,6 +40,7 @@ function mockFetchNetworkError(message: string) {
 describe('GET /api/quote', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    cache.clear();
   });
 
   it('returns quote and author from the first array element', async () => {

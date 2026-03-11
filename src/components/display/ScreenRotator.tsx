@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { Screen, GlobalSettings, ScreenConfiguration, Profile } from '@/types/config';
-import ScreenRenderer from './ScreenRenderer';
+import ScreenRenderer, { resolveProvider } from './ScreenRenderer';
 import type { SharedDisplayData } from './ScreenRenderer';
 import SleepOverlay from './SleepOverlay';
 import { useSleepManager } from '@/hooks/useSleepManager';
@@ -11,7 +11,9 @@ import { useDisplayCommands, useStatusReporter } from '@/hooks/useDisplayCommand
 import { useFetchData } from '@/hooks/useFetchData';
 import { useTZClock } from '@/hooks/useTZClock';
 import { resolveProfileScreens } from '@/lib/schedule';
-import { WEATHER_REFRESH_MS, CALENDAR_REFRESH_MS } from '@/lib/constants';
+import { WEATHER_REFRESH_MS, CALENDAR_REFRESH_MS, DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT } from '@/lib/constants';
+import { displayCache } from '@/lib/display-cache';
+import { prefetchScreen } from '@/lib/prefetch';
 
 /** How often the display polls for config changes (ms) */
 const CONFIG_POLL_MS = 3_000;
@@ -102,6 +104,7 @@ function useLiveConfig(initialScreens: Screen[], initialSettings: GlobalSettings
         // Only update state when the JSON actually changed
         if (text !== configJsonRef.current) {
           configJsonRef.current = text;
+          displayCache.clear(); // invalidate client cache on config change
           const cfg: ScreenConfiguration = JSON.parse(text);
           if (cfg.screens && cfg.settings) {
             setScreens(cfg.screens);
@@ -123,14 +126,6 @@ function useLiveConfig(initialScreens: Screen[], initialSettings: GlobalSettings
   }, []);
 
   return { screens, settings, profiles };
-}
-
-function resolveProvider(mod: { type: string; config: Record<string, unknown> }, globalProvider: string): string {
-  if (mod.type === 'weather') {
-    const p = mod.config.provider as string | undefined;
-    return (p && p !== 'global') ? p : globalProvider;
-  }
-  return globalProvider;
 }
 
 /** Fetch weather + calendar data once, shared across all screen rotations. */
@@ -180,12 +175,65 @@ function useSharedDisplayData(screens: Screen[], settings: GlobalSettings): Shar
   return { owmData, wapiData, pirateData, noaaData, calendarData };
 }
 
+/** Prefetch next screen's module data ~5s before rotation fires.
+ *  Uses screenKey (stable string) instead of screens array to avoid
+ *  restarting the timer every time useMemo returns a new array reference.
+ */
+function usePrefetchNextScreen(
+  screens: Screen[],
+  screenKey: string,
+  currentIndex: number,
+  rotationIntervalMs: number,
+  displayState: string,
+) {
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const screensRef = useRef(screens);
+
+  useEffect(() => {
+    screensRef.current = screens;
+  }, [screens]);
+
+  useEffect(() => {
+    if (displayState === 'asleep' || screensRef.current.length <= 1) return;
+
+    const nextIndex = (currentIndex + 1) % screensRef.current.length;
+    const delay = Math.max(rotationIntervalMs - 5000, 0);
+
+    timerRef.current = setTimeout(() => {
+      prefetchScreen(screensRef.current[nextIndex], new Date());
+    }, delay);
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [screenKey, currentIndex, rotationIntervalMs, displayState]);
+}
+
 export default function ScreenRotator({ screens: initialScreens, settings: initialSettings, profiles: initialProfiles }: ScreenRotatorProps) {
   const { screens: allScreens, settings, profiles } = useLiveConfig(initialScreens, initialSettings, initialProfiles);
   const [currentIndex, setCurrentIndex] = useState(0);
+  // Bumped on manual navigation to reset the auto-rotation timer
+  const [rotationEpoch, setRotationEpoch] = useState(0);
   const { displayState, dimOpacity, wake, forceSleep, setRemoteBrightness } = useSleepManager(settings.sleep);
   // Shared data needs all screens (for weather provider detection), not just active profile screens
   const sharedData = useSharedDisplayData(allScreens, settings);
+
+  // Viewport measurement lives here (not in ScreenRenderer) so it persists across screen transitions
+  const [viewportSize, setViewportSize] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    function update() {
+      setViewportSize({ w: window.innerWidth, h: window.innerHeight });
+    }
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
+  const displayW = settings.displayWidth || DEFAULT_DISPLAY_WIDTH;
+  const displayH = settings.displayHeight || DEFAULT_DISPLAY_HEIGHT;
+  const scale = viewportSize.w > 0
+    ? Math.min(viewportSize.w / displayW, viewportSize.h / displayH)
+    : 0; // Start at 0 (invisible) until measured, preventing unscaled flash
 
   // Re-evaluate profile schedule every minute (timezone-aware)
   const now = useTZClock(settings.timezone, 60_000);
@@ -200,9 +248,17 @@ export default function ScreenRotator({ screens: initialScreens, settings: initi
   // Stable key derived from resolved screen IDs — changes only when actual set changes
   const screenKey = screens.map((s) => s.id).join(',');
 
+  // Prefetch next screen's API data before rotation fires
+  usePrefetchNextScreen(screens, screenKey, currentIndex, settings.rotationIntervalMs, displayState);
+
   // Compute safeIndex early so command/status hooks can use it
   const safeIndex = currentIndex < screens.length ? currentIndex : 0;
   const currentScreen = screens[safeIndex];
+
+  const goToScreen = useCallback((index: number) => {
+    setCurrentIndex(index);
+    setRotationEpoch((e) => e + 1);
+  }, []);
 
   const nextScreen = useCallback(() => {
     if (screens.length <= 1) return;
@@ -226,19 +282,24 @@ export default function ScreenRotator({ screens: initialScreens, settings: initi
     setCurrentIndex(0);
   }, [screenKey]);
 
-  // Pause screen rotation when display is asleep (no point cycling invisible screens)
+  // Pause screen rotation when display is asleep (no point cycling invisible screens).
+  // rotationEpoch resets the timer after manual navigation (dot click, remote command).
   useEffect(() => {
     if (screens.length <= 1 || displayState === 'asleep') return;
     const interval = setInterval(nextScreen, settings.rotationIntervalMs);
     return () => clearInterval(interval);
-  }, [nextScreen, settings.rotationIntervalMs, screens.length, displayState]);
+  }, [nextScreen, settings.rotationIntervalMs, screens.length, displayState, rotationEpoch]);
+
+  // Wrap next/prev so remote-triggered navigation also resets the rotation timer.
+  const remoteNext = useCallback(() => { nextScreen(); setRotationEpoch((e) => e + 1); }, [nextScreen]);
+  const remotePrev = useCallback(() => { prevScreen(); setRotationEpoch((e) => e + 1); }, [prevScreen]);
 
   // Remote control — poll for commands from /api/display/commands
   useDisplayCommands({
     wake,
     sleep: forceSleep,
-    nextScreen,
-    prevScreen,
+    nextScreen: remoteNext,
+    prevScreen: remotePrev,
     setBrightness: setRemoteBrightness,
     reload,
   });
@@ -262,7 +323,7 @@ export default function ScreenRotator({ screens: initialScreens, settings: initi
   }
 
   return (
-    <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden', backgroundColor: '#000' }}>
+    <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden', backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <AnimatePresence mode="wait">
         <motion.div
           key={currentScreen.id}
@@ -271,7 +332,7 @@ export default function ScreenRotator({ screens: initialScreens, settings: initi
           exit={{ opacity: 0, scale: 1.02 }}
           transition={{ duration: 0.6, ease: 'easeInOut' }}
         >
-          <ScreenRenderer screen={currentScreen} settings={settings} rotatingBackground={rotatingBackgrounds[currentScreen.id]} sharedData={sharedData} />
+          <ScreenRenderer screen={currentScreen} settings={settings} rotatingBackground={rotatingBackgrounds[currentScreen.id]} sharedData={sharedData} displayW={displayW} displayH={displayH} scale={scale} />
         </motion.div>
       </AnimatePresence>
 
@@ -288,16 +349,32 @@ export default function ScreenRotator({ screens: initialScreens, settings: initi
           }}
         >
           {screens.map((s, i) => (
-            <div
+            <button
               key={s.id}
+              onClick={() => goToScreen(i)}
               style={{
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                backgroundColor: i === safeIndex ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.3)',
-                transition: 'background-color 0.3s',
+                width: 20,
+                height: 20,
+                padding: 0,
+                border: 'none',
+                background: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
-            />
+            >
+              <span
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  backgroundColor: i === safeIndex ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.3)',
+                  transition: 'background-color 0.3s',
+                  display: 'block',
+                }}
+              />
+            </button>
           ))}
         </div>
       )}

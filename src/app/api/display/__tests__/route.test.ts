@@ -180,6 +180,7 @@ describe('POST /api/display/profile', () => {
   it('switches to a valid profile', async () => {
     vi.mocked(requireSession).mockResolvedValue(undefined as never);
     vi.mocked(readConfig).mockResolvedValue({
+      version: 1,
       screens: [],
       settings: { activeProfile: undefined } as never,
       profiles: [{ id: 'day', name: 'Day', screenIds: [] }],
@@ -197,6 +198,7 @@ describe('POST /api/display/profile', () => {
   it('rejects unknown profile ID', async () => {
     vi.mocked(requireSession).mockResolvedValue(undefined as never);
     vi.mocked(readConfig).mockResolvedValue({
+      version: 1,
       screens: [],
       settings: { activeProfile: undefined } as never,
       profiles: [{ id: 'day', name: 'Day', screenIds: [] }],
@@ -209,6 +211,7 @@ describe('POST /api/display/profile', () => {
   it('clears profile with empty string', async () => {
     vi.mocked(requireSession).mockResolvedValue(undefined as never);
     vi.mocked(readConfig).mockResolvedValue({
+      version: 1,
       screens: [],
       settings: { activeProfile: 'day' } as never,
       profiles: [],

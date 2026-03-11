@@ -10,17 +10,21 @@ vi.mock('@/lib/auth', () => ({
   requireSession: vi.fn(),
 }));
 
-vi.mock('@/lib/api-utils', () => ({
-  errorResponse: vi.fn((err: unknown, msg: string, status = 500) => {
-    const message = err instanceof Error ? err.message : msg;
-    return Response.json({ error: message }, { status });
-  }),
-}));
+vi.mock('@/lib/api-utils', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api-utils')>();
+  return {
+    ...actual,
+    errorResponse: vi.fn((err: unknown, msg: string, status = 500) => {
+      const message = err instanceof Error ? err.message : msg;
+      return Response.json({ error: message }, { status });
+    }),
+  };
+});
 
 import { getSecret, setSecret } from '@/lib/secrets';
 import { requireSession } from '@/lib/auth';
 
-const { GET, PUT } = await import('@/app/api/todoist/route');
+const { GET, PUT, cache } = await import('@/app/api/todoist/route');
 
 // ─── Helpers ───
 
@@ -112,6 +116,7 @@ function mockTodoistAPI(data: {
 
 beforeEach(() => {
   vi.restoreAllMocks();
+  cache.clear();
 });
 
 // ─── GET ───

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { errorResponse } from '@/lib/api-utils';
+import { errorResponse, createTTLCache } from '@/lib/api-utils';
 import { requireSession } from '@/lib/auth';
 import { getSecret, setSecret } from '@/lib/secrets';
 
@@ -106,6 +106,7 @@ export async function PUT(request: NextRequest) {
     }
 
     await setSecret('todoist_token', token);
+    cache.clear(); // invalidate cached tasks from previous token
 
     return NextResponse.json({ ok: true });
   } catch (error) {
@@ -115,6 +116,9 @@ export async function PUT(request: NextRequest) {
 }
 
 // ─── GET: Fetch tasks ───
+
+/** @internal exported for test cleanup */
+export const cache = createTTLCache<unknown>(60 * 1000); // 1 minute
 
 export async function GET() {
   try {
@@ -126,6 +130,9 @@ export async function GET() {
         { status: 401 },
       );
     }
+
+    const cached = cache.get('todoist');
+    if (cached) return NextResponse.json(cached);
 
     const [rawTasks, rawProjects, rawSections, rawLabels] = await Promise.all([
       fetchTodoistList('/tasks', token),
@@ -196,7 +203,9 @@ export async function GET() {
       order: num(p, 'child_order', 'childOrder', 'order'),
     }));
 
-    return NextResponse.json({ tasks: enrichedTasks, projects: enrichedProjects });
+    const result = { tasks: enrichedTasks, projects: enrichedProjects };
+    cache.set('todoist', result);
+    return NextResponse.json(result);
   } catch (error) {
     return errorResponse(error, 'Failed to fetch Todoist data');
   }

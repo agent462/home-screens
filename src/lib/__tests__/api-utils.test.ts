@@ -149,6 +149,59 @@ describe('createTTLCache', () => {
     // The cache returns the stored data, which is null
     expect(cache.get('empty')).toBeNull();
   });
+
+  it('clear() removes all entries', () => {
+    const cache = createTTLCache<string>(5000);
+    cache.set('a', 'alpha');
+    cache.set('b', 'beta');
+
+    cache.clear();
+
+    expect(cache.get('a')).toBeNull();
+    expect(cache.get('b')).toBeNull();
+  });
+
+  it('get() deletes expired entries from the map', () => {
+    const cache = createTTLCache<string>(1000);
+    cache.set('key', 'value');
+
+    vi.advanceTimersByTime(1001);
+    expect(cache.get('key')).toBeNull();
+
+    // A second get should also return null (entry was deleted, not just skipped)
+    expect(cache.get('key')).toBeNull();
+  });
+
+  it('evicts expired entries when at capacity', () => {
+    const cache = createTTLCache<number>(1000);
+
+    // Fill to capacity (50)
+    for (let i = 0; i < 50; i++) {
+      cache.set(`key-${i}`, i);
+    }
+
+    // Expire all entries
+    vi.advanceTimersByTime(1001);
+
+    // Adding a new entry should succeed (expired entries evicted)
+    cache.set('new-key', 999);
+    expect(cache.get('new-key')).toBe(999);
+  });
+
+  it('evicts oldest entry when at capacity with no expired entries', () => {
+    const cache = createTTLCache<number>(60_000);
+
+    // Fill to capacity
+    for (let i = 0; i < 50; i++) {
+      cache.set(`key-${i}`, i);
+    }
+
+    // Add one more — should evict the first entry (oldest by insertion order)
+    cache.set('overflow', 999);
+    expect(cache.get('overflow')).toBe(999);
+    expect(cache.get('key-0')).toBeNull(); // evicted
+    expect(cache.get('key-1')).toBe(1);    // still present
+  });
 });
 
 describe('getLocationFromConfig', () => {

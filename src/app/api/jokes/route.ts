@@ -1,10 +1,16 @@
 import { NextResponse } from 'next/server';
-import { errorResponse } from '@/lib/api-utils';
+import { errorResponse, createTTLCache } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
 
+/** @internal exported for test cleanup */
+export const cache = createTTLCache<unknown>(60 * 1000); // 1 minute
+
 export async function GET() {
   try {
+    const cached = cache.get('joke');
+    if (cached) return NextResponse.json(cached);
+
     const res = await fetch('https://icanhazdadjoke.com', {
       headers: { Accept: 'application/json' },
     });
@@ -12,7 +18,9 @@ export async function GET() {
       return NextResponse.json({ error: 'Failed to fetch joke' }, { status: 502 });
     }
     const data = await res.json();
-    return NextResponse.json({ joke: data.joke });
+    const result = { joke: data.joke };
+    cache.set('joke', result);
+    return NextResponse.json(result);
   } catch (error) {
     return errorResponse(error, 'Failed to fetch joke');
   }

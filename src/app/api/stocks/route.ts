@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { errorResponse } from '@/lib/api-utils';
+import { errorResponse, createTTLCache } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
+
+/** @internal exported for test cleanup */
+export const cache = createTTLCache<unknown>(30 * 1000); // 30 seconds
 
 interface StockResult {
   symbol: string;
@@ -35,7 +38,10 @@ export async function GET(request: NextRequest) {
   try {
     const symbolsParam = request.nextUrl.searchParams.get('symbols') || 'AAPL';
     const symbols = symbolsParam.split(',').map((s) => s.trim()).filter(Boolean);
+    const cacheKey = symbols.join(',');
 
+    const cached = cache.get(cacheKey);
+    if (cached) return NextResponse.json(cached);
     const results = await Promise.allSettled(symbols.map(fetchStock));
     const stocks = results
       .filter((r): r is PromiseFulfilledResult<StockResult> => r.status === 'fulfilled')
@@ -45,7 +51,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch any stock data' }, { status: 502 });
     }
 
-    return NextResponse.json({ stocks });
+    const result = { stocks };
+    cache.set(cacheKey, result);
+    return NextResponse.json(result);
   } catch (error) {
     return errorResponse(error, 'Failed to fetch stocks');
   }

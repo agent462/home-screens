@@ -1,0 +1,159 @@
+import { describe, it, expect } from 'vitest';
+import {
+  stocksUrl,
+  cryptoUrl,
+  newsUrl,
+  airQualityUrl,
+  sportsUrl,
+  standingsUrl,
+  trafficUrl,
+  todoistUrl,
+  rainMapUrl,
+  historyUrl,
+  quoteUrl,
+  dadJokeUrl,
+  photoSlideshowUrl,
+  FETCH_KEY_REGISTRY,
+} from '@/lib/fetch-keys';
+
+// ── URL builders that return null when config is empty ──────────
+
+describe('stocksUrl', () => {
+  it('builds URL with encoded symbols', () => {
+    expect(stocksUrl({ symbols: 'AAPL,MSFT' })).toBe('/api/stocks?symbols=AAPL%2CMSFT');
+  });
+
+  it('returns null when symbols is missing', () => {
+    expect(stocksUrl({})).toBeNull();
+  });
+
+  it('returns null when symbols is empty string', () => {
+    expect(stocksUrl({ symbols: '' })).toBeNull();
+  });
+});
+
+describe('cryptoUrl', () => {
+  it('builds URL with encoded ids', () => {
+    expect(cryptoUrl({ ids: 'bitcoin,ethereum' })).toBe('/api/crypto?ids=bitcoin%2Cethereum');
+  });
+
+  it('returns null when ids is missing', () => {
+    expect(cryptoUrl({})).toBeNull();
+  });
+
+  it('returns null when ids is empty string', () => {
+    expect(cryptoUrl({ ids: '' })).toBeNull();
+  });
+});
+
+describe('trafficUrl', () => {
+  it('builds URL with JSON-encoded routes', () => {
+    const routes = [{ origin: 'A', destination: 'B' }];
+    const url = trafficUrl({ routes });
+    expect(url).toBe(`/api/traffic?routes=${encodeURIComponent(JSON.stringify(routes))}`);
+  });
+
+  it('returns null when routes is missing', () => {
+    expect(trafficUrl({})).toBeNull();
+  });
+
+  it('returns null when routes is empty array', () => {
+    expect(trafficUrl({ routes: [] })).toBeNull();
+  });
+});
+
+// ── URL builders with defaults ──────────────────────────────────
+
+describe('newsUrl', () => {
+  it('builds URL with encoded feed', () => {
+    expect(newsUrl({ feedUrl: 'https://example.com/feed.xml' }))
+      .toBe('/api/news?feed=https%3A%2F%2Fexample.com%2Ffeed.xml');
+  });
+
+  it('uses empty string when feedUrl is missing', () => {
+    expect(newsUrl({})).toBe('/api/news?feed=');
+  });
+});
+
+describe('sportsUrl', () => {
+  it('defaults leagues to nfl,nba', () => {
+    expect(sportsUrl({})).toBe('/api/sports?leagues=nfl%2Cnba');
+  });
+
+  it('uses provided leagues', () => {
+    expect(sportsUrl({ leagues: ['mlb', 'nhl'] })).toBe('/api/sports?leagues=mlb%2Cnhl');
+  });
+});
+
+describe('standingsUrl', () => {
+  it('defaults league to nfl and grouping to division', () => {
+    expect(standingsUrl({})).toBe('/api/standings?league=nfl&grouping=division');
+  });
+
+  it('uses provided league and grouping', () => {
+    expect(standingsUrl({ league: 'nba', grouping: 'conference' }))
+      .toBe('/api/standings?league=nba&grouping=conference');
+  });
+});
+
+describe('photoSlideshowUrl', () => {
+  it('includes directory when provided', () => {
+    expect(photoSlideshowUrl({ directory: 'vacation/2026' }))
+      .toBe('/api/backgrounds?directory=vacation%2F2026');
+  });
+
+  it('uses bare endpoint when directory is missing', () => {
+    expect(photoSlideshowUrl({})).toBe('/api/backgrounds');
+  });
+});
+
+// ── Static URL builders ─────────────────────────────────────────
+
+describe('static URL builders', () => {
+  it('airQualityUrl', () => expect(airQualityUrl()).toBe('/api/air-quality'));
+  it('todoistUrl', () => expect(todoistUrl()).toBe('/api/todoist'));
+  it('rainMapUrl', () => expect(rainMapUrl()).toBe('/api/rain-map'));
+  it('historyUrl', () => expect(historyUrl()).toBe('/api/history'));
+  it('quoteUrl', () => expect(quoteUrl()).toBe('/api/quote'));
+  it('dadJokeUrl', () => expect(dadJokeUrl()).toBe('/api/jokes'));
+});
+
+// ── FETCH_KEY_REGISTRY ──────────────────────────────────────────
+
+describe('FETCH_KEY_REGISTRY', () => {
+  it('has entries for all data-fetching module types', () => {
+    const expectedTypes = [
+      'stock-ticker', 'crypto', 'news', 'air-quality', 'sports',
+      'standings', 'traffic', 'todoist', 'rain-map', 'history',
+      'quote', 'dad-joke', 'photo-slideshow',
+    ];
+    for (const type of expectedTypes) {
+      expect(FETCH_KEY_REGISTRY).toHaveProperty(type);
+    }
+  });
+
+  it('every entry has a buildUrl function and positive ttlMs', () => {
+    for (const [type, entry] of Object.entries(FETCH_KEY_REGISTRY)) {
+      expect(typeof entry.buildUrl).toBe('function');
+      expect(entry.ttlMs).toBeGreaterThan(0);
+      // Verify the function is callable with empty config
+      expect(() => entry.buildUrl({})).not.toThrow();
+    }
+  });
+
+  it('buildUrl references match the standalone URL builder functions', () => {
+    expect(FETCH_KEY_REGISTRY['stock-ticker'].buildUrl).toBe(stocksUrl);
+    expect(FETCH_KEY_REGISTRY.crypto.buildUrl).toBe(cryptoUrl);
+    expect(FETCH_KEY_REGISTRY.news.buildUrl).toBe(newsUrl);
+    expect(FETCH_KEY_REGISTRY['air-quality'].buildUrl).toBe(airQualityUrl);
+    expect(FETCH_KEY_REGISTRY.sports.buildUrl).toBe(sportsUrl);
+    expect(FETCH_KEY_REGISTRY.standings.buildUrl).toBe(standingsUrl);
+    expect(FETCH_KEY_REGISTRY.traffic.buildUrl).toBe(trafficUrl);
+    expect(FETCH_KEY_REGISTRY.todoist.buildUrl).toBe(todoistUrl);
+    expect(FETCH_KEY_REGISTRY['rain-map'].buildUrl).toBe(rainMapUrl);
+    expect(FETCH_KEY_REGISTRY.history.buildUrl).toBe(historyUrl);
+    expect(FETCH_KEY_REGISTRY.quote.buildUrl).toBe(quoteUrl);
+    expect(FETCH_KEY_REGISTRY['dad-joke'].buildUrl).toBe(dadJokeUrl);
+    expect(FETCH_KEY_REGISTRY['photo-slideshow'].buildUrl).toBe(photoSlideshowUrl);
+  });
+});

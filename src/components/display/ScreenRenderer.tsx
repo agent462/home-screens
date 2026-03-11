@@ -1,8 +1,7 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import type { Screen, GlobalSettings } from '@/types/config';
-import { DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT } from '@/lib/constants';
 import { moduleComponents } from '@/lib/module-components';
 import { isModuleVisible } from '@/lib/schedule';
 import { useTZClock } from '@/hooks/useTZClock';
@@ -20,9 +19,12 @@ interface ScreenRendererProps {
   settings: GlobalSettings;
   rotatingBackground?: string;
   sharedData: SharedDisplayData;
+  displayW: number;
+  displayH: number;
+  scale: number;
 }
 
-function resolveProvider(mod: { type: string; config: Record<string, unknown> }, globalProvider: string): string {
+export function resolveProvider(mod: { type: string; config: Record<string, unknown> }, globalProvider: string): string {
   if (mod.type === 'weather') {
     const p = mod.config.provider as string | undefined;
     return (p && p !== 'global') ? p : globalProvider;
@@ -30,18 +32,8 @@ function resolveProvider(mod: { type: string; config: Record<string, unknown> },
   return globalProvider;
 }
 
-export default function ScreenRenderer({ screen, settings, rotatingBackground, sharedData }: ScreenRendererProps) {
+export default function ScreenRenderer({ screen, settings, rotatingBackground, sharedData, displayW, displayH, scale }: ScreenRendererProps) {
   const globalProvider = settings.weather.provider;
-
-  const [viewportSize, setViewportSize] = useState({ w: 0, h: 0 });
-  useEffect(() => {
-    function update() {
-      setViewportSize({ w: window.innerWidth, h: window.innerHeight });
-    }
-    update();
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
-  }, []);
 
   // Minute-resolution timezone-aware clock for module scheduling
   const now = useTZClock(settings.timezone);
@@ -53,13 +45,6 @@ export default function ScreenRenderer({ screen, settings, rotatingBackground, s
 
   const rotation = screen.backgroundRotation;
   const backgroundImage = rotation?.enabled ? (rotatingBackground || screen.backgroundImage) : screen.backgroundImage;
-
-  const displayW = settings.displayWidth || DEFAULT_DISPLAY_WIDTH;
-  const displayH = settings.displayHeight || DEFAULT_DISPLAY_HEIGHT;
-
-  const scale = viewportSize.w > 0
-    ? Math.min(viewportSize.w / displayW, viewportSize.h / displayH)
-    : 1;
 
   function getWeatherData(mod: { type: string; config: Record<string, unknown> }): Record<string, unknown> | null {
     const p = resolveProvider(mod, globalProvider);
@@ -79,7 +64,6 @@ export default function ScreenRenderer({ screen, settings, rotatingBackground, s
         overflow: 'hidden',
         backgroundColor: '#000',
         transform: `scale(${scale})`,
-        transformOrigin: 'top left',
       }}
     >
       {backgroundImage && (
@@ -131,6 +115,7 @@ export default function ScreenRenderer({ screen, settings, rotatingBackground, s
               width: mod.size.w,
               height: mod.size.h,
               zIndex: mod.zIndex,
+              overflow: 'hidden',
             }}
           >
             <Component config={mod.config} style={mod.style} {...extraProps} />

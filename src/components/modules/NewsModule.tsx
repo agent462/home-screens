@@ -5,6 +5,7 @@ import ModuleWrapper from './ModuleWrapper';
 import TickerMarquee from './TickerMarquee';
 import { ModuleLoadingState, ModuleEmptyState } from './ModuleStates';
 import { useFetchData } from '@/hooks/useFetchData';
+import { newsUrl } from '@/lib/fetch-keys';
 import { useRotatingIndex } from '@/hooks/useRotatingIndex';
 
 interface NewsModuleProps {
@@ -121,7 +122,7 @@ function CompactView({ items, showTimestamp }: { items: NewsItem[]; showTimestam
 
 export default function NewsModule({ config, style }: NewsModuleProps) {
   const [data] = useFetchData<{ items: NewsItem[] }>(
-    `/api/news?feed=${encodeURIComponent(config.feedUrl)}`,
+    newsUrl(config),
     config.refreshIntervalMs ?? 300000,
   );
   const allItems = data?.items ?? [];

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { GET } from '@/app/api/jokes/route';
+import { GET, cache } from '@/app/api/jokes/route';
 
 function mockFetchSuccess(joke: string) {
   vi.stubGlobal(
@@ -36,6 +36,7 @@ function mockFetchNetworkError(message: string) {
 describe('GET /api/jokes', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    cache.clear();
   });
 
   it('returns a joke on successful upstream response', async () => {

@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
-import { GET } from '@/app/api/crypto/route';
+import { GET, cache } from '@/app/api/crypto/route';
 
 beforeEach(() => {
   vi.restoreAllMocks();
+  cache.clear();
 });
 
 function mockCoinGeckoResponse(data: Record<string, unknown>) {

@@ -31,16 +31,16 @@ export default function ClockModule({ config, style, timezone }: ClockModuleProp
   return (
     <ModuleWrapper style={style}>
       <div className="flex flex-col items-center justify-center h-full">
-        <span className="font-light tracking-tight tabular-nums" style={{ fontSize: '3em' }}>
+        <span className="font-light tracking-tight tabular-nums" style={{ fontSize: '3em' }} suppressHydrationWarning>
           {format(now, timeFormat)}
         </span>
         {config.showDate && (
-          <span className="mt-2 opacity-70" style={{ fontSize: '1.125em' }}>
+          <span className="mt-2 opacity-70" style={{ fontSize: '1.125em' }} suppressHydrationWarning>
             {format(now, config.dateFormat)}
           </span>
         )}
         {infoParts.length > 0 && (
-          <span className="mt-1 opacity-50" style={{ fontSize: '0.85em' }}>
+          <span className="mt-1 opacity-50" style={{ fontSize: '0.85em' }} suppressHydrationWarning>
             {infoParts.join(' \u00B7 ')}
           </span>
         )}

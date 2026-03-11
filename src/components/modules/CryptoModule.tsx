@@ -8,6 +8,7 @@ import { ModuleLoadingState, ModuleEmptyState } from './ModuleStates';
 import { formatPercent, ChangeColor, FinancialTableView, FinancialCompactView } from './financial/shared';
 import type { TableColumn } from './financial/shared';
 import { useFetchData } from '@/hooks/useFetchData';
+import { cryptoUrl } from '@/lib/fetch-keys';
 
 interface CryptoModuleProps {
   config: CryptoConfig;
@@ -85,7 +86,7 @@ const cryptoTableColumns: TableColumn<CryptoData>[] = [
 
 export default function CryptoModule({ config, style }: CryptoModuleProps) {
   const [data] = useFetchData<{ prices: CryptoData[] }>(
-    `/api/crypto?ids=${encodeURIComponent(config.ids)}`,
+    cryptoUrl(config) ?? '',
     config.refreshIntervalMs ?? 60000,
   );
   const coins = data?.prices ?? [];

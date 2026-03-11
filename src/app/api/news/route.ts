@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseItems } from '@/lib/rss';
-import { errorResponse } from '@/lib/api-utils';
+import { errorResponse, createTTLCache } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
 
 const DEFAULT_FEED = 'https://feeds.bbci.co.uk/news/rss.xml';
+/** @internal exported for test cleanup */
+export const cache = createTTLCache<unknown>(5 * 60 * 1000); // 5 minutes
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,13 +21,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid feed URL' }, { status: 400 });
     }
 
+    const cached = cache.get(feed);
+    if (cached) return NextResponse.json(cached);
+
     const res = await fetch(feed);
     if (!res.ok) return NextResponse.json({ error: 'Failed to fetch RSS feed' }, { status: 502 });
 
     const xml = await res.text();
     const items = parseItems(xml);
 
-    return NextResponse.json({ items });
+    const result = { items };
+    cache.set(feed, result);
+    return NextResponse.json(result);
   } catch (error) {
     return errorResponse(error, 'Failed to fetch news');
   }

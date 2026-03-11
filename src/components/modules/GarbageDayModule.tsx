@@ -112,16 +112,16 @@ function TrashIcon({ active, color }: { active: boolean; color: string }) {
   );
 }
 
-// Recycling icon
+// Recycling icon (Tabler Icons "recycle" – three chasing arrows)
 function RecyclingIcon({ active, color }: { active: boolean; color: string }) {
   return (
-    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: active ? 1 : 0.45 }}>
-      <path d="M7 19H4.815a1.83 1.83 0 0 1-1.57-.881 1.785 1.785 0 0 1-.004-1.784L7.196 9.5" />
-      <path d="M11 19h8.203a1.83 1.83 0 0 0 1.556-.89 1.784 1.784 0 0 0 0-1.775l-1.226-2.12" />
-      <path d="m14 16-3 3 3 3" />
-      <path d="M8.293 13.596 4.875 7.97l5.088.018" />
-      <path d="M7.074 9.456 9.09 5.7a1.83 1.83 0 0 1 1.575-.886c.642 0 1.226.33 1.568.886l3.702 6.4" />
-      <path d="m18.024 10.584-1.7-3.143-3.538 1.57" />
+    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: active ? 1 : 0.45 }}>
+      <path d="M12 17l-2 2 2 2" />
+      <path d="M10 19h9a2 2 0 0 0 1.75-2.75l-.55-1" />
+      <path d="M8.536 11l-.732-2.732-2.732.732" />
+      <path d="M7.804 8.268l-4.5 7.794a2 2 0 0 0 1.506 2.89l1.141.048" />
+      <path d="M15.464 11l2.732.732.732-2.732" />
+      <path d="M18.196 11.732l-4.5-7.794a2 2 0 0 0-3.256-.14l-.591.976" />
     </svg>
   );
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
-import { GET } from '@/app/api/stocks/route';
+import { GET, cache } from '@/app/api/stocks/route';
 
 function makeYahooResponse(price: number, previousClose: number) {
   return {
@@ -59,6 +59,7 @@ function makeRequest(symbols?: string): NextRequest {
 describe('GET /api/stocks', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    cache.clear();
   });
 
   it('fetches a single stock with correct response shape', async () => {

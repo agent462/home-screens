@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import type { PhotoSlideshowConfig, ModuleStyle } from '@/types/config';
 import ModuleWrapper from './ModuleWrapper';
 import { useFetchData } from '@/hooks/useFetchData';
+import { photoSlideshowUrl } from '@/lib/fetch-keys';
 import { useRotatingIndex } from '@/hooks/useRotatingIndex';
 
 interface PhotoSlideshowModuleProps {
@@ -12,10 +13,7 @@ interface PhotoSlideshowModuleProps {
 }
 
 export default function PhotoSlideshowModule({ config, style }: PhotoSlideshowModuleProps) {
-  const url = config.directory
-    ? `/api/backgrounds?directory=${encodeURIComponent(config.directory)}`
-    : '/api/backgrounds';
-  const [data] = useFetchData<string[]>(url, 600000);
+  const [data] = useFetchData<string[]>(photoSlideshowUrl(config), 600000);
   const files = data ?? [];
   const intervalMs = config.intervalMs ?? 30000;
   const index = useRotatingIndex(files.length, intervalMs);

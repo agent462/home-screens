@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import type { TodoistConfig, TodoistGroupBy, ModuleStyle } from '@/types/config';
 import ModuleWrapper from './ModuleWrapper';
 import { useFetchData } from '@/hooks/useFetchData';
+import { todoistUrl } from '@/lib/fetch-keys';
 
 // ─── Types ───
 
@@ -746,7 +747,7 @@ function FocusView({
 // ─── Main Component ───
 
 export default function TodoistModule({ config, style }: TodoistModuleProps) {
-  const [data, error] = useFetchData<TodoistData>('/api/todoist', config.refreshIntervalMs ?? 300000);
+  const [data, error] = useFetchData<TodoistData>(todoistUrl(), config.refreshIntervalMs ?? 300000);
 
   const { tasks, filteredAll, totalCount } = useMemo(() => {
     if (!data?.tasks) return { tasks: [] as TodoistTask[], filteredAll: [] as TodoistTask[], totalCount: 0 };

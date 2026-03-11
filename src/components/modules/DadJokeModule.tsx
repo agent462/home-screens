@@ -3,6 +3,7 @@
 import type { DadJokeConfig, ModuleStyle } from '@/types/config';
 import ModuleWrapper from './ModuleWrapper';
 import { useFetchData } from '@/hooks/useFetchData';
+import { dadJokeUrl } from '@/lib/fetch-keys';
 
 interface DadJokeModuleProps {
   config: DadJokeConfig;
@@ -10,7 +11,7 @@ interface DadJokeModuleProps {
 }
 
 export default function DadJokeModule({ config, style }: DadJokeModuleProps) {
-  const [data] = useFetchData<{ joke: string }>('/api/jokes', config.refreshIntervalMs);
+  const [data] = useFetchData<{ joke: string }>(dadJokeUrl(), config.refreshIntervalMs);
 
   return (
     <ModuleWrapper style={style}>

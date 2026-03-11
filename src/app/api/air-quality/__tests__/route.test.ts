@@ -4,14 +4,18 @@ vi.mock('@/lib/secrets', () => ({
   getSecret: vi.fn(),
 }));
 
-vi.mock('@/lib/api-utils', () => ({
-  errorResponse: vi.fn((err: unknown, msg: string, status = 500) => {
-    const { NextResponse } = require('next/server');
-    const message = err instanceof Error ? err.message : msg;
-    return NextResponse.json({ error: message }, { status });
-  }),
-  getLocationFromConfig: vi.fn(),
-}));
+vi.mock('@/lib/api-utils', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api-utils')>();
+  return {
+    ...actual,
+    errorResponse: vi.fn((err: unknown, msg: string, status = 500) => {
+      const { NextResponse } = require('next/server');
+      const message = err instanceof Error ? err.message : msg;
+      return NextResponse.json({ error: message }, { status });
+    }),
+    getLocationFromConfig: vi.fn(),
+  };
+});
 
 import { getSecret } from '@/lib/secrets';
 import { getLocationFromConfig } from '@/lib/api-utils';
@@ -19,7 +23,7 @@ import { getLocationFromConfig } from '@/lib/api-utils';
 const mockGetSecret = vi.mocked(getSecret);
 const mockGetLocation = vi.mocked(getLocationFromConfig);
 
-const { GET } = await import('@/app/api/air-quality/route');
+const { GET, cache } = await import('@/app/api/air-quality/route');
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -77,6 +81,7 @@ function mockFetchResponses(
 
 beforeEach(() => {
   vi.restoreAllMocks();
+  cache.clear();
 });
 
 describe('GET /api/air-quality', () => {

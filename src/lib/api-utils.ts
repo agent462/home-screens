@@ -42,17 +42,39 @@ export async function getLocationFromConfig(
 
 /**
  * Creates a simple in-memory cache with TTL expiration.
+ * Expired entries are cleaned up on access and when at capacity.
  */
+const SERVER_CACHE_MAX_ENTRIES = 50;
+
 export function createTTLCache<T>(ttlMs: number) {
   const cache = new Map<string, { data: T; timestamp: number }>();
   return {
     get(key: string): T | null {
       const entry = cache.get(key);
-      if (!entry || Date.now() - entry.timestamp > ttlMs) return null;
+      if (!entry) return null;
+      if (Date.now() - entry.timestamp > ttlMs) {
+        cache.delete(key);
+        return null;
+      }
       return entry.data;
     },
     set(key: string, data: T) {
+      if (!cache.has(key) && cache.size >= SERVER_CACHE_MAX_ENTRIES) {
+        // Evict expired entries first
+        const now = Date.now();
+        for (const [k, v] of cache) {
+          if (now - v.timestamp > ttlMs) cache.delete(k);
+        }
+        // If still full, drop the oldest entry (Map insertion order)
+        if (cache.size >= SERVER_CACHE_MAX_ENTRIES) {
+          const oldest = cache.keys().next().value;
+          if (oldest !== undefined) cache.delete(oldest);
+        }
+      }
       cache.set(key, { data, timestamp: Date.now() });
+    },
+    clear() {
+      cache.clear();
     },
   };
 }

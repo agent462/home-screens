@@ -5,6 +5,7 @@ import type { RainMapConfig, ModuleStyle } from '@/types/config';
 import ModuleWrapper from './ModuleWrapper';
 import { ModuleLoadingState, ModuleEmptyState } from './ModuleStates';
 import { useFetchData } from '@/hooks/useFetchData';
+import { rainMapUrl } from '@/lib/fetch-keys';
 
 interface RainMapModuleProps {
   config: RainMapConfig;
@@ -76,7 +77,7 @@ export default function RainMapModule({
   const colorScheme = config.colorScheme ?? 2;
   const refreshMs = config.refreshIntervalMs ?? 600000;
 
-  const [data] = useFetchData<RainViewerData>('/api/rain-map', refreshMs);
+  const [data] = useFetchData<RainViewerData>(rainMapUrl(), refreshMs);
 
   const [displayIndex, setDisplayIndex] = useState(0);
   const [imagesReady, setImagesReady] = useState(false);
