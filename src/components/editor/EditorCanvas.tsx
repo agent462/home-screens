@@ -391,8 +391,10 @@ export default function EditorCanvas({ onScaleChange }: { onScaleChange?: (scale
       onScaleChange?.(newScale);
     };
     updateScale();
-    window.addEventListener('resize', updateScale);
-    return () => window.removeEventListener('resize', updateScale);
+    const el = containerRef.current;
+    const ro = new ResizeObserver(updateScale);
+    if (el) ro.observe(el);
+    return () => ro.disconnect();
   }, [displayWidth, displayHeight, onScaleChange]);
 
   if (!currentScreen) {

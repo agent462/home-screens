@@ -106,7 +106,7 @@ export default function EditorPage() {
   }
 
   return (
-    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setActivePaletteType(null)}>
+    <DndContext sensors={sensors} autoScroll={false} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setActivePaletteType(null)}>
       <div className="h-screen flex flex-col">
         {/* Toolbar */}
         <div className="flex items-center gap-4 overflow-hidden border-b border-neutral-700 bg-neutral-900 px-3 py-2">
