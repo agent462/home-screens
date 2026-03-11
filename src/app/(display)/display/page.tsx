@@ -8,7 +8,7 @@ export default async function DisplayPage() {
 
   return (
     <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', backgroundColor: '#000' }}>
-      <ScreenRotator screens={config.screens} settings={config.settings} />
+      <ScreenRotator screens={config.screens} settings={config.settings} profiles={config.profiles} />
     </div>
   );
 }

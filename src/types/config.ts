@@ -130,12 +130,21 @@ export interface GlobalSettings {
   calendar: CalendarSettings;
   sleep?: SleepSettings;
   screensaver?: ScreensaverSettings;
+  activeProfile?: string;
+}
+
+export interface Profile {
+  id: string;
+  name: string;
+  screenIds: string[];
+  schedule?: ModuleSchedule;
 }
 
 export interface ScreenConfiguration {
   version: number;
   settings: GlobalSettings;
   screens: Screen[];
+  profiles?: Profile[];
 }
 
 // Default style for new modules

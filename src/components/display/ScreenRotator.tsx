@@ -2,12 +2,14 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import type { Screen, GlobalSettings, ScreenConfiguration } from '@/types/config';
+import type { Screen, GlobalSettings, ScreenConfiguration, Profile } from '@/types/config';
 import ScreenRenderer from './ScreenRenderer';
 import type { SharedDisplayData } from './ScreenRenderer';
 import SleepOverlay from './SleepOverlay';
 import { useSleepManager } from '@/hooks/useSleepManager';
 import { useFetchData } from '@/hooks/useFetchData';
+import { useTZClock } from '@/hooks/useTZClock';
+import { resolveProfileScreens } from '@/lib/schedule';
 import { WEATHER_REFRESH_MS, CALENDAR_REFRESH_MS } from '@/lib/constants';
 
 /** How often the display polls for config changes (ms) */
@@ -16,6 +18,7 @@ const CONFIG_POLL_MS = 3_000;
 interface ScreenRotatorProps {
   screens: Screen[];
   settings: GlobalSettings;
+  profiles?: Profile[];
 }
 
 /** How often the client polls the server-side rotation cache (ms) */
@@ -66,12 +69,13 @@ function useBackgroundRotation(screens: Screen[]) {
 }
 
 /**
- * Poll /api/config and return live screens + settings, falling back to
- * the server-rendered props until the first successful fetch.
+ * Poll /api/config and return live screens + settings + profiles,
+ * falling back to the server-rendered props until the first successful fetch.
  */
-function useLiveConfig(initialScreens: Screen[], initialSettings: GlobalSettings) {
+function useLiveConfig(initialScreens: Screen[], initialSettings: GlobalSettings, initialProfiles?: Profile[]) {
   const [screens, setScreens] = useState(initialScreens);
   const [settings, setSettings] = useState(initialSettings);
+  const [profiles, setProfiles] = useState(initialProfiles);
   const configJsonRef = useRef<string>('');
   const buildIdRef = useRef<string>('');
 
@@ -101,6 +105,7 @@ function useLiveConfig(initialScreens: Screen[], initialSettings: GlobalSettings
           if (cfg.screens && cfg.settings) {
             setScreens(cfg.screens);
             setSettings(cfg.settings);
+            setProfiles(cfg.profiles);
           }
         }
       } catch {
@@ -116,7 +121,7 @@ function useLiveConfig(initialScreens: Screen[], initialSettings: GlobalSettings
     };
   }, []);
 
-  return { screens, settings };
+  return { screens, settings, profiles };
 }
 
 function resolveProvider(mod: { type: string; config: Record<string, unknown> }, globalProvider: string): string {
@@ -174,21 +179,35 @@ function useSharedDisplayData(screens: Screen[], settings: GlobalSettings): Shar
   return { owmData, wapiData, pirateData, noaaData, calendarData };
 }
 
-export default function ScreenRotator({ screens: initialScreens, settings: initialSettings }: ScreenRotatorProps) {
-  const { screens, settings } = useLiveConfig(initialScreens, initialSettings);
+export default function ScreenRotator({ screens: initialScreens, settings: initialSettings, profiles: initialProfiles }: ScreenRotatorProps) {
+  const { screens: allScreens, settings, profiles } = useLiveConfig(initialScreens, initialSettings, initialProfiles);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const rotatingBackgrounds = useBackgroundRotation(screens);
   const { displayState, dimOpacity } = useSleepManager(settings.sleep);
-  const sharedData = useSharedDisplayData(screens, settings);
+  // Shared data needs all screens (for weather provider detection), not just active profile screens
+  const sharedData = useSharedDisplayData(allScreens, settings);
+
+  // Re-evaluate profile schedule every minute (timezone-aware)
+  const now = useTZClock(settings.timezone, 60_000);
+  const screens = useMemo(
+    () => resolveProfileScreens(allScreens, profiles, settings.activeProfile, now),
+    [allScreens, profiles, settings.activeProfile, now],
+  );
+
+  // Only poll background rotation for screens visible under the active profile
+  const rotatingBackgrounds = useBackgroundRotation(screens);
+
+  // Stable key derived from resolved screen IDs — changes only when actual set changes
+  const screenKey = screens.map((s) => s.id).join(',');
 
   const advance = useCallback(() => {
     setCurrentIndex((prev) => (prev + 1) % screens.length);
-  }, [screens.length]);
+  }, [screens.length, screenKey]);
 
-  // Clamp currentIndex when screens array shrinks
+  // Reset currentIndex when the active screen set changes (handles both
+  // length changes and same-length profile switches with different screens)
   useEffect(() => {
-    setCurrentIndex((prev) => (prev >= screens.length ? 0 : prev));
-  }, [screens.length]);
+    setCurrentIndex(0);
+  }, [screenKey]);
 
   // Pause screen rotation when display is asleep (no point cycling invisible screens)
   useEffect(() => {

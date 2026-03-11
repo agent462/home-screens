@@ -271,4 +271,170 @@ describe('editor store', () => {
       }).toThrow();
     });
   });
+
+  describe('addProfile', () => {
+    it('adds a profile with all current screen IDs', () => {
+      const store = useEditorStore;
+      store.setState({ config: makeConfig(), isDirty: false });
+
+      store.getState().addProfile('Morning');
+
+      const state = store.getState();
+      expect(state.config!.profiles).toHaveLength(1);
+      expect(state.config!.profiles![0].name).toBe('Morning');
+      expect(state.config!.profiles![0].screenIds).toEqual(['screen-1']);
+      expect(state.isDirty).toBe(true);
+    });
+
+    it('appends to existing profiles', () => {
+      const store = useEditorStore;
+      const config = makeConfig({ profiles: [{ id: 'p1', name: 'Existing', screenIds: ['screen-1'] }] });
+      store.setState({ config });
+
+      store.getState().addProfile('New Profile');
+
+      expect(store.getState().config!.profiles).toHaveLength(2);
+      expect(store.getState().config!.profiles![1].name).toBe('New Profile');
+    });
+
+    it('does nothing when config is null', () => {
+      const store = useEditorStore;
+      store.setState({ config: null });
+      store.getState().addProfile('Test');
+      expect(store.getState().config).toBeNull();
+    });
+  });
+
+  describe('removeProfile', () => {
+    it('removes a profile by ID', () => {
+      const store = useEditorStore;
+      const config = makeConfig({
+        profiles: [
+          { id: 'p1', name: 'A', screenIds: ['screen-1'] },
+          { id: 'p2', name: 'B', screenIds: ['screen-1'] },
+        ],
+      });
+      store.setState({ config });
+
+      store.getState().removeProfile('p1');
+
+      expect(store.getState().config!.profiles).toHaveLength(1);
+      expect(store.getState().config!.profiles![0].id).toBe('p2');
+    });
+
+    it('clears activeProfile when the active profile is removed', () => {
+      const store = useEditorStore;
+      const config = makeConfig({
+        profiles: [{ id: 'p1', name: 'A', screenIds: ['screen-1'] }],
+      });
+      config.settings.activeProfile = 'p1';
+      store.setState({ config });
+
+      store.getState().removeProfile('p1');
+
+      expect(store.getState().config!.settings.activeProfile).toBeUndefined();
+    });
+
+    it('preserves activeProfile when a different profile is removed', () => {
+      const store = useEditorStore;
+      const config = makeConfig({
+        profiles: [
+          { id: 'p1', name: 'A', screenIds: ['screen-1'] },
+          { id: 'p2', name: 'B', screenIds: ['screen-1'] },
+        ],
+      });
+      config.settings.activeProfile = 'p1';
+      store.setState({ config });
+
+      store.getState().removeProfile('p2');
+
+      expect(store.getState().config!.settings.activeProfile).toBe('p1');
+    });
+  });
+
+  describe('updateProfile', () => {
+    it('merges partial updates into the correct profile', () => {
+      const store = useEditorStore;
+      const config = makeConfig({
+        profiles: [
+          { id: 'p1', name: 'A', screenIds: ['screen-1'] },
+          { id: 'p2', name: 'B', screenIds: ['screen-1'] },
+        ],
+      });
+      store.setState({ config });
+
+      store.getState().updateProfile('p1', { name: 'Updated', screenIds: [] });
+
+      const profiles = store.getState().config!.profiles!;
+      expect(profiles[0].name).toBe('Updated');
+      expect(profiles[0].screenIds).toEqual([]);
+      expect(profiles[1].name).toBe('B'); // untouched
+    });
+  });
+
+  describe('reorderProfiles', () => {
+    it('moves a profile from one index to another', () => {
+      const store = useEditorStore;
+      const config = makeConfig({
+        profiles: [
+          { id: 'p1', name: 'A', screenIds: [] },
+          { id: 'p2', name: 'B', screenIds: [] },
+          { id: 'p3', name: 'C', screenIds: [] },
+        ],
+      });
+      store.setState({ config, isDirty: false });
+
+      store.getState().reorderProfiles(0, 2);
+
+      const ids = store.getState().config!.profiles!.map((p) => p.id);
+      expect(ids).toEqual(['p2', 'p3', 'p1']);
+      expect(store.getState().isDirty).toBe(true);
+    });
+  });
+
+  describe('setActiveProfile', () => {
+    it('sets activeProfile on settings', () => {
+      const store = useEditorStore;
+      store.setState({ config: makeConfig(), isDirty: false });
+
+      store.getState().setActiveProfile('p1');
+
+      expect(store.getState().config!.settings.activeProfile).toBe('p1');
+      expect(store.getState().isDirty).toBe(true);
+    });
+
+    it('clears activeProfile with undefined', () => {
+      const store = useEditorStore;
+      const config = makeConfig();
+      config.settings.activeProfile = 'p1';
+      store.setState({ config });
+
+      store.getState().setActiveProfile(undefined);
+
+      expect(store.getState().config!.settings.activeProfile).toBeUndefined();
+    });
+  });
+
+  describe('removeScreen prunes profiles', () => {
+    it('removes deleted screen ID from all profile screenIds', () => {
+      const store = useEditorStore;
+      const config = makeConfig({
+        screens: [
+          { id: 's1', name: 'Screen 1', backgroundImage: '', modules: [] },
+          { id: 's2', name: 'Screen 2', backgroundImage: '', modules: [] },
+        ],
+        profiles: [
+          { id: 'p1', name: 'A', screenIds: ['s1', 's2'] },
+          { id: 'p2', name: 'B', screenIds: ['s2'] },
+        ],
+      });
+      store.setState({ config, selectedScreenId: 's1' });
+
+      store.getState().removeScreen('s2');
+
+      const profiles = store.getState().config!.profiles!;
+      expect(profiles[0].screenIds).toEqual(['s1']);
+      expect(profiles[1].screenIds).toEqual([]);
+    });
+  });
 });

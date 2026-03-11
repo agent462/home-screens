@@ -15,6 +15,7 @@ import {
   Server,
   Database,
   Shield,
+  Layers,
 } from 'lucide-react';
 
 import HomeScreensLogo from '@/components/brand/HomeScreensLogo';
@@ -25,6 +26,7 @@ import LocationSection from '@/components/editor/settings/LocationSection';
 import WeatherSection from '@/components/editor/settings/WeatherSection';
 import IntegrationsSection from '@/components/editor/settings/IntegrationsSection';
 import CalendarSection from '@/components/editor/settings/CalendarSection';
+import ProfilesSection from '@/components/editor/settings/ProfilesSection';
 import SystemSection from '@/components/editor/settings/SystemSection';
 import SecuritySection from '@/components/editor/settings/SecuritySection';
 import UpgradeModal from '@/components/editor/UpgradeModal';
@@ -34,6 +36,7 @@ import { useConfirmStore } from '@/stores/confirm-store';
 
 const TABS = [
   { id: 'display', label: 'Display', icon: Monitor },
+  { id: 'profiles', label: 'Profiles', icon: Layers },
   { id: 'sleep', label: 'Sleep', icon: Moon },
   { id: 'location', label: 'Location', icon: MapPin },
   { id: 'weather', label: 'Weather', icon: CloudSun },
@@ -133,9 +136,15 @@ export default function SettingsPage() {
     if (!config) loadConfig();
   }, [config, loadConfig]);
 
-  // Re-initialize local state once config arrives
+  // Re-initialize local state once config arrives (initial load only).
+  // Imports re-sync manually in handleImport. Profile actions that mutate
+  // config.settings (e.g. setActiveProfile) must NOT wipe unsaved form edits.
+  const settingsInitRef = useRef(false);
   useEffect(() => {
-    if (settings) setState(initSettings(settings));
+    if (settings && !settingsInitRef.current) {
+      settingsInitRef.current = true;
+      setState(initSettings(settings));
+    }
   }, [settings]);
 
   // Upgrade/rollback/rebuild modal state
@@ -256,7 +265,7 @@ export default function SettingsPage() {
     );
   }
 
-  const showSaveButton = activeTab !== 'system' && activeTab !== 'data' && activeTab !== 'integrations' && activeTab !== 'security';
+  const showSaveButton = activeTab !== 'system' && activeTab !== 'data' && activeTab !== 'integrations' && activeTab !== 'security' && activeTab !== 'profiles';
 
   return (
     <div className="h-screen flex flex-col">
@@ -328,6 +337,10 @@ export default function SettingsPage() {
                 }}
                 onChange={update}
               />
+            )}
+
+            {activeTab === 'profiles' && (
+              <ProfilesSection />
             )}
 
             {activeTab === 'sleep' && (

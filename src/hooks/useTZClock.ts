@@ -6,6 +6,7 @@ import { createTZDate } from '@/lib/timezone';
 export function useTZClock(timezone: string | undefined, intervalMs = 60_000): Date {
   const [now, setNow] = useState(() => createTZDate(timezone));
   useEffect(() => {
+    setNow(createTZDate(timezone));
     const interval = setInterval(() => setNow(createTZDate(timezone)), intervalMs);
     return () => clearInterval(interval);
   }, [timezone, intervalMs]);

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { isModuleVisible } from '../schedule';
+import { isModuleVisible, resolveProfileScreens } from '../schedule';
+import type { Screen, Profile } from '@/types/config';
 
 // Helper: create a Date for a specific day/time
 // day: 0=Sun, 1=Mon, ... 6=Sat
@@ -127,19 +128,25 @@ describe('isModuleVisible', () => {
       expect(isModuleVisible({ invert: true }, makeDate(0, 0, 0))).toBe(false);
     });
 
-    it('overnight window + daysOfWeek checks current calendar day (known limitation)', () => {
+    it('overnight window + daysOfWeek uses previous day for post-midnight portion', () => {
       // Saturday-only schedule with overnight window 22:00–06:00
       // At Saturday 23:00 → day=6 matches, time matches → visible
       const saturdayAt11pm = makeDate(6, 23, 0);
       const schedule = { daysOfWeek: [6], startTime: '22:00', endTime: '06:00' };
       expect(isModuleVisible(schedule, saturdayAt11pm)).toBe(true);
 
-      // At Sunday 02:00 → day=0 doesn't match [6] → NOT visible
-      // This is a known limitation: the post-midnight portion of an overnight
-      // window uses the new calendar day, not the day the window started.
-      // Workaround: include both days in daysOfWeek (e.g., [6, 0]).
+      // At Sunday 02:00 → post-midnight portion of overnight window,
+      // so we check yesterday (Saturday=6) which IS in daysOfWeek → visible
       const sundayAt2am = makeDate(0, 2, 0);
-      expect(isModuleVisible(schedule, sundayAt2am)).toBe(false);
+      expect(isModuleVisible(schedule, sundayAt2am)).toBe(true);
+
+      // At Sunday 10:00 → not in time window at all → not visible
+      const sundayAt10am = makeDate(0, 10, 0);
+      expect(isModuleVisible(schedule, sundayAt10am)).toBe(false);
+
+      // At Friday 23:00 → day=5 not in [6], time matches but day doesn't → not visible
+      const fridayAt11pm = makeDate(5, 23, 0);
+      expect(isModuleVisible(schedule, fridayAt11pm)).toBe(false);
     });
   });
 
@@ -162,5 +169,142 @@ describe('isModuleVisible', () => {
       const schedule = { daysOfWeek: [1, 2, 3, 4, 5], startTime: '06:00', endTime: '09:00', invert: true };
       expect(isModuleVisible(schedule, sundayAt7am)).toBe(true);
     });
+  });
+});
+
+// ── resolveProfileScreens ──────────────────────────────────────
+
+function makeScreen(id: string, name?: string): Screen {
+  return { id, name: name ?? id, backgroundImage: '', modules: [] };
+}
+
+describe('resolveProfileScreens', () => {
+  const screenA = makeScreen('a', 'Screen A');
+  const screenB = makeScreen('b', 'Screen B');
+  const screenC = makeScreen('c', 'Screen C');
+  const allScreens = [screenA, screenB, screenC];
+
+  it('returns all screens when no profiles exist', () => {
+    expect(resolveProfileScreens(allScreens, undefined, undefined, new Date())).toEqual(allScreens);
+    expect(resolveProfileScreens(allScreens, [], undefined, new Date())).toEqual(allScreens);
+  });
+
+  it('returns all screens when profiles exist but none active', () => {
+    const profiles: Profile[] = [{ id: 'p1', name: 'Morning', screenIds: ['a'] }];
+    expect(resolveProfileScreens(allScreens, profiles, undefined, new Date())).toEqual(allScreens);
+  });
+
+  it('filters screens by manually active profile', () => {
+    const profiles: Profile[] = [{ id: 'p1', name: 'Morning', screenIds: ['a', 'c'] }];
+    const result = resolveProfileScreens(allScreens, profiles, 'p1', new Date());
+    expect(result).toEqual([screenA, screenC]);
+  });
+
+  it('falls back to all screens if active profile references invalid ID', () => {
+    const profiles: Profile[] = [{ id: 'p1', name: 'Morning', screenIds: ['a'] }];
+    expect(resolveProfileScreens(allScreens, profiles, 'nonexistent', new Date())).toEqual(allScreens);
+  });
+
+  it('falls back to all screens if profile has empty screenIds', () => {
+    const profiles: Profile[] = [{ id: 'p1', name: 'Empty', screenIds: [] }];
+    expect(resolveProfileScreens(allScreens, profiles, 'p1', new Date())).toEqual(allScreens);
+  });
+
+  it('falls back to all screens if profile references only nonexistent screens', () => {
+    const profiles: Profile[] = [{ id: 'p1', name: 'Bad', screenIds: ['x', 'y'] }];
+    expect(resolveProfileScreens(allScreens, profiles, 'p1', new Date())).toEqual(allScreens);
+  });
+
+  it('scheduled profile takes priority over manually active profile', () => {
+    const mondayAt7am = makeDate(1, 7, 0);
+    const profiles: Profile[] = [
+      { id: 'morning', name: 'Morning', screenIds: ['a'], schedule: { daysOfWeek: [1, 2, 3, 4, 5], startTime: '06:00', endTime: '09:00' } },
+      { id: 'default', name: 'Default', screenIds: ['b', 'c'] },
+    ];
+    const result = resolveProfileScreens(allScreens, profiles, 'default', mondayAt7am);
+    expect(result).toEqual([screenA]);
+  });
+
+  it('falls back to active profile when scheduled profile does not match', () => {
+    const mondayAt10am = makeDate(1, 10, 0);
+    const profiles: Profile[] = [
+      { id: 'morning', name: 'Morning', screenIds: ['a'], schedule: { daysOfWeek: [1, 2, 3, 4, 5], startTime: '06:00', endTime: '09:00' } },
+      { id: 'default', name: 'Default', screenIds: ['b', 'c'] },
+    ];
+    const result = resolveProfileScreens(allScreens, profiles, 'default', mondayAt10am);
+    expect(result).toEqual([screenB, screenC]);
+  });
+
+  it('first matching scheduled profile wins', () => {
+    const mondayAt7am = makeDate(1, 7, 0);
+    const profiles: Profile[] = [
+      { id: 'early', name: 'Early', screenIds: ['a'], schedule: { startTime: '06:00', endTime: '08:00' } },
+      { id: 'morning', name: 'Morning', screenIds: ['b'], schedule: { startTime: '06:00', endTime: '10:00' } },
+    ];
+    const result = resolveProfileScreens(allScreens, profiles, undefined, mondayAt7am);
+    expect(result).toEqual([screenA]);
+  });
+
+  it('preserves screen order from allScreens', () => {
+    const profiles: Profile[] = [{ id: 'p1', name: 'Reversed', screenIds: ['c', 'a'] }];
+    const result = resolveProfileScreens(allScreens, profiles, 'p1', new Date());
+    // Order follows allScreens (a, c), not profile's screenIds (c, a)
+    expect(result).toEqual([screenA, screenC]);
+  });
+
+  it('ignores profiles without schedule for auto-activation', () => {
+    const profiles: Profile[] = [
+      { id: 'p1', name: 'No Schedule', screenIds: ['a'] },
+      { id: 'p2', name: 'Has Schedule', screenIds: ['b'], schedule: { startTime: '06:00', endTime: '09:00' } },
+    ];
+    const mondayAt7am = makeDate(1, 7, 0);
+    const result = resolveProfileScreens(allScreens, profiles, undefined, mondayAt7am);
+    expect(result).toEqual([screenB]);
+  });
+
+  it('scheduled profile with stale screens falls through to active profile', () => {
+    const mondayAt7am = makeDate(1, 7, 0);
+    const profiles: Profile[] = [
+      { id: 'stale', name: 'Stale', screenIds: ['x', 'y'], schedule: { startTime: '06:00', endTime: '09:00' } },
+      { id: 'fallback', name: 'Fallback', screenIds: ['b'] },
+    ];
+    // Schedule matches but all screenIds are gone → falls through to manual active
+    const result = resolveProfileScreens(allScreens, profiles, 'fallback', mondayAt7am);
+    expect(result).toEqual([screenB]);
+  });
+
+  it('first scheduled profile stale falls through to second scheduled profile', () => {
+    const mondayAt7am = makeDate(1, 7, 0);
+    const profiles: Profile[] = [
+      { id: 'stale-sched', name: 'Stale Scheduled', screenIds: ['x'], schedule: { startTime: '06:00', endTime: '09:00' } },
+      { id: 'valid-sched', name: 'Valid Scheduled', screenIds: ['b'], schedule: { startTime: '06:00', endTime: '10:00' } },
+    ];
+    // First schedule matches but screens are stale → falls through to second scheduled profile
+    const result = resolveProfileScreens(allScreens, profiles, undefined, mondayAt7am);
+    expect(result).toEqual([screenB]);
+  });
+
+  it('all profiles stale falls back to all screens', () => {
+    const mondayAt7am = makeDate(1, 7, 0);
+    const profiles: Profile[] = [
+      { id: 'stale', name: 'Stale', screenIds: ['x'], schedule: { startTime: '06:00', endTime: '09:00' } },
+      { id: 'also-stale', name: 'Also Stale', screenIds: ['y', 'z'] },
+    ];
+    const result = resolveProfileScreens(allScreens, profiles, 'also-stale', mondayAt7am);
+    expect(result).toEqual(allScreens);
+  });
+
+  it('overnight scheduled profile stays active past midnight', () => {
+    // Friday-only profile scheduled 22:00–06:00
+    const profiles: Profile[] = [
+      { id: 'night', name: 'Night', screenIds: ['a'], schedule: { daysOfWeek: [5], startTime: '22:00', endTime: '06:00' } },
+    ];
+    // Saturday 02:00 — post-midnight portion uses Friday (day 5) → matches
+    const saturdayAt2am = makeDate(6, 2, 0);
+    expect(resolveProfileScreens(allScreens, profiles, undefined, saturdayAt2am)).toEqual([screenA]);
+
+    // Saturday 10:00 — outside time window entirely
+    const saturdayAt10am = makeDate(6, 10, 0);
+    expect(resolveProfileScreens(allScreens, profiles, undefined, saturdayAt10am)).toEqual(allScreens);
   });
 });

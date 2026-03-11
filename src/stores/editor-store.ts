@@ -9,6 +9,7 @@ import type {
   ModuleSize,
   GlobalSettings,
   Screen,
+  Profile,
 } from '@/types/config';
 import { DEFAULT_MODULE_STYLE as defaultStyle } from '@/types/config';
 import { getModuleDefinition } from '@/lib/module-registry';
@@ -35,6 +36,11 @@ interface EditorState {
   removeScreen: (id: string) => void;
   updateScreen: (id: string, updates: Partial<Screen>) => void;
   updateSettings: (settings: Partial<GlobalSettings>) => void;
+  addProfile: (name: string) => void;
+  removeProfile: (id: string) => void;
+  updateProfile: (id: string, updates: Partial<Profile>) => void;
+  reorderProfiles: (fromIndex: number, toIndex: number) => void;
+  setActiveProfile: (id: string | undefined) => void;
   exportConfig: () => void;
   importConfig: (json: string) => void;
 }
@@ -212,9 +218,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { config, selectedScreenId } = get();
     if (!config || config.screens.length <= 1) return;
     const screens = config.screens.filter((s) => s.id !== id);
+    // Prune deleted screen from all profile screenIds
+    const profiles = config.profiles?.map((p) => ({
+      ...p,
+      screenIds: p.screenIds.filter((sid) => sid !== id),
+    }));
     const newSelectedId = selectedScreenId === id ? screens[0]?.id ?? null : selectedScreenId;
     set({
-      config: { ...config, screens },
+      config: { ...config, screens, profiles },
       selectedScreenId: newSelectedId,
       selectedModuleId: null,
       isDirty: true,
@@ -243,6 +254,65 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (!config) return;
     set({
       config: { ...config, settings: { ...config.settings, ...settings } },
+      isDirty: true,
+    });
+  },
+
+  addProfile: (name: string) => {
+    const { config } = get();
+    if (!config) return;
+    const newProfile: Profile = {
+      id: uuidv4(),
+      name,
+      screenIds: config.screens.map((s) => s.id),
+    };
+    set({
+      config: { ...config, profiles: [...(config.profiles ?? []), newProfile] },
+      isDirty: true,
+    });
+  },
+
+  removeProfile: (id: string) => {
+    const { config } = get();
+    if (!config) return;
+    const profiles = (config.profiles ?? []).filter((p) => p.id !== id);
+    const settings = config.settings.activeProfile === id
+      ? { ...config.settings, activeProfile: undefined }
+      : config.settings;
+    set({
+      config: { ...config, profiles, settings },
+      isDirty: true,
+    });
+  },
+
+  updateProfile: (id: string, updates: Partial<Profile>) => {
+    const { config } = get();
+    if (!config) return;
+    set({
+      config: {
+        ...config,
+        profiles: (config.profiles ?? []).map((p) =>
+          p.id === id ? { ...p, ...updates } : p,
+        ),
+      },
+      isDirty: true,
+    });
+  },
+
+  reorderProfiles: (fromIndex: number, toIndex: number) => {
+    const { config } = get();
+    if (!config?.profiles) return;
+    const profiles = [...config.profiles];
+    const [moved] = profiles.splice(fromIndex, 1);
+    profiles.splice(toIndex, 0, moved);
+    set({ config: { ...config, profiles }, isDirty: true });
+  },
+
+  setActiveProfile: (id: string | undefined) => {
+    const { config } = get();
+    if (!config) return;
+    set({
+      config: { ...config, settings: { ...config.settings, activeProfile: id } },
       isDirty: true,
     });
   },

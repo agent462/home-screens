@@ -29,7 +29,7 @@ export function ScheduleSection({ mod, screenId }: { mod: ModuleInstance; screen
   };
 
   const toggleDay = (day: number) => {
-    const current = schedule?.daysOfWeek ?? [];
+    const current = schedule?.daysOfWeek ?? [0, 1, 2, 3, 4, 5, 6];
     const next = current.includes(day) ? current.filter((d) => d !== day) : [...current, day].sort();
     // Prevent deselecting the last day — at least one must remain active
     if (next.length === 0) return;
