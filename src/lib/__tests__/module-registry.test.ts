@@ -14,7 +14,7 @@ const ALL_MODULE_TYPES: ModuleType[] = [
   'word-of-day', 'history', 'moon-phase', 'sunrise-sunset',
   'photo-slideshow', 'qr-code', 'year-progress', 'traffic',
   'sports', 'air-quality', 'todoist', 'rain-map',
-  'multi-month', 'garbage-day', 'standings',
+  'multi-month', 'garbage-day', 'standings', 'affirmations',
 ];
 
 describe('MODULE_CATEGORIES', () => {
@@ -151,8 +151,8 @@ describe('getModuleDefinition', () => {
 });
 
 describe('getAllModuleDefinitions', () => {
-  it('returns an array of length 29', () => {
-    expect(getAllModuleDefinitions()).toHaveLength(29);
+  it('returns an array of length 30', () => {
+    expect(getAllModuleDefinitions()).toHaveLength(30);
   });
 
   it('all items have required fields', () => {
@@ -235,12 +235,13 @@ describe('getModulesByCategory', () => {
     expect(types).toContain('history');
   });
 
-  it('Personal contains todo, sticky-note, greeting', () => {
+  it('Personal contains todo, sticky-note, greeting, affirmations', () => {
     const grouped = getModulesByCategory();
     const types = grouped.get('Personal')!.map((d) => d.type);
     expect(types).toContain('todo');
     expect(types).toContain('sticky-note');
     expect(types).toContain('greeting');
+    expect(types).toContain('affirmations');
   });
 
   it('Media & Display contains text, image, photo-slideshow, qr-code', () => {
@@ -269,8 +270,8 @@ describe('getModulesByCategory', () => {
         total++;
       }
     }
-    expect(total).toBe(29);
-    expect(allTypes.size).toBe(29);
+    expect(total).toBe(30);
+    expect(allTypes.size).toBe(30);
   });
 });
 

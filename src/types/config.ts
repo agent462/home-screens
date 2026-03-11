@@ -27,7 +27,8 @@ export type ModuleType =
   | 'rain-map'
   | 'multi-month'
   | 'garbage-day'
-  | 'standings';
+  | 'standings'
+  | 'affirmations';
 
 export interface ModuleStyle {
   opacity: number;
@@ -461,5 +462,25 @@ export interface StandingsConfig {
   showPlayoffLine: boolean;
   rotationIntervalMs: number;
   refreshIntervalMs: number;
+}
+
+// Affirmations module config
+export type AffirmationsView = 'elegant' | 'card' | 'minimal' | 'typewriter';
+export type AffirmationsCategory = 'affirmations' | 'compliments' | 'motivational' | 'gratitude' | 'mindfulness';
+
+export interface CustomAffirmation {
+  id: string;
+  text: string;
+  attribution?: string;
+}
+
+export interface AffirmationsConfig {
+  view: AffirmationsView;
+  categories: AffirmationsCategory[];
+  rotationIntervalMs: number;
+  showCategoryLabel: boolean;
+  timeAware: boolean;
+  customEntries: CustomAffirmation[];
+  accentColor: string;
 }
 

@@ -25,3 +25,4 @@ export { RainMapConfigSection } from './RainMapConfigSection';
 export { GarbageDayConfigSection } from './GarbageDayConfigSection';
 export { MultiMonthConfigSection } from './MultiMonthConfigSection';
 export { StandingsConfigSection } from './StandingsConfigSection';
+export { AffirmationsConfigSection } from './AffirmationsConfigSection';

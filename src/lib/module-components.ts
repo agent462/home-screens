@@ -35,4 +35,5 @@ export const moduleComponents = {
   'multi-month': dynamic(() => import('@/components/modules/MultiMonthModule')),
   'garbage-day': dynamic(() => import('@/components/modules/GarbageDayModule')),
   standings: dynamic(() => import('@/components/modules/standings/StandingsModule')),
+  affirmations: dynamic(() => import('@/components/modules/AffirmationsModule')),
 } as unknown as Record<ModuleType, ComponentType<Record<string, unknown>>>;

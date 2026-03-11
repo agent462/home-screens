@@ -5,7 +5,7 @@ import {
   Quote, ListTodo, StickyNote, HandMetal,
   Newspaper, TrendingUp, Bitcoin, BookOpen, History,
   Moon, Sunrise, Image, QrCode, BarChart3, Car, Trophy, Wind,
-  ListChecks, CloudRain, CalendarRange, Trash2, Medal,
+  ListChecks, CloudRain, CalendarRange, Trash2, Medal, Sparkles,
 } from 'lucide-react';
 import { DEFAULT_MODULE_SIZES } from './constants';
 
@@ -489,4 +489,21 @@ registerModule({
     refreshIntervalMs: 300000,
   },
   defaultSize: DEFAULT_MODULE_SIZES.standings,
+});
+
+registerModule({
+  type: 'affirmations',
+  label: 'Affirmations',
+  icon: Sparkles,
+  category: 'Personal',
+  defaultConfig: {
+    view: 'elegant',
+    categories: ['affirmations', 'compliments', 'motivational'],
+    rotationIntervalMs: 15000,
+    showCategoryLabel: false,
+    timeAware: true,
+    customEntries: [],
+    accentColor: '#a78bfa',
+  },
+  defaultSize: DEFAULT_MODULE_SIZES.affirmations,
 });

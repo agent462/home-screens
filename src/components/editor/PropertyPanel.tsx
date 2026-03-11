@@ -41,6 +41,7 @@ import {
   GarbageDayConfigSection,
   MultiMonthConfigSection,
   StandingsConfigSection,
+  AffirmationsConfigSection,
 } from '@/components/editor/config-sections';
 
 // Shared constants — exported for use by config section components
@@ -189,6 +190,7 @@ const CONFIG_SECTIONS: Record<string, React.FC<{ mod: ModuleInstance; screenId: 
   'multi-month': MultiMonthConfigSection,
   'garbage-day': GarbageDayConfigSection,
   standings: StandingsConfigSection,
+  affirmations: AffirmationsConfigSection,
 };
 
 export default function PropertyPanel() {

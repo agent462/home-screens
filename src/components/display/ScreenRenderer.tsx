@@ -104,7 +104,7 @@ export default function ScreenRenderer({ screen, settings, rotatingBackground, s
         const extraProps: Record<string, unknown> = {};
         extraProps.timezone = settings.timezone;
 
-        if (['moon-phase', 'sunrise-sunset', 'rain-map'].includes(mod.type)) {
+        if (['moon-phase', 'sunrise-sunset', 'rain-map', 'affirmations'].includes(mod.type)) {
           extraProps.latitude = settings.latitude ?? settings.weather.latitude;
           extraProps.longitude = settings.longitude ?? settings.weather.longitude;
         }
