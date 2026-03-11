@@ -18,8 +18,11 @@ A custom smart display system built with Next.js. Designed to run on a Raspberry
 
 - **Drag-and-drop editor** — visually arrange modules on a 1080x1920 portrait canvas
 - **Multi-screen rotation** — configure multiple screens that cycle automatically
-- **29 built-in modules** — clock, calendar, weather (8 views), countdown, dad jokes, text, image, quote, todo, sticky note, greeting, news, stock ticker, crypto, word of the day, this day in history, moon phase, sunrise/sunset, photo slideshow, QR code, year progress, traffic/commute, sports scores, air quality, todoist, rain map, multi-month calendar, garbage day, and sports standings
-- **Triple weather providers** — OpenWeatherMap, WeatherAPI, and Pirate Weather with a shared interface
+- **30 built-in modules** — clock, calendar, weather (8 views), countdown, dad jokes, text, image, quote, todo, sticky note, greeting, news, stock ticker, crypto, word of the day, this day in history, moon phase, sunrise/sunset, photo slideshow, QR code, year progress, traffic/commute, sports scores, air quality, todoist, rain map, multi-month calendar, garbage day, sports standings, and affirmations
+- **4 weather providers** — OpenWeatherMap, WeatherAPI, Pirate Weather, and NOAA (free, no API key) with a shared interface
+- **Profile system** — define screen groups with schedule-based auto-activation (day of week, time windows)
+- **Remote display control** — wake, sleep, brightness, screen navigation, and alerts via simple HTTP endpoints
+- **Per-module scheduling** — show or hide individual modules by day of week and time window
 - **Google Calendar integration** — display upcoming events from one or more calendars
 - **Background images** — upload custom backgrounds or rotate via Unsplash
 - **Per-module styling** — opacity, blur, colors, fonts, border radius, padding
@@ -34,7 +37,7 @@ A custom smart display system built with Next.js. Designed to run on a Raspberry
 - @dnd-kit (drag-and-drop)
 - Zustand (editor state)
 - Framer Motion (screen transitions)
-- Zod (config validation)
+- Vitest (testing)
 
 ## Getting Started
 
@@ -136,7 +139,7 @@ scripts/
 | `/api/config` | GET, PUT | Read/write screen configuration |
 | `/api/calendar` | GET | Google Calendar event proxy |
 | `/api/calendars` | GET | List available Google Calendars |
-| `/api/weather` | GET | Weather data (triple provider) |
+| `/api/weather` | GET | Weather data (4 providers) |
 | `/api/geocode` | GET | Location geocoding for weather |
 | `/api/jokes` | GET | Dad jokes proxy |
 | `/api/quote` | GET | ZenQuotes daily quote proxy |
@@ -155,6 +158,7 @@ scripts/
 | `/api/time` | GET | Server time |
 | `/api/image-proxy` | GET | Proxy external images |
 | `/api/secrets` | GET, PUT | Manage API keys and credentials |
+| `/api/display/*` | GET, POST | Remote display control (wake, sleep, brightness, navigation, alerts) |
 | `/api/auth/*` | GET, POST | Authentication (password + Google OAuth) |
 | `/api/system/*` | GET, POST | System management (version, upgrade, rebuild, backups, power) |
 
@@ -162,7 +166,7 @@ scripts/
 
 - [Getting Started](docs/getting-started.md) — installation and setup
 - [Editor Guide](docs/editor.md) — how to use the visual editor
-- [Modules Reference](docs/modules.md) — all 29 modules and their options
+- [Modules Reference](docs/modules.md) — all 30 modules and their options
 - [API Reference](docs/api.md) — all API endpoints
 - [Configuration](docs/configuration.md) — config file schema and examples
 - [Raspberry Pi Deployment](docs/raspberry-pi.md) — kiosk setup and troubleshooting

@@ -1,6 +1,6 @@
 # Modules Reference
 
-Home Screens includes 29 built-in modules organized into 7 categories. Each module can be dragged onto the canvas from the module palette in the editor.
+Home Screens includes 30 built-in modules organized into 7 categories. Each module can be dragged onto the canvas from the module palette in the editor.
 
 ## Time & Date
 
@@ -73,7 +73,7 @@ Displays multiple months in a vertical or horizontal layout with today highlight
 
 ### Weather
 
-Unified weather module with 8 views and 3 provider options.
+Unified weather module with 8 views and 4 provider options.
 
 **Views:** `current`, `hourly`, `daily`, `combined`, `compact`, `table`, `precipitation`, `alerts`
 
@@ -81,7 +81,7 @@ Unified weather module with 8 views and 3 provider options.
 |---|---|---|---|
 | `view` | string | `"hourly"` | Which view to render (see list above) |
 | `iconSet` | string | `"color"` | Icon style: `outline` or `color` |
-| `provider` | string | `"global"` | Weather provider: `global` (use global setting), `openweathermap`, `weatherapi`, or `pirateweather` |
+| `provider` | string | `"global"` | Weather provider: `global` (use global setting), `openweathermap`, `weatherapi`, `pirateweather`, or `noaa` |
 | `hoursToShow` | number | `8` | Number of hours to display (hourly view) |
 | `showFeelsLike` | boolean | `true` | Show "feels like" temperature |
 | `daysToShow` | number | `5` | Number of forecast days (daily view) |
@@ -350,6 +350,27 @@ Trash and recycling collection schedule. Highlights when collection day is appro
 | `highlightMode` | string | `"day-before"` | When to highlight: `day-of` or `day-before` |
 
 Supports up to 3 collection types: trash, recycling, and a customizable third type (e.g. yard waste, compost). Each type can run on its own weekly or biweekly schedule.
+
+### Affirmations
+
+Displays rotating positive affirmations with multiple visual styles. Time-aware selection adjusts messages based on time of day, day of week, and season.
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `view` | string | `"elegant"` | Display style: `elegant`, `card`, `minimal`, or `typewriter` |
+| `categories` | array | `["affirmations"]` | Categories to include: `affirmations`, `compliments`, `motivational`, `gratitude`, `mindfulness` |
+| `rotationIntervalMs` | number | `30000` | How often to rotate to the next affirmation (30 sec) |
+| `showCategoryLabel` | boolean | `false` | Show the category label below the affirmation |
+| `timeAware` | boolean | `true` | Select affirmations based on time of day, day of week, and season |
+| `customEntries` | array | `[]` | Custom affirmations, each with `id`, `text`, and optional `category` |
+| `accentColor` | string | `"#a78bfa"` | Accent color for card/typewriter views |
+
+**View details:**
+
+- **elegant** — Large centered text with a subtle gradient backdrop.
+- **card** — Rounded card with accent-colored left border.
+- **minimal** — Simple text with no decoration.
+- **typewriter** — Typewriter-style animation that types out each affirmation.
 
 ---
 

@@ -22,9 +22,10 @@ The following integrations can be configured through the editor:
 | Integration | Description | Required |
 |---|---|---|
 | Google Calendar | OAuth client ID and secret for calendar sync | For calendar module |
-| OpenWeatherMap | Weather data provider | Optional (one of three weather providers) |
-| WeatherAPI | Weather data provider | Optional (one of three weather providers) |
-| Pirate Weather | Weather data provider (Dark Sky replacement) | Optional (one of three weather providers) |
+| OpenWeatherMap | Weather data provider | Optional (one of four weather providers) |
+| WeatherAPI | Weather data provider | Optional (one of four weather providers) |
+| Pirate Weather | Weather data provider (Dark Sky replacement) | Optional (one of four weather providers) |
+| NOAA | Free weather data (US only, no API key needed) | Optional (one of four weather providers) |
 | Google Maps | Google Routes API key for traffic module | For traffic module |
 | TomTom | TomTom Routing API key (traffic fallback) | For traffic module |
 
@@ -68,5 +69,5 @@ Google Calendar uses **OAuth 2.0 Device Flow**, which means you can authorize fr
 ## Next Steps
 
 - [Editor Guide](editor.md) -- learn how to build your screens
-- [Modules Reference](modules.md) -- see all 29 available modules
+- [Modules Reference](modules.md) -- see all 30 available modules
 - [Raspberry Pi Deployment](raspberry-pi.md) -- set up a dedicated kiosk display

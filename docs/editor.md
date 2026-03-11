@@ -116,7 +116,7 @@ The **Integrations** tab is where you configure all API keys and external servic
 
 ### Weather
 
-- **Provider** — choose OpenWeatherMap, WeatherAPI, or Pirate Weather
+- **Provider** — choose OpenWeatherMap, WeatherAPI, Pirate Weather, or NOAA (free, US only)
 - **Location** — set latitude/longitude for weather data
 - **Units** — metric or imperial
 
@@ -142,6 +142,40 @@ The **Integrations** tab is where you configure all API keys and external servic
 ### Timezone
 
 Set the timezone for all time-aware modules (clock, calendar, sunrise/sunset, etc.).
+
+## Profiles
+
+Profiles let you define named groups of screens that activate based on a schedule or manually.
+
+### Creating a Profile
+
+1. Open **Settings > Profiles**
+2. Click **Add Profile** and give it a name (e.g. "Morning", "Evening")
+3. Select which screens to include in this profile
+
+### Schedule-Based Activation
+
+Each profile can have a schedule:
+
+- **Days of Week** — which days the profile is active
+- **Start Time / End Time** — the time window (supports overnight, e.g. 23:00–06:00)
+
+When multiple profiles have overlapping schedules, the first matching profile wins.
+
+### Manual Activation
+
+Set a profile manually in Settings or via the `/api/display/profile` endpoint. Manual activation overrides any scheduled profile.
+
+## Module Scheduling
+
+Individual modules can be shown or hidden based on a schedule:
+
+1. Select a module on the canvas
+2. In the Property Panel, expand **Schedule**
+3. Set the days of week and time window
+4. Optionally toggle **Invert** to hide the module during the window instead of showing it
+
+This is useful for showing a commute widget only on weekday mornings or a sports scores widget only on game days.
 
 ## Password Protection
 

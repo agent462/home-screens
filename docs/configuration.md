@@ -37,6 +37,7 @@ Supported secret keys:
   version: number           // Config schema version (for migrations)
   settings: GlobalSettings  // System-wide settings
   screens: Screen[]         // Array of display screens
+  profiles?: Profile[]      // Named screen groups with optional schedules
 }
 ```
 
@@ -55,7 +56,7 @@ Supported secret keys:
   timezone: string              // IANA timezone (e.g. "America/Chicago")
 
   weather: {
-    provider: string            // "openweathermap", "weatherapi", or "pirateweather"
+    provider: string            // "openweathermap", "weatherapi", "pirateweather", or "noaa"
     latitude: number            // Weather-specific latitude (overrides global)
     longitude: number           // Weather-specific longitude (overrides global)
     units: string               // "metric" or "imperial"
@@ -86,6 +87,8 @@ Supported secret keys:
   screensaver: {
     mode: string                // "clock", "blank", or "off"
   }
+
+  activeProfile: string         // Currently active profile ID (optional)
 }
 ```
 
@@ -116,12 +119,41 @@ Supported secret keys:
   zIndex: number                        // Stacking order
   config: Record<string, unknown>       // Module-specific configuration
   style: ModuleStyle                    // Visual styling
+  schedule?: ModuleSchedule             // Optional show/hide schedule
 }
 ```
 
+### ModuleSchedule
+
+Controls when a module (or profile) is active based on day of week and time window.
+
+```typescript
+{
+  daysOfWeek?: number[]    // 0=Sun, 1=Mon, ... 6=Sat (omit = every day)
+  startTime?: string       // "06:00" (omit = from midnight)
+  endTime?: string         // "09:00" (omit = until midnight)
+  invert?: boolean         // if true, HIDE during this window instead of show
+}
+```
+
+### Profile
+
+Named groups of screens that can be activated manually or on a schedule.
+
+```typescript
+{
+  id: string                    // Unique ID (UUID)
+  name: string                  // Display name (e.g. "Morning", "Evening")
+  screenIds: string[]           // Subset of screen IDs to show
+  schedule?: ModuleSchedule     // Optional schedule for auto-activation
+}
+```
+
+Profiles support overnight windows (e.g. 23:00–06:00). When multiple profiles have overlapping schedules, the first matching profile wins. Manual activation via `settings.activeProfile` overrides scheduled profiles.
+
 ### ModuleType
 
-There are 29 module types:
+There are 30 module types:
 
 ```typescript
 type ModuleType =
@@ -153,7 +185,8 @@ type ModuleType =
   | 'rain-map'
   | 'multi-month'
   | 'garbage-day'
-  | 'standings';
+  | 'standings'
+  | 'affirmations';
 ```
 
 ### ModuleStyle
@@ -201,13 +234,13 @@ type ModuleType =
 
 ### WeatherConfig
 
-Three providers are supported: **OpenWeatherMap**, **WeatherAPI**, and **Pirate Weather** (a Dark Sky replacement with minutely precipitation and alerts). Eight views are available.
+Four providers are supported: **OpenWeatherMap**, **WeatherAPI**, **Pirate Weather** (a Dark Sky replacement with minutely precipitation and alerts), and **NOAA** (free, no API key, US only). Eight views are available.
 
 ```typescript
 {
   view: 'current' | 'hourly' | 'daily' | 'combined' | 'compact' | 'table' | 'precipitation' | 'alerts'
   iconSet: 'outline' | 'color'
-  provider: 'global' | 'openweathermap' | 'weatherapi' | 'pirateweather'
+  provider: 'global' | 'openweathermap' | 'weatherapi' | 'pirateweather' | 'noaa'
   hoursToShow: number
   showFeelsLike: boolean
   daysToShow: number
@@ -509,6 +542,22 @@ Tracks collection schedules for trash, recycling, and a custom bin. Supports wee
   customColor: string
   customLabel: string
   highlightMode: 'day-of' | 'day-before'
+}
+```
+
+### AffirmationsConfig
+
+Rotating positive affirmations with 4 visual styles and 5 categories. Supports time-aware selection.
+
+```typescript
+{
+  view: 'elegant' | 'card' | 'minimal' | 'typewriter'
+  categories: ('affirmations' | 'compliments' | 'motivational' | 'gratitude' | 'mindfulness')[]
+  rotationIntervalMs: number
+  showCategoryLabel: boolean
+  timeAware: boolean           // Adjust messages based on time of day, day of week, season
+  customEntries: { id: string; text: string; category?: string }[]
+  accentColor: string          // Accent color for card/typewriter views
 }
 ```
 

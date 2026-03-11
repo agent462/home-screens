@@ -9,7 +9,7 @@ src/
     (editor)/editor/         # Configuration editor
     api/                     # API routes (see API Routes section below)
   components/
-    modules/                 # All 29 module components + ModuleWrapper
+    modules/                 # All 30 module components + ModuleWrapper
     display/                 # ScreenRotator, ScreenRenderer, SleepOverlay
     editor/                  # Canvas, palette, property panel, settings, backgrounds
     ui/                      # Shared UI primitives (Button, Slider, Toggle, ColorPicker)
@@ -35,7 +35,7 @@ The app uses Next.js route groups to separate concerns:
 
 ### Module System
 
-There are currently **29 modules** organized into 7 categories:
+There are currently **30 modules** organized into 7 categories:
 
 | Category | Modules |
 |---|---|
@@ -43,7 +43,7 @@ There are currently **29 modules** organized into 7 categories:
 | **Weather & Environment** | weather, moon-phase, sunrise-sunset, air-quality, rain-map |
 | **News & Finance** | news, stock-ticker, crypto, sports, standings |
 | **Knowledge & Fun** | dad-joke, quote, word-of-day, history |
-| **Personal** | todo, sticky-note, greeting, todoist, garbage-day |
+| **Personal** | todo, sticky-note, greeting, todoist, garbage-day, affirmations |
 | **Media & Display** | text, image, photo-slideshow, qr-code |
 | **Travel** | traffic |
 
@@ -85,7 +85,7 @@ interface WeatherProvider {
 }
 ```
 
-Three implementations exist: `OpenWeatherMapProvider`, `WeatherAPIProvider`, and `PirateWeatherProvider`. The factory function `createWeatherProvider(provider, apiKey)` instantiates the correct one. Pirate Weather (a Dark Sky replacement) additionally supports minutely precipitation data and weather alerts.
+Four implementations exist: `OpenWeatherMapProvider`, `WeatherAPIProvider`, `PirateWeatherProvider`, and `NOAAProvider`. The factory function `createWeatherProvider(provider, apiKey)` instantiates the correct one. Pirate Weather (a Dark Sky replacement) additionally supports minutely precipitation data and weather alerts. NOAA uses the National Weather Service API — it's free and requires no API key, but is limited to US locations.
 
 ### API Routes
 
@@ -96,9 +96,10 @@ API routes live in `src/app/api/*/route.ts` and serve as server-side proxies for
 | **Auth** | `auth/login`, `auth/logout`, `auth/status`, `auth/password`, `auth/google` | Authentication and session management |
 | **System** | `system/status`, `system/version`, `system/build-id`, `system/changelog`, `system/power`, `system/upgrade`, `system/rebuild`, `system/rollback`, `system/backups` | Server management and deployment |
 | **Config** | `config`, `secrets` | Read/write config and manage API keys |
-| **Weather** | `weather`, `rain-map` | Weather data (triple provider) and rain radar tiles |
+| **Weather** | `weather`, `rain-map` | Weather data (4 providers) and rain radar tiles |
 | **Calendar** | `calendar`, `calendars` | Google Calendar events and calendar list |
 | **Data** | `jokes`, `quote`, `news`, `history`, `stocks`, `crypto`, `sports`, `standings`, `todoist`, `air-quality`, `traffic` | External data proxies |
+| **Display** | `display/[action]` | Remote control: wake, sleep, brightness, navigation, profiles, alerts |
 | **Utility** | `backgrounds`, `geocode`, `image-proxy`, `time`, `unsplash` | Background images, geocoding, image proxying, server time, Unsplash photos |
 
 ### Auth System
@@ -217,6 +218,7 @@ const [data] = useFetchData('/api/my-data?param=value', 60000)
 | `useRotatingIndex(length, interval)` | Cycles through an array index on a timer |
 | `useScaledFontSize(base, ratio)` | Calculates responsive font sizes |
 | `useSleepManager(sleep, screensaver)` | Manages display sleep/dim state |
+| `useDisplayCommands()` | Polls for remote commands and reports display status |
 | `useTZClock(timezone)` | Provides a live-updating `Date` for a given timezone |
 
 ## Testing

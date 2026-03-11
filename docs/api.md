@@ -24,12 +24,12 @@ Saves the screen configuration. Performs an atomic write (temp file + rename) to
 
 ### GET /api/weather
 
-Fetches weather data from the configured provider. Supports three providers: OpenWeatherMap, WeatherAPI, and Pirate Weather. Results are cached for 5 minutes.
+Fetches weather data from the configured provider. Supports four providers: OpenWeatherMap, WeatherAPI, Pirate Weather, and NOAA. Results are cached for 5 minutes.
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `type` | string | `"both"` | `hourly`, `forecast`, or `both` |
-| `provider` | string | from config | `openweathermap`, `weatherapi`, or `pirateweather` |
+| `provider` | string | from config | `openweathermap`, `weatherapi`, `pirateweather`, or `noaa` |
 | `lat` | number | from config | Latitude |
 | `lon` | number | from config | Longitude |
 | `units` | string | `"imperial"` | `metric` or `imperial` |
@@ -684,6 +684,95 @@ Pass `?download=config-v0.9.0-20260308-120000.json` to download a specific backu
 Restores a configuration backup. Requires a valid session.
 
 **Body:** `{ "name": "config-v0.9.0-20260308-120000.json" }`
+
+**Response:** `{ "ok": true }`
+
+---
+
+## Display Control
+
+Remote control endpoints for the kiosk display. The display polls for pending commands; the editor or any HTTP client can enqueue commands.
+
+### GET /api/display/commands
+
+Returns and drains all pending commands from the queue. The display polls this endpoint every 3 seconds.
+
+**Response:**
+```json
+{
+  "commands": [
+    { "type": "wake" },
+    { "type": "brightness", "payload": { "value": 50 } }
+  ]
+}
+```
+
+### GET /api/display/status
+
+Returns the last-known display status as reported by the display client.
+
+**Response:**
+```json
+{
+  "currentScreen": { "id": "abc-123", "name": "Main" },
+  "activeProfile": "evening",
+  "displayState": "active",
+  "brightness": 100,
+  "timestamp": 1709913600000
+}
+```
+
+### GET /api/display/:command
+
+Simple commands via GET — bookmarkable from a phone or browser. Supported commands: `wake`, `sleep`, `next-screen`, `prev-screen`, `reload`.
+
+**Response:** `{ "ok": true, "command": "wake" }`
+
+### POST /api/display/brightness
+
+Sets the display brightness.
+
+**Body:** `{ "value": 50 }` (0–100)
+
+**Response:** `{ "ok": true, "command": "brightness", "value": 50 }`
+
+### POST /api/display/profile
+
+Switches the active profile. Requires a valid session.
+
+**Body:** `{ "profile": "profile-id" }`
+
+**Response:** `{ "ok": true, "profile": "profile-id" }`
+
+### POST /api/display/alert
+
+Shows an alert overlay on the display.
+
+**Body:**
+```json
+{
+  "type": "info",
+  "title": "Alert Title",
+  "message": "Alert message body",
+  "duration": 10000
+}
+```
+
+**Response:** `{ "ok": true, "command": "alert" }`
+
+### POST /api/display/status
+
+Reports the current display state. Called by the display client every 30 seconds.
+
+**Body:**
+```json
+{
+  "currentScreen": { "id": "abc-123", "name": "Main" },
+  "displayState": "active",
+  "brightness": 100,
+  "timestamp": 1709913600000
+}
+```
 
 **Response:** `{ "ok": true }`
 

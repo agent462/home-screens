@@ -34,7 +34,7 @@ npx vitest run src/lib/__tests__/config.test.ts  # Run a single test file
 - `(editor)` — configuration editor at `/editor`, has toolbars/panels
 
 ### Module System
-The codebase uses a **module registry pattern**. Each of the 25 widget types requires:
+The codebase uses a **module registry pattern**. Each of the 30 widget types requires:
 1. A React component in `src/components/modules/`
 2. A type in the `ModuleType` union (`src/types/config.ts`)
 3. A config interface in `src/types/config.ts`
@@ -58,7 +58,7 @@ All API routes are server-side proxies for external services (weather, calendar,
 - `src/lib/module-registry.ts` — module definitions (type, label, icon, category, defaults)
 - `src/lib/module-components.ts` — dynamic imports mapping ModuleType → React component
 - `src/lib/config.ts` — config file read/write
-- `src/lib/weather.ts` — dual weather provider (OpenWeatherMap + WeatherAPI) with abstract interface
+- `src/lib/weather.ts` — 4 weather providers (OpenWeatherMap, WeatherAPI, Pirate Weather, NOAA) with abstract interface
 - `src/lib/google-calendar.ts` — Google Calendar integration (OAuth device flow)
 - `src/stores/editor-store.ts` — Zustand store for all editor state and actions
 
