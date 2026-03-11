@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseItems } from '@/lib/rss';
-import { errorResponse, createTTLCache } from '@/lib/api-utils';
+import { errorResponse, createTTLCache, fetchWithTimeout } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     const cached = cache.get(feed);
     if (cached) return NextResponse.json(cached);
 
-    const res = await fetch(feed);
+    const res = await fetchWithTimeout(feed);
     if (!res.ok) return NextResponse.json({ error: 'Failed to fetch RSS feed' }, { status: 502 });
 
     const xml = await res.text();

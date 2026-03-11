@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from '@/lib/api-utils';
+
 // ── Public types ─────────────────────────────────────────────────────
 
 export interface HourlyWeather {
@@ -196,8 +198,8 @@ export class OpenWeatherMapProvider implements WeatherProvider {
 
   async getHourly(lat: number, lon: number, units: string): Promise<HourlyWeather[]> {
     const [currentRes, forecastRes] = await Promise.all([
-      fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=${units}&appid=${this.apiKey}`),
-      fetch(`https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&units=${units}&cnt=8&appid=${this.apiKey}`),
+      fetchWithTimeout(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=${units}&appid=${this.apiKey}`),
+      fetchWithTimeout(`https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&units=${units}&cnt=8&appid=${this.apiKey}`),
     ]);
     if (!currentRes.ok) {
       const body = await currentRes.text();
@@ -237,7 +239,7 @@ export class OpenWeatherMapProvider implements WeatherProvider {
 
   async getForecast(lat: number, lon: number, units: string): Promise<ForecastDay[]> {
     const url = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&units=${units}&appid=${this.apiKey}`;
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url);
     if (!res.ok) {
       const body = await res.text();
       throw new Error(`OpenWeatherMap API error ${res.status}: ${body}`);
@@ -280,7 +282,7 @@ export class WeatherAPIProvider implements WeatherProvider {
 
   async getHourly(lat: number, lon: number, units: string): Promise<HourlyWeather[]> {
     const url = `https://api.weatherapi.com/v1/forecast.json?key=${this.apiKey}&q=${lat},${lon}&days=2&aqi=no`;
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url);
     if (!res.ok) {
       const body = await res.text();
       throw new Error(`WeatherAPI error ${res.status}: ${body}`);
@@ -306,7 +308,7 @@ export class WeatherAPIProvider implements WeatherProvider {
 
   async getForecast(lat: number, lon: number, units: string): Promise<ForecastDay[]> {
     const url = `https://api.weatherapi.com/v1/forecast.json?key=${this.apiKey}&q=${lat},${lon}&days=7&aqi=no`;
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url);
     if (!res.ok) {
       const body = await res.text();
       throw new Error(`WeatherAPI error ${res.status}: ${body}`);
@@ -417,7 +419,7 @@ export class PirateWeatherProvider implements WeatherProvider {
   private async _doFetch(lat: number, lon: number, units: string): Promise<PWResponse> {
     const pwUnits = units === 'imperial' ? 'us' : 'ca';
     const url = `https://api.pirateweather.net/forecast/${this.apiKey}/${lat},${lon}?units=${pwUnits}&version=2`;
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url);
     if (!res.ok) {
       const body = await res.text();
       throw new Error(`Pirate Weather API error ${res.status}: ${body}`);
@@ -574,7 +576,7 @@ export class NOAAProvider implements WeatherProvider {
   constructor() {}
 
   private async fetchJSON<T>(url: string): Promise<T> {
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       headers: { 'User-Agent': NOAAProvider.USER_AGENT },
     });
     if (!res.ok) {

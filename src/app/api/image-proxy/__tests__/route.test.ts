@@ -7,12 +7,12 @@ const mockCache = {
 };
 
 vi.mock('@/lib/api-utils', () => ({
-  errorResponse: vi.fn((err: unknown, msg: string, status = 500) => {
+  errorResponse: vi.fn((_err: unknown, msg: string, status = 500) => {
     const { NextResponse } = require('next/server');
-    const message = err instanceof Error ? err.message : msg;
-    return NextResponse.json({ error: message }, { status });
+    return NextResponse.json({ error: msg }, { status });
   }),
   createTTLCache: vi.fn(() => mockCache),
+  fetchWithTimeout: vi.fn((...args: unknown[]) => (globalThis.fetch as Function)(...args)),
 }));
 
 const { GET } = await import('@/app/api/image-proxy/route');
@@ -172,6 +172,6 @@ describe('GET /api/image-proxy', () => {
     const json = await res.json();
 
     expect(res.status).toBe(500);
-    expect(json.error).toBe('Connection refused');
+    expect(json.error).toBe('Fetch error');
   });
 });

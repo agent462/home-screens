@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { errorResponse, createTTLCache } from '@/lib/api-utils';
+import { errorResponse, createTTLCache, fetchWithTimeout } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,7 +11,7 @@ export async function GET() {
     const cached = cache.get('quote');
     if (cached) return NextResponse.json(cached);
 
-    const res = await fetch('https://zenquotes.io/api/random');
+    const res = await fetchWithTimeout('https://zenquotes.io/api/random');
     if (!res.ok) return NextResponse.json({ error: 'Failed to fetch quote' }, { status: 502 });
     const data = await res.json();
     const item = data[0];

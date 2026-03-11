@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { errorResponse, createTTLCache } from '@/lib/api-utils';
+import { errorResponse, createTTLCache, fetchWithTimeout } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,7 +13,7 @@ export async function GET() {
   }
 
   try {
-    const res = await fetch('https://history.muffinlabs.com/date', {
+    const res = await fetchWithTimeout('https://history.muffinlabs.com/date', {
       headers: { Accept: 'application/json' },
     });
     if (!res.ok) return NextResponse.json({ error: 'Failed to fetch historical events' }, { status: 502 });

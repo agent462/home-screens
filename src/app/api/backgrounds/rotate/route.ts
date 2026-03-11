@@ -4,6 +4,7 @@ import path from 'path';
 import { readConfig } from '@/lib/config';
 import { BACKGROUNDS_DIR } from '@/lib/constants';
 import { getUnsplashAccessKey, trackDownload } from '@/lib/unsplash';
+import { fetchWithTimeout } from '@/lib/api-utils';
 
 const CACHE_FILE = path.join(process.cwd(), 'data', 'background-cache.json');
 
@@ -34,7 +35,7 @@ async function writeCache(cache: BackgroundCache): Promise<void> {
 
 async function fetchAndSavePhoto(query: string, accessKey: string): Promise<string | null> {
   // Fetch random photo metadata from Unsplash
-  const res = await fetch(
+  const res = await fetchWithTimeout(
     `https://api.unsplash.com/photos/random?query=${encodeURIComponent(query)}&orientation=portrait&content_filter=high`,
     { headers: { Authorization: `Client-ID ${accessKey}` } },
   );
@@ -52,7 +53,7 @@ async function fetchAndSavePhoto(query: string, accessKey: string): Promise<stri
   }
 
   // Download and save locally
-  const imgRes = await fetch(imageUrl);
+  const imgRes = await fetchWithTimeout(imageUrl);
   if (!imgRes.ok) return null;
 
   const buffer = Buffer.from(await imgRes.arrayBuffer());

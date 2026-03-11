@@ -149,7 +149,7 @@ describe('GET /api/history', () => {
     const json = await response.json();
 
     expect(response.status).toBe(500);
-    expect(json).toEqual({ error: 'ECONNREFUSED' });
+    expect(json).toEqual({ error: 'Failed to fetch historical events' });
   });
 
   it('sends correct URL and Accept header to upstream API', async () => {
@@ -158,9 +158,9 @@ describe('GET /api/history', () => {
     const GET = await importGET();
     await GET();
 
-    expect(fetch).toHaveBeenCalledWith('https://history.muffinlabs.com/date', {
+    expect(fetch).toHaveBeenCalledWith('https://history.muffinlabs.com/date', expect.objectContaining({
       headers: { Accept: 'application/json' },
-    });
+    }));
   });
 
   it('serves cached response on second call for the same day', async () => {

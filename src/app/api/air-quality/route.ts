@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSecret } from '@/lib/secrets';
-import { errorResponse, getLocationFromConfig, createTTLCache } from '@/lib/api-utils';
+import { errorResponse, getLocationFromConfig, createTTLCache, fetchWithTimeout } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,14 +33,15 @@ export async function GET() {
 
   try {
     const [airRes, uvRes] = await Promise.all([
-      fetch(
+      fetchWithTimeout(
         `https://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lon}&appid=${apiKey}`,
       ),
       // NOTE: /data/2.5/uvi is deprecated; may not work on newer API keys.
       // If UV returns 0, consider migrating to One Call API 3.0.
-      fetch(
+      // Caught separately so a UV failure doesn't reject the entire Promise.all.
+      fetchWithTimeout(
         `https://api.openweathermap.org/data/2.5/uvi?lat=${lat}&lon=${lon}&appid=${apiKey}`,
-      ),
+      ).catch(() => null),
     ]);
 
     if (!airRes.ok) {
@@ -57,7 +58,7 @@ export async function GET() {
     const components = entry.components;
 
     let uv = 0;
-    if (uvRes.ok) {
+    if (uvRes?.ok) {
       const uvData = await uvRes.json();
       uv = uvData.value ?? 0;
     }

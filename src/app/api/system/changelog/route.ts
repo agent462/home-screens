@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getRemoteUrl } from '@/lib/version';
 import { requireSession } from '@/lib/auth';
-import { errorResponse } from '@/lib/api-utils';
+import { errorResponse, fetchWithTimeout } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,14 +22,14 @@ export async function GET(request: NextRequest) {
 
     const repo = match[1];
 
-    const res = await fetch(`https://api.github.com/repos/${repo}/releases?per_page=10`, {
+    const res = await fetchWithTimeout(`https://api.github.com/repos/${repo}/releases?per_page=10`, {
       headers: { Accept: 'application/vnd.github.v3+json' },
       next: { revalidate: 3600 }, // Cache for 1 hour
     });
 
     if (!res.ok) {
       // Fall back to tags if no releases
-      const tagsRes = await fetch(`https://api.github.com/repos/${repo}/tags?per_page=10`, {
+      const tagsRes = await fetchWithTimeout(`https://api.github.com/repos/${repo}/tags?per_page=10`, {
         headers: { Accept: 'application/vnd.github.v3+json' },
         next: { revalidate: 3600 },
       });

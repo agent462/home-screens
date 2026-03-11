@@ -28,7 +28,7 @@ function makeConfig(version: number): ScreenConfiguration {
       {
         id: 'default',
         name: 'Screen 1',
-        backgroundImage: '/backgrounds/default.svg',
+        backgroundImage: '',
         modules: [],
       },
     ],

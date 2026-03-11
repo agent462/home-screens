@@ -97,7 +97,7 @@ describe('GET /api/rain-map', () => {
     const GET = await importGET();
     await GET();
 
-    expect(fetch).toHaveBeenCalledWith('https://api.rainviewer.com/public/weather-maps.json');
+    expect(fetch).toHaveBeenCalledWith('https://api.rainviewer.com/public/weather-maps.json', expect.anything());
   });
 
   it('returns 502 with status in error message when upstream fails', async () => {
@@ -129,7 +129,7 @@ describe('GET /api/rain-map', () => {
     const json = await response.json();
 
     expect(response.status).toBe(500);
-    expect(json).toEqual({ error: 'ETIMEDOUT' });
+    expect(json).toEqual({ error: 'Failed to fetch rain map data' });
   });
 
   it('serves cached response on second call', async () => {

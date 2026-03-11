@@ -1,4 +1,5 @@
 import { getSecret } from '@/lib/secrets';
+import { fetchWithTimeout } from '@/lib/api-utils';
 
 export const UNSPLASH_API = 'https://api.unsplash.com';
 
@@ -14,7 +15,7 @@ export async function getUnsplashAccessKey(): Promise<string | null> {
  * Fires and forgets — errors are silently ignored.
  */
 export function trackDownload(downloadUrl: string, accessKey: string): void {
-  fetch(downloadUrl, {
+  fetchWithTimeout(downloadUrl, {
     headers: { Authorization: `Client-ID ${accessKey}` },
   }).catch(() => {});
 }

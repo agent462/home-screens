@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { errorResponse, createTTLCache } from '@/lib/api-utils';
+import { errorResponse, createTTLCache, fetchWithTimeout } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +15,7 @@ interface StockResult {
 
 async function fetchStock(symbol: string): Promise<StockResult> {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`;
-  const res = await fetch(url);
+  const res = await fetchWithTimeout(url);
   if (!res.ok) throw new Error(`Failed to fetch ${symbol}`);
 
   const data = await res.json();

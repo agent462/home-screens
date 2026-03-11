@@ -35,7 +35,7 @@ describe('GET /api/news', () => {
     expect(json).toEqual({
       items: [{ title: 'Test Article', link: 'https://test.com/article', pubDate: '2026-03-08', description: '' }],
     });
-    expect(global.fetch).toHaveBeenCalledWith('https://example.com/rss');
+    expect(global.fetch).toHaveBeenCalledWith('https://example.com/rss', expect.anything());
     expect(mockParseItems).toHaveBeenCalledWith(xml);
   });
 
@@ -45,7 +45,7 @@ describe('GET /api/news', () => {
     const req = new NextRequest('http://localhost/api/news');
     await GET(req);
 
-    expect(global.fetch).toHaveBeenCalledWith('https://feeds.bbci.co.uk/news/rss.xml');
+    expect(global.fetch).toHaveBeenCalledWith('https://feeds.bbci.co.uk/news/rss.xml', expect.anything());
   });
 
   it('returns 400 for an invalid URL', async () => {
@@ -94,7 +94,7 @@ describe('GET /api/news', () => {
     const json = await res.json();
 
     expect(res.status).toBe(500);
-    expect(json).toEqual({ error: 'Network failure' });
+    expect(json).toEqual({ error: 'Failed to fetch news' });
   });
 
   it('passes fetched XML text to parseItems', async () => {

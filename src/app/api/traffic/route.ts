@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { errorResponse, createTTLCache } from '@/lib/api-utils';
+import { errorResponse, createTTLCache, fetchWithTimeout } from '@/lib/api-utils';
 import { getSecret } from '@/lib/secrets';
 
 export const dynamic = 'force-dynamic';
@@ -23,7 +23,7 @@ async function fetchGoogle(routes: RouteInput[], apiKey: string) {
         routingPreference: 'TRAFFIC_AWARE',
       };
 
-      const res = await fetch(
+      const res = await fetchWithTimeout(
         'https://routes.googleapis.com/directions/v2:computeRoutes',
         {
           method: 'POST',
@@ -65,7 +65,7 @@ async function tomtomGeocode(address: string, apiKey: string): Promise<string> {
   if (cached) return cached;
 
   const url = `https://api.tomtom.com/search/2/geocode/${encodeURIComponent(address)}.json?key=${apiKey}&limit=1`;
-  const res = await fetch(url);
+  const res = await fetchWithTimeout(url);
   if (!res.ok) {
     throw new Error(`TomTom Geocode error: ${res.status}`);
   }
@@ -89,7 +89,7 @@ async function fetchTomTom(routes: RouteInput[], apiKey: string) {
 
       const url = `https://api.tomtom.com/routing/1/calculateRoute/${originCoords}:${destCoords}/json?key=${apiKey}&traffic=true&computeTravelTimeFor=all`;
 
-      const res = await fetch(url);
+      const res = await fetchWithTimeout(url);
       if (!res.ok) {
         const text = await res.text();
         throw new Error(`TomTom API error: ${res.status} ${text}`);

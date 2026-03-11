@@ -3,7 +3,7 @@ import path from 'path';
 import { BACKGROUNDS_DIR } from '@/lib/constants';
 import { UNSPLASH_API, getUnsplashAccessKey, trackDownload } from '@/lib/unsplash';
 import { requireSession } from '@/lib/auth';
-import { errorResponse } from '@/lib/api-utils';
+import { errorResponse, fetchWithTimeout } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     const orientation = searchParams.get('orientation') || 'portrait';
 
     const url = `${UNSPLASH_API}/search/photos?query=${encodeURIComponent(query)}&page=${page}&per_page=${perPage}&orientation=${orientation}`;
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       headers: { Authorization: `Client-ID ${accessKey}` },
     });
 
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Download the image
-    const res = await fetch(imageUrl);
+    const res = await fetchWithTimeout(imageUrl);
     if (!res.ok) throw new Error(`Failed to fetch image: ${res.status}`);
 
     const buffer = Buffer.from(await res.arrayBuffer());

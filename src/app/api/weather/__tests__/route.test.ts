@@ -19,10 +19,9 @@ vi.mock('@/lib/weather', () => ({
 }));
 
 vi.mock('@/lib/api-utils', () => ({
-  errorResponse: vi.fn((err: unknown, msg: string, status = 500) => {
+  errorResponse: vi.fn((_err: unknown, msg: string, status = 500) => {
     const { NextResponse } = require('next/server');
-    const message = err instanceof Error ? err.message : msg;
-    return NextResponse.json({ error: message }, { status });
+    return NextResponse.json({ error: msg }, { status });
   }),
   createTTLCache: vi.fn(() => mockCache),
   getLocationFromConfig: vi.fn(),
@@ -297,6 +296,6 @@ describe('GET /api/weather', () => {
     const json = await res.json();
 
     expect(res.status).toBe(500);
-    expect(json.error).toBe('Invalid provider configuration');
+    expect(json.error).toBe('Failed to fetch weather');
   });
 });

@@ -13,10 +13,10 @@ vi.mock('@/lib/auth', () => ({
 }));
 
 vi.mock('@/lib/api-utils', () => ({
-  errorResponse: vi.fn((err: unknown, msg: string, status = 500) => {
-    const message = err instanceof Error ? err.message : msg;
-    return Response.json({ error: message }, { status });
+  errorResponse: vi.fn((_err: unknown, msg: string, status = 500) => {
+    return Response.json({ error: msg }, { status });
   }),
+  fetchWithTimeout: vi.fn((...args: unknown[]) => (globalThis.fetch as Function)(...args)),
 }));
 
 import { getSecretStatus, setSecret, deleteSecret, isValidSecretKey } from '@/lib/secrets';

@@ -6,14 +6,14 @@ vi.mock('@/lib/secrets', () => ({
 }));
 
 vi.mock('@/lib/api-utils', () => ({
-  errorResponse: vi.fn((err: unknown, msg: string, status = 500) => {
-    const message = err instanceof Error ? err.message : msg;
-    return Response.json({ error: message }, { status });
+  errorResponse: vi.fn((_err: unknown, msg: string, status = 500) => {
+    return Response.json({ error: msg }, { status });
   }),
   createTTLCache: vi.fn(() => ({
     get: vi.fn(() => null),
     set: vi.fn(),
   })),
+  fetchWithTimeout: vi.fn((...args: unknown[]) => (globalThis.fetch as Function)(...args)),
 }));
 
 import { getSecret } from '@/lib/secrets';
@@ -296,7 +296,7 @@ describe('GET /api/traffic - Google provider', () => {
     const json = await res.json();
 
     expect(res.status).toBe(500);
-    expect(json.error).toMatch(/Google Routes API error/);
+    expect(json.error).toBe('Failed to fetch traffic data');
   });
 });
 
@@ -421,6 +421,6 @@ describe('GET /api/traffic - errors', () => {
     const json = await res.json();
 
     expect(res.status).toBe(500);
-    expect(json.error).toBe('Network timeout');
+    expect(json.error).toBe('Failed to fetch traffic data');
   });
 });

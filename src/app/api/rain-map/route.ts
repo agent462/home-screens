@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { errorResponse, createTTLCache } from '@/lib/api-utils';
+import { errorResponse, createTTLCache, fetchWithTimeout } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,7 +30,7 @@ export async function GET() {
       return NextResponse.json(cached);
     }
 
-    const res = await fetch('https://api.rainviewer.com/public/weather-maps.json');
+    const res = await fetchWithTimeout('https://api.rainviewer.com/public/weather-maps.json');
     if (!res.ok) {
       return NextResponse.json({ error: `RainViewer API returned ${res.status}` }, { status: 502 });
     }

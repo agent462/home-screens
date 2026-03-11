@@ -250,7 +250,7 @@ describe('GET /api/geocode', () => {
     const json = await response.json();
 
     expect(response.status).toBe(500);
-    expect(json).toEqual({ error: 'ENOTFOUND' });
+    expect(json).toEqual({ error: 'Geocoding request failed' });
   });
 
   it('sends User-Agent header to Nominatim', async () => {

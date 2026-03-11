@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 
 const BGS = path.join(process.cwd(), BACKGROUNDS_DIR);
 
-const IMAGE_RE = /\.(jpe?g|png|webp|gif|svg|avif)$/i;
+const IMAGE_RE = /\.(jpe?g|png|webp|gif|avif)$/i;
 
 /** Validate and resolve a relative path within BGS, preventing directory traversal */
 function safePath(relativePath: string): string | null {

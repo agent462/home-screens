@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { errorResponse, createTTLCache } from '@/lib/api-utils';
+import { errorResponse, createTTLCache, fetchWithTimeout } from '@/lib/api-utils';
 import { LEAGUE_MAP } from '@/lib/espn';
 
 export const dynamic = 'force-dynamic';
@@ -34,7 +34,7 @@ async function fetchLeague(league: string): Promise<GameResult[]> {
   if (!path) return [];
 
   const url = `https://site.api.espn.com/apis/site/v2/sports/${path}/scoreboard`;
-  const res = await fetch(url);
+  const res = await fetchWithTimeout(url);
   if (!res.ok) throw new Error(`Failed to fetch ${league} scores`);
 
   const data = await res.json();

@@ -4,6 +4,7 @@ import { GET, cache } from '@/app/api/crypto/route';
 
 beforeEach(() => {
   vi.restoreAllMocks();
+  vi.spyOn(console, 'error').mockImplementation(() => {});
   cache.clear();
 });
 
@@ -28,6 +29,7 @@ describe('GET /api/crypto', () => {
     expect(res.status).toBe(200);
     expect(global.fetch).toHaveBeenCalledWith(
       expect.stringContaining('ids=bitcoin%2Cethereum'),
+      expect.anything(),
     );
     expect(json.prices).toHaveLength(2);
   });
@@ -42,6 +44,7 @@ describe('GET /api/crypto', () => {
 
     expect(global.fetch).toHaveBeenCalledWith(
       expect.stringContaining('ids=solana'),
+      expect.anything(),
     );
   });
 
@@ -56,6 +59,7 @@ describe('GET /api/crypto', () => {
 
     expect(global.fetch).toHaveBeenCalledWith(
       expect.stringContaining('ids=bitcoin%2Cdogecoin'),
+      expect.anything(),
     );
   });
 
@@ -70,6 +74,7 @@ describe('GET /api/crypto', () => {
 
     expect(global.fetch).toHaveBeenCalledWith(
       expect.stringContaining('ids=bitcoin%2Cethereum'),
+      expect.anything(),
     );
   });
 
@@ -161,6 +166,6 @@ describe('GET /api/crypto', () => {
     const json = await res.json();
 
     expect(res.status).toBe(500);
-    expect(json).toEqual({ error: 'DNS resolution failed' });
+    expect(json).toEqual({ error: 'Failed to fetch crypto prices' });
   });
 });

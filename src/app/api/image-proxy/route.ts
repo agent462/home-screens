@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { errorResponse, createTTLCache } from '@/lib/api-utils';
+import { errorResponse, createTTLCache, fetchWithTimeout } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url);
     if (!res.ok) return NextResponse.json({ error: 'Upstream fetch failed' }, { status: 502 });
 
     const data = await res.arrayBuffer();

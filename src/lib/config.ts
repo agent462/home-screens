@@ -32,7 +32,7 @@ const DEFAULT_CONFIG: ScreenConfiguration = {
     {
       id: 'default',
       name: 'Screen 1',
-      backgroundImage: '/backgrounds/default.svg',
+      backgroundImage: '',
       modules: [],
     },
   ],

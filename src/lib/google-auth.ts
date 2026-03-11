@@ -2,6 +2,7 @@ import { google } from 'googleapis';
 import { readFile, writeFile } from 'fs/promises';
 import path from 'path';
 import { getSecret } from '@/lib/secrets';
+import { fetchWithTimeout } from '@/lib/api-utils';
 
 const TOKENS_PATH = path.join(process.cwd(), 'data', 'google-tokens.json');
 const SCOPES = ['https://www.googleapis.com/auth/calendar.readonly'];
@@ -24,7 +25,7 @@ export async function requestDeviceCode(): Promise<DeviceCodeResponse> {
   const clientId = await getSecret('google_client_id');
   if (!clientId) throw new Error('Google OAuth Client ID is not configured. Add it in Settings → Integrations.');
 
-  const res = await fetch(DEVICE_CODE_URL, {
+  const res = await fetchWithTimeout(DEVICE_CODE_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -49,7 +50,7 @@ export async function pollDeviceToken(
   const clientSecret = await getSecret('google_client_secret');
   if (!clientId || !clientSecret) throw new Error('Google OAuth Client ID and Secret are not configured. Add them in Settings → Integrations.');
 
-  const res = await fetch(TOKEN_URL, {
+  const res = await fetchWithTimeout(TOKEN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({

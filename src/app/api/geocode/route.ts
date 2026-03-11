@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { errorResponse } from '@/lib/api-utils';
+import { errorResponse, fetchWithTimeout } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
   // Nominatim (OpenStreetMap) — no key required
   try {
     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=1&addressdetails=1`;
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       headers: { 'User-Agent': 'HomeScreens/1.0' },
     });
     if (res.ok) {

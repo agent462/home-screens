@@ -54,9 +54,9 @@ describe('trackDownload', () => {
 
     expect(mockFetch).toHaveBeenCalledWith(
       'https://api.unsplash.com/photos/abc/download',
-      {
+      expect.objectContaining({
         headers: { Authorization: 'Client-ID my-key' },
-      },
+      }),
     );
   });
 

@@ -64,9 +64,9 @@ describe('GET /api/jokes', () => {
 
     await GET();
 
-    expect(fetch).toHaveBeenCalledWith('https://icanhazdadjoke.com', {
+    expect(fetch).toHaveBeenCalledWith('https://icanhazdadjoke.com', expect.objectContaining({
       headers: { Accept: 'application/json' },
-    });
+    }));
   });
 
   it('returns 502 when upstream API returns non-ok response', async () => {
@@ -96,7 +96,7 @@ describe('GET /api/jokes', () => {
     const json = await response.json();
 
     expect(response.status).toBe(500);
-    expect(json).toEqual({ error: 'DNS resolution failed' });
+    expect(json).toEqual({ error: 'Failed to fetch joke' });
   });
 
   it('returns 500 with fallback message for non-Error throws', async () => {

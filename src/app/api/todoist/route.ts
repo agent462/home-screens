@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { errorResponse, createTTLCache } from '@/lib/api-utils';
+import { errorResponse, createTTLCache, fetchWithTimeout } from '@/lib/api-utils';
 import { requireSession } from '@/lib/auth';
 import { getSecret, setSecret } from '@/lib/secrets';
 
@@ -69,7 +69,7 @@ function arr(obj: Record<string, unknown>, ...keys: string[]): string[] {
 
 /** Fetch a list endpoint, handling { results: [...] } wrapper or bare array. */
 async function fetchTodoistList(endpoint: string, token: string): Promise<Record<string, unknown>[]> {
-  const res = await fetch(`${TODOIST_API}${endpoint}`, {
+  const res = await fetchWithTimeout(`${TODOIST_API}${endpoint}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
@@ -98,7 +98,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Validate the token by making a quick API call
-    const res = await fetch(`${TODOIST_API}/projects`, {
+    const res = await fetchWithTimeout(`${TODOIST_API}/projects`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { errorResponse, createTTLCache } from '@/lib/api-utils';
+import { errorResponse, createTTLCache, fetchWithTimeout } from '@/lib/api-utils';
 import { LEAGUE_MAP } from '@/lib/espn';
 
 export const dynamic = 'force-dynamic';
@@ -244,7 +244,7 @@ async function fetchTeamColors(path: string, league: string): Promise<Map<string
 
   try {
     const url = `https://site.api.espn.com/apis/site/v2/sports/${path}/teams`;
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url);
     if (!res.ok) return new Map();
     const data = await res.json();
     const teams = data?.sports?.[0]?.leagues?.[0]?.teams ?? [];
@@ -279,7 +279,7 @@ export async function GET(request: NextRequest) {
     }
 
     const url = `https://site.api.espn.com/apis/v2/sports/${path}/standings`;
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url);
     if (!res.ok) {
       return NextResponse.json(
         { error: `Failed to fetch ${league} standings: ${res.status}` },

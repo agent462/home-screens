@@ -12,7 +12,6 @@ const MIME_TYPES: Record<string, string> = {
   '.webp': 'image/webp',
   '.gif': 'image/gif',
   '.avif': 'image/avif',
-  '.svg': 'image/svg+xml',
 };
 
 /** Validate and resolve a relative path within BGS, preventing directory traversal */

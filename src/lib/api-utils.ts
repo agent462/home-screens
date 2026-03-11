@@ -3,15 +3,35 @@ import { readConfig } from '@/lib/config';
 
 /**
  * Standardized error response for API routes.
- * Extracts message from Error instances, falls back to provided default.
+ * Always returns the generic fallbackMessage to clients to avoid leaking
+ * internal details (file paths, upstream API info, stack traces).
+ * The real error is logged server-side for debugging.
  */
 export function errorResponse(
   error: unknown,
   fallbackMessage: string,
   status = 500,
 ): NextResponse {
-  const message = error instanceof Error ? error.message : fallbackMessage;
-  return NextResponse.json({ error: message }, { status });
+  console.error(fallbackMessage, error);
+  return NextResponse.json({ error: fallbackMessage }, { status });
+}
+
+/**
+ * Fetch wrapper that enforces a timeout on external API calls.
+ * Prevents hung upstream services from blocking requests indefinitely.
+ */
+const DEFAULT_FETCH_TIMEOUT_MS = 10_000;
+
+export function fetchWithTimeout(
+  url: string | URL | Request,
+  init?: RequestInit & { timeout?: number },
+): Promise<Response> {
+  const { timeout = DEFAULT_FETCH_TIMEOUT_MS, ...rest } = init ?? {};
+  const timeoutSignal = AbortSignal.timeout(timeout);
+  const signal = rest.signal
+    ? AbortSignal.any([rest.signal, timeoutSignal])
+    : timeoutSignal;
+  return fetch(url, { ...rest, signal });
 }
 
 /**

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { errorResponse, createTTLCache } from '@/lib/api-utils';
+import { errorResponse, createTTLCache, fetchWithTimeout } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,7 +11,7 @@ export async function GET() {
     const cached = cache.get('joke');
     if (cached) return NextResponse.json(cached);
 
-    const res = await fetch('https://icanhazdadjoke.com', {
+    const res = await fetchWithTimeout('https://icanhazdadjoke.com', {
       headers: { Accept: 'application/json' },
     });
     if (!res.ok) {

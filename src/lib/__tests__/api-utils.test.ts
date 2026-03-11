@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { errorResponse, createTTLCache, getLocationFromConfig } from '@/lib/api-utils';
+import { errorResponse, createTTLCache, getLocationFromConfig, fetchWithTimeout } from '@/lib/api-utils';
 
 vi.mock('@/lib/config', () => ({
   readConfig: vi.fn(),
@@ -9,10 +9,14 @@ import { readConfig } from '@/lib/config';
 const mockReadConfig = vi.mocked(readConfig);
 
 describe('errorResponse', () => {
-  it('extracts message from Error instances', async () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  it('always returns the fallback message, even for Error instances', async () => {
     const response = errorResponse(new Error('something broke'), 'fallback');
     const json = await response.json();
-    expect(json).toEqual({ error: 'something broke' });
+    expect(json).toEqual({ error: 'fallback' });
   });
 
   it('uses fallbackMessage for non-Error string', async () => {
@@ -57,6 +61,68 @@ describe('errorResponse', () => {
   it('returns valid JSON response with correct content type', () => {
     const response = errorResponse(new Error('test'), 'fallback');
     expect(response.headers.get('content-type')).toContain('application/json');
+  });
+});
+
+describe('fetchWithTimeout', () => {
+  let fetchSpy: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchSpy = vi.fn().mockResolvedValue(new Response('ok'));
+    vi.stubGlobal('fetch', fetchSpy);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('passes an AbortSignal.timeout to fetch', async () => {
+    await fetchWithTimeout('https://example.com');
+
+    expect(fetchSpy).toHaveBeenCalledOnce();
+    const [, init] = fetchSpy.mock.calls[0];
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('strips the custom timeout property from the init object', async () => {
+    await fetchWithTimeout('https://example.com', {
+      timeout: 5000,
+      headers: { Accept: 'application/json' },
+    });
+
+    const [, init] = fetchSpy.mock.calls[0];
+    expect(init.timeout).toBeUndefined();
+    expect(init.headers).toEqual({ Accept: 'application/json' });
+  });
+
+  it('composes caller signal with timeout signal via AbortSignal.any', async () => {
+    const controller = new AbortController();
+    await fetchWithTimeout('https://example.com', { signal: controller.signal });
+
+    const [, init] = fetchSpy.mock.calls[0];
+    // The signal should be a composite — not the original controller signal
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+    expect(init.signal).not.toBe(controller.signal);
+
+    // Aborting the caller signal should abort the composite
+    controller.abort();
+    expect(init.signal.aborted).toBe(true);
+  });
+
+  it('uses the default 10s timeout when none is specified', async () => {
+    const timeoutSpy = vi.spyOn(AbortSignal, 'timeout');
+    await fetchWithTimeout('https://example.com');
+
+    expect(timeoutSpy).toHaveBeenCalledWith(10_000);
+    timeoutSpy.mockRestore();
+  });
+
+  it('respects a custom timeout value', async () => {
+    const timeoutSpy = vi.spyOn(AbortSignal, 'timeout');
+    await fetchWithTimeout('https://example.com', { timeout: 3000 });
+
+    expect(timeoutSpy).toHaveBeenCalledWith(3000);
+    timeoutSpy.mockRestore();
   });
 });
 

@@ -8,12 +8,12 @@ vi.mock('@/lib/api-utils', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api-utils')>();
   return {
     ...actual,
-    errorResponse: vi.fn((err: unknown, msg: string, status = 500) => {
+    errorResponse: vi.fn((_err: unknown, msg: string, status = 500) => {
       const { NextResponse } = require('next/server');
-      const message = err instanceof Error ? err.message : msg;
-      return NextResponse.json({ error: message }, { status });
+      return NextResponse.json({ error: msg }, { status });
     }),
     getLocationFromConfig: vi.fn(),
+    fetchWithTimeout: vi.fn((...args: unknown[]) => (globalThis.fetch as Function)(...args)),
   };
 });
 
@@ -181,6 +181,33 @@ describe('GET /api/air-quality', () => {
     expect(json.uv).toBe(0);
   });
 
+  it('gracefully degrades UV to 0 when UV fetch rejects (timeout/network error)', async () => {
+    mockGetLocation.mockResolvedValue({ lat: '40.7', lon: '-74.0' });
+    mockGetSecret.mockResolvedValue('test-key');
+
+    // Air pollution succeeds, UV fetch rejects entirely (e.g., timeout)
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('air_pollution')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => makeAirPollutionResponse(2),
+        });
+      }
+      if (url.includes('uvi')) {
+        return Promise.reject(new Error('AbortError: signal timed out'));
+      }
+      return Promise.reject(new Error(`Unexpected fetch URL: ${url}`));
+    });
+
+    const res = await GET();
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.uv).toBe(0);
+    expect(json.aqi).toBe(2);
+  });
+
   it('extracts UV value when UV endpoint succeeds', async () => {
     mockGetLocation.mockResolvedValue({ lat: '40.7', lon: '-74.0' });
     mockGetSecret.mockResolvedValue('test-key');
@@ -227,6 +254,6 @@ describe('GET /api/air-quality', () => {
     const json = await res.json();
 
     expect(res.status).toBe(500);
-    expect(json.error).toBe('DNS resolution failed');
+    expect(json.error).toBe('Failed to fetch air quality data');
   });
 });

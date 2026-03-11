@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     }
     const entries = await fs.readdir(dir, { withFileTypes: true });
     const images = entries
-      .filter((e) => e.isFile() && /\.(jpe?g|png|webp|gif|svg|avif)$/i.test(e.name))
+      .filter((e) => e.isFile() && /\.(jpe?g|png|webp|gif|avif)$/i.test(e.name))
       .map((e) => e.name);
     const paths = images.map((name) => serveUrl(name, directory || undefined));
     return NextResponse.json(paths);
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
     }
 
     const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
-    const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml', 'image/avif'];
+    const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'];
 
     // Validate all files first
     for (const file of files) {

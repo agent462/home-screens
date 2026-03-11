@@ -14,10 +14,10 @@ vi.mock('@/lib/api-utils', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api-utils')>();
   return {
     ...actual,
-    errorResponse: vi.fn((err: unknown, msg: string, status = 500) => {
-      const message = err instanceof Error ? err.message : msg;
-      return Response.json({ error: message }, { status });
+    errorResponse: vi.fn((_err: unknown, msg: string, status = 500) => {
+      return Response.json({ error: msg }, { status });
     }),
+    fetchWithTimeout: vi.fn((...args: unknown[]) => (globalThis.fetch as Function)(...args)),
   };
 });
 
@@ -444,7 +444,7 @@ describe('GET /api/todoist', () => {
     const json = await res.json();
 
     expect(res.status).toBe(500);
-    expect(json.error).toBe('Connection refused');
+    expect(json.error).toBe('Failed to fetch Todoist data');
   });
 
   it('returns enriched projects alongside tasks', async () => {
@@ -586,7 +586,7 @@ describe('PUT /api/todoist', () => {
     expect(global.fetch).toHaveBeenCalledWith(
       expect.stringContaining('/projects'),
       expect.objectContaining({
-        headers: { Authorization: 'Bearer valid-token' },
+        headers: expect.objectContaining({ Authorization: 'Bearer valid-token' }),
       }),
     );
   });

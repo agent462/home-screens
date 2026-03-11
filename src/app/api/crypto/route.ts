@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { errorResponse, createTTLCache } from '@/lib/api-utils';
+import { errorResponse, createTTLCache, fetchWithTimeout } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     if (cached) return NextResponse.json(cached);
 
     const url = `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(ids)}&vs_currencies=usd&include_24hr_change=true`;
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url);
     if (!res.ok) return NextResponse.json({ error: 'Failed to fetch crypto prices' }, { status: 502 });
 
     const data = await res.json();

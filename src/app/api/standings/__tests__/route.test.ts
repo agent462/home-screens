@@ -6,12 +6,12 @@ import { NextRequest } from 'next/server';
 // ---------------------------------------------------------------------------
 
 vi.mock('@/lib/api-utils', () => ({
-  errorResponse: vi.fn((err: unknown, msg: string, status = 500) => {
+  errorResponse: vi.fn((_err: unknown, msg: string, status = 500) => {
     const { NextResponse } = require('next/server');
-    const message = err instanceof Error ? err.message : msg;
-    return NextResponse.json({ error: message }, { status });
+    return NextResponse.json({ error: msg }, { status });
   }),
   createTTLCache: vi.fn(() => ({ get: vi.fn(() => null), set: vi.fn() })),
+  fetchWithTimeout: vi.fn((...args: unknown[]) => (globalThis.fetch as Function)(...args)),
 }));
 
 vi.mock('@/lib/espn', () => ({
@@ -864,7 +864,7 @@ describe('GET /api/standings', () => {
       const json = await res.json();
 
       expect(res.status).toBe(500);
-      expect(json.error).toBe('Network timeout');
+      expect(json.error).toBe('Failed to fetch standings');
     });
   });
 
