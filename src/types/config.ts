@@ -50,6 +50,13 @@ export interface ModuleSize {
   h: number;
 }
 
+export interface ModuleSchedule {
+  daysOfWeek?: number[];    // 0=Sun, 1=Mon, ... 6=Sat (omit = every day)
+  startTime?: string;       // "06:00" (omit = from midnight)
+  endTime?: string;         // "09:00" (omit = until midnight)
+  invert?: boolean;         // if true, HIDE during this window instead of show
+}
+
 export interface ModuleInstance {
   id: string;
   type: ModuleType;
@@ -58,6 +65,7 @@ export interface ModuleInstance {
   zIndex: number;
   config: Record<string, unknown>;
   style: ModuleStyle;
+  schedule?: ModuleSchedule;
 }
 
 export interface BackgroundRotation {

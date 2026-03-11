@@ -9,6 +9,7 @@ import Slider from '@/components/ui/Slider';
 import ColorPicker from '@/components/ui/ColorPicker';
 import Button from '@/components/ui/Button';
 import BackgroundPicker from '@/components/editor/BackgroundPicker';
+import { ScheduleSection } from '@/components/editor/ScheduleSection';
 import type { ModuleInstance } from '@/types/config';
 
 import {
@@ -228,6 +229,10 @@ export default function PropertyPanel() {
             <ConfigSection mod={selectedModule} screenId={selectedScreenId} />
           </AccordionSection>
         )}
+
+        <AccordionSection title="Schedule" defaultOpen={false}>
+          <ScheduleSection mod={selectedModule} screenId={selectedScreenId} />
+        </AccordionSection>
 
         <div className="pt-3 border-t border-neutral-700">
           <Button

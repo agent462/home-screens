@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import type { Screen, GlobalSettings } from '@/types/config';
 import { DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT } from '@/lib/constants';
 import { moduleComponents } from '@/lib/module-components';
+import { isModuleVisible } from '@/lib/schedule';
+import { useTZClock } from '@/hooks/useTZClock';
 
 export interface SharedDisplayData {
   owmData: unknown;
@@ -40,6 +42,14 @@ export default function ScreenRenderer({ screen, settings, rotatingBackground, s
     window.addEventListener('resize', update);
     return () => window.removeEventListener('resize', update);
   }, []);
+
+  // Minute-resolution timezone-aware clock for module scheduling
+  const now = useTZClock(settings.timezone);
+
+  const visibleModules = useMemo(
+    () => screen.modules.filter((mod) => isModuleVisible(mod.schedule, now)),
+    [screen.modules, now],
+  );
 
   const rotation = screen.backgroundRotation;
   const backgroundImage = rotation?.enabled ? (rotatingBackground || screen.backgroundImage) : screen.backgroundImage;
@@ -87,7 +97,7 @@ export default function ScreenRenderer({ screen, settings, rotatingBackground, s
         />
       )}
 
-      {screen.modules.map((mod) => {
+      {visibleModules.map((mod) => {
         const Component = moduleComponents[mod.type];
         if (!Component) return null;
 

@@ -2,10 +2,13 @@
 
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { useDroppable, useDraggable, useDndMonitor } from '@dnd-kit/core';
+import { Clock } from 'lucide-react';
 import { useEditorStore } from '@/stores/editor-store';
 import { DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT, GRID_SIZE, snapToGrid } from '@/lib/constants';
 import { getModuleDefinition } from '@/lib/module-registry';
 import { moduleComponents } from '@/lib/module-components';
+import { isModuleVisible } from '@/lib/schedule';
+import { useTZClock } from '@/hooks/useTZClock';
 import type { ModuleInstance } from '@/types/config';
 
 function ModulePreview({ mod, previewData, settings }: { mod: ModuleInstance; previewData: PreviewData; settings: PreviewSettings | null }) {
@@ -73,6 +76,7 @@ function DraggableModule({
   onResize,
   previewData,
   settings,
+  now,
 }: {
   mod: ModuleInstance;
   scale: number;
@@ -81,6 +85,7 @@ function DraggableModule({
   onResize: (size: { w: number; h: number }) => void;
   previewData: PreviewData;
   settings: PreviewSettings | null;
+  now: Date;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `module-${mod.id}`,
@@ -163,6 +168,19 @@ function DraggableModule({
       <div className="absolute top-0 left-0 px-1.5 py-0.5 bg-black/50 rounded-br text-white" style={{ fontSize: Math.max(7, 9 * scale) }}>
         {getModuleDefinition(mod.type)?.label || mod.type}
       </div>
+      {/* Schedule indicator badge */}
+      {mod.schedule && (
+        <div
+          className={`absolute top-0 right-0 p-0.5 rounded-bl ${
+            isModuleVisible(mod.schedule, now)
+              ? 'bg-blue-600/70 text-white'
+              : 'bg-amber-600/70 text-amber-200'
+          }`}
+          title={isModuleVisible(mod.schedule, now) ? 'Scheduled — currently active' : 'Scheduled — currently inactive'}
+        >
+          <Clock style={{ width: Math.max(8, 10 * scale), height: Math.max(8, 10 * scale) }} />
+        </div>
+      )}
       {isSelected && (
         <div
           onMouseDown={handleResizeStart}
@@ -278,6 +296,8 @@ export default function EditorCanvas({ onScaleChange }: { onScaleChange?: (scale
       setDragState(null);
     },
   });
+
+  const now = useTZClock(config?.settings.timezone);
 
   const displayWidth = config?.settings.displayWidth || DEFAULT_DISPLAY_WIDTH;
   const displayHeight = config?.settings.displayHeight || DEFAULT_DISPLAY_HEIGHT;
@@ -413,6 +433,7 @@ export default function EditorCanvas({ onScaleChange }: { onScaleChange?: (scale
             onResize={(size) => resizeModule(selectedScreenId!, mod.id, size)}
             previewData={previewData}
             settings={previewSettings}
+            now={now}
           />
         ))}
         {dragState && (() => {
