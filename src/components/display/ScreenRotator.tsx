@@ -7,6 +7,7 @@ import ScreenRenderer from './ScreenRenderer';
 import type { SharedDisplayData } from './ScreenRenderer';
 import SleepOverlay from './SleepOverlay';
 import { useSleepManager } from '@/hooks/useSleepManager';
+import { useDisplayCommands, useStatusReporter } from '@/hooks/useDisplayCommands';
 import { useFetchData } from '@/hooks/useFetchData';
 import { useTZClock } from '@/hooks/useTZClock';
 import { resolveProfileScreens } from '@/lib/schedule';
@@ -182,7 +183,7 @@ function useSharedDisplayData(screens: Screen[], settings: GlobalSettings): Shar
 export default function ScreenRotator({ screens: initialScreens, settings: initialSettings, profiles: initialProfiles }: ScreenRotatorProps) {
   const { screens: allScreens, settings, profiles } = useLiveConfig(initialScreens, initialSettings, initialProfiles);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const { displayState, dimOpacity } = useSleepManager(settings.sleep);
+  const { displayState, dimOpacity, wake, forceSleep, setRemoteBrightness } = useSleepManager(settings.sleep);
   // Shared data needs all screens (for weather provider detection), not just active profile screens
   const sharedData = useSharedDisplayData(allScreens, settings);
 
@@ -199,9 +200,25 @@ export default function ScreenRotator({ screens: initialScreens, settings: initi
   // Stable key derived from resolved screen IDs — changes only when actual set changes
   const screenKey = screens.map((s) => s.id).join(',');
 
-  const advance = useCallback(() => {
+  // Compute safeIndex early so command/status hooks can use it
+  const safeIndex = currentIndex < screens.length ? currentIndex : 0;
+  const currentScreen = screens[safeIndex];
+
+  const nextScreen = useCallback(() => {
+    if (screens.length <= 1) return;
     setCurrentIndex((prev) => (prev + 1) % screens.length);
-  }, [screens.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screens.length, screenKey]);
+
+  const prevScreen = useCallback(() => {
+    if (screens.length <= 1) return;
+    setCurrentIndex((prev) => (prev - 1 + screens.length) % screens.length);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screens.length, screenKey]);
+
+  const reload = useCallback(() => {
+    window.location.reload();
+  }, []);
 
   // Reset currentIndex when the active screen set changes (handles both
   // length changes and same-length profile switches with different screens)
@@ -212,9 +229,29 @@ export default function ScreenRotator({ screens: initialScreens, settings: initi
   // Pause screen rotation when display is asleep (no point cycling invisible screens)
   useEffect(() => {
     if (screens.length <= 1 || displayState === 'asleep') return;
-    const interval = setInterval(advance, settings.rotationIntervalMs);
+    const interval = setInterval(nextScreen, settings.rotationIntervalMs);
     return () => clearInterval(interval);
-  }, [advance, settings.rotationIntervalMs, screens.length, displayState]);
+  }, [nextScreen, settings.rotationIntervalMs, screens.length, displayState]);
+
+  // Remote control — poll for commands from /api/display/commands
+  useDisplayCommands({
+    wake,
+    sleep: forceSleep,
+    nextScreen,
+    prevScreen,
+    setBrightness: setRemoteBrightness,
+    reload,
+  });
+
+  // Report display status to /api/display/status
+  useStatusReporter(
+    safeIndex,
+    currentScreen?.id ?? '',
+    currentScreen?.name ?? '',
+    screens.length,
+    settings.activeProfile,
+    displayState,
+  );
 
   if (screens.length === 0) {
     return (
@@ -224,20 +261,17 @@ export default function ScreenRotator({ screens: initialScreens, settings: initi
     );
   }
 
-  const safeIndex = currentIndex < screens.length ? currentIndex : 0;
-  const screen = screens[safeIndex];
-
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden', backgroundColor: '#000' }}>
       <AnimatePresence mode="wait">
         <motion.div
-          key={screen.id}
+          key={currentScreen.id}
           initial={false}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 1.02 }}
           transition={{ duration: 0.6, ease: 'easeInOut' }}
         >
-          <ScreenRenderer screen={screen} settings={settings} rotatingBackground={rotatingBackgrounds[screen.id]} sharedData={sharedData} />
+          <ScreenRenderer screen={currentScreen} settings={settings} rotatingBackground={rotatingBackgrounds[currentScreen.id]} sharedData={sharedData} />
         </motion.div>
       </AnimatePresence>
 

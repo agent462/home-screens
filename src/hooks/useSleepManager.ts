@@ -31,12 +31,15 @@ interface UseSleepManagerResult {
   displayState: DisplayState;
   dimOpacity: number;
   wake: () => void;
+  forceSleep: () => void;
+  setRemoteBrightness: (value: number) => void;
 }
 
 export function useSleepManager(
   sleep?: SleepSettings,
 ): UseSleepManagerResult {
   const [displayState, setDisplayState] = useState<DisplayState>('active');
+  const [brightnessOverride, setBrightnessOverride] = useState<number | null>(null);
   const lastActivityRef = useRef(Date.now());
   const wasDimScheduleRef = useRef(false);
   const wasSleepScheduleRef = useRef(false);
@@ -44,7 +47,30 @@ export function useSleepManager(
 
   const wake = useCallback(() => {
     lastActivityRef.current = Date.now();
+    setBrightnessOverride(null);
     setDisplayState('active');
+  }, []);
+
+  const forceSleep = useCallback(() => {
+    lastActivityRef.current = 0;
+    setBrightnessOverride(null);
+    setDisplayState('asleep');
+  }, []);
+
+  const setRemoteBrightness = useCallback((value: number) => {
+    const clamped = Math.max(0, Math.min(100, value));
+    if (clamped === 0) {
+      lastActivityRef.current = 0;
+      setBrightnessOverride(null);
+      setDisplayState('asleep');
+    } else if (clamped >= 100) {
+      lastActivityRef.current = Date.now();
+      setBrightnessOverride(null);
+      setDisplayState('active');
+    } else {
+      setBrightnessOverride(clamped);
+      setDisplayState('dimmed');
+    }
   }, []);
 
   // Track user activity (mouse, touch, keyboard) for idle detection
@@ -53,6 +79,7 @@ export function useSleepManager(
 
     function onActivity() {
       lastActivityRef.current = Date.now();
+      setBrightnessOverride(null);
       setDisplayState((prev) => (prev !== 'active' ? 'active' : prev));
     }
 
@@ -77,6 +104,7 @@ export function useSleepManager(
       // Detect leaving a sleep schedule window — wake the display
       if (wasSleepScheduleRef.current && !inSleepWindow) {
         lastActivityRef.current = Date.now();
+        setBrightnessOverride(null);
         setDisplayState('active');
         wasSleepScheduleRef.current = false;
         wasDimScheduleRef.current = inDimWindow;
@@ -87,6 +115,7 @@ export function useSleepManager(
       // Detect leaving a dim schedule window — wake the display
       if (wasDimScheduleRef.current && !inDimWindow) {
         lastActivityRef.current = Date.now();
+        setBrightnessOverride(null);
         setDisplayState('active');
         wasDimScheduleRef.current = false;
         return;
@@ -94,7 +123,9 @@ export function useSleepManager(
       wasDimScheduleRef.current = inDimWindow;
 
       // Fixed sleep schedule takes highest priority — force asleep during window
+      // Clear brightness override so remote brightness can't prevent full blackout
       if (inSleepWindow) {
+        setBrightnessOverride(null);
         setDisplayState('asleep');
         return;
       }
@@ -103,6 +134,7 @@ export function useSleepManager(
       // Idle-based sleep is suppressed during dim schedule; the schedule controls behavior.
       // If you want the screen fully off at night, use a sleep schedule.
       if (inDimWindow) {
+        setBrightnessOverride(null);
         setDisplayState('dimmed');
         return;
       }
@@ -113,8 +145,10 @@ export function useSleepManager(
         const idle = Date.now() - lastActivityRef.current;
 
         if (sleepMs > 0 && idle >= dimMs + sleepMs) {
+          setBrightnessOverride(null);
           setDisplayState('asleep');
         } else if (idle >= dimMs) {
+          setBrightnessOverride(null);
           setDisplayState('dimmed');
         }
       }
@@ -124,8 +158,11 @@ export function useSleepManager(
     return () => clearInterval(interval);
   }, [enabled, sleep]);
 
-  // Calculate dim opacity
+  // Calculate dim opacity — remote brightness override takes precedence
   const dimOpacity = (() => {
+    if (brightnessOverride !== null) {
+      return 1 - brightnessOverride / 100;
+    }
     if (!enabled) return 0;
     switch (displayState) {
       case 'active':
@@ -139,5 +176,5 @@ export function useSleepManager(
     }
   })();
 
-  return { displayState, dimOpacity, wake };
+  return { displayState, dimOpacity, wake, forceSleep, setRemoteBrightness };
 }
