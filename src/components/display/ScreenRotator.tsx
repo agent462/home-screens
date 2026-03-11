@@ -201,7 +201,7 @@ export default function ScreenRotator({ screens: initialScreens, settings: initi
 
   const advance = useCallback(() => {
     setCurrentIndex((prev) => (prev + 1) % screens.length);
-  }, [screens.length, screenKey]);
+  }, [screens.length]);
 
   // Reset currentIndex when the active screen set changes (handles both
   // length changes and same-length profile switches with different screens)

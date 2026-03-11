@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const mockCache = {
-  get: vi.fn(() => null),
+  get: vi.fn(() => null) as ReturnType<typeof vi.fn>,
   set: vi.fn(),
 };
 

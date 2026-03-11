@@ -360,7 +360,7 @@ describe('GET /api/traffic - TomTom provider', () => {
 
     // Should have geocoded both origin and destination
     const geocodeCalls = fetchMock.mock.calls.filter(
-      (call: [string, ...unknown[]]) => call[0].includes('geocode'),
+      (call) => typeof call[0] === 'string' && call[0].includes('geocode'),
     );
     expect(geocodeCalls).toHaveLength(2);
     expect(geocodeCalls[0][0]).toContain(encodeURIComponent('123 Home St'));
