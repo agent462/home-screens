@@ -13,7 +13,7 @@ vi.mock('@/lib/api-utils', () => ({
     get: vi.fn(() => null),
     set: vi.fn(),
   })),
-  fetchWithTimeout: vi.fn((...args: unknown[]) => (globalThis.fetch as Function)(...args)),
+  fetchWithTimeout: vi.fn((...args: unknown[]) => (globalThis.fetch as (...a: unknown[]) => unknown)(...args)),
 }));
 
 import { getSecret } from '@/lib/secrets';

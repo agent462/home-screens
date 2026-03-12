@@ -12,7 +12,7 @@ vi.mock('@/lib/api-utils', () => ({
     return NextResponse.json({ error: msg }, { status });
   }),
   createTTLCache: vi.fn(() => mockCache),
-  fetchWithTimeout: vi.fn((...args: unknown[]) => (globalThis.fetch as Function)(...args)),
+  fetchWithTimeout: vi.fn((...args: unknown[]) => (globalThis.fetch as (...a: unknown[]) => unknown)(...args)),
 }));
 
 const { GET } = await import('@/app/api/image-proxy/route');

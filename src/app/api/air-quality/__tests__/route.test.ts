@@ -13,7 +13,7 @@ vi.mock('@/lib/api-utils', async (importOriginal) => {
       return NextResponse.json({ error: msg }, { status });
     }),
     getLocationFromConfig: vi.fn(),
-    fetchWithTimeout: vi.fn((...args: unknown[]) => (globalThis.fetch as Function)(...args)),
+    fetchWithTimeout: vi.fn((...args: unknown[]) => (globalThis.fetch as (...a: unknown[]) => unknown)(...args)),
   };
 });
 

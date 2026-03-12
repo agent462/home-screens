@@ -133,7 +133,7 @@ describe('FETCH_KEY_REGISTRY', () => {
   });
 
   it('every entry has a buildUrl function and positive ttlMs', () => {
-    for (const [type, entry] of Object.entries(FETCH_KEY_REGISTRY)) {
+    for (const [_type, entry] of Object.entries(FETCH_KEY_REGISTRY)) {
       expect(typeof entry.buildUrl).toBe('function');
       expect(entry.ttlMs).toBeGreaterThan(0);
       // Verify the function is callable with empty config

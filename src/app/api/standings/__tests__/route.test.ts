@@ -11,7 +11,7 @@ vi.mock('@/lib/api-utils', () => ({
     return NextResponse.json({ error: msg }, { status });
   }),
   createTTLCache: vi.fn(() => ({ get: vi.fn(() => null), set: vi.fn() })),
-  fetchWithTimeout: vi.fn((...args: unknown[]) => (globalThis.fetch as Function)(...args)),
+  fetchWithTimeout: vi.fn((...args: unknown[]) => (globalThis.fetch as (...a: unknown[]) => unknown)(...args)),
 }));
 
 vi.mock('@/lib/espn', () => ({

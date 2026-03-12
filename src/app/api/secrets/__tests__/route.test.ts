@@ -16,7 +16,7 @@ vi.mock('@/lib/api-utils', () => ({
   errorResponse: vi.fn((_err: unknown, msg: string, status = 500) => {
     return Response.json({ error: msg }, { status });
   }),
-  fetchWithTimeout: vi.fn((...args: unknown[]) => (globalThis.fetch as Function)(...args)),
+  fetchWithTimeout: vi.fn((...args: unknown[]) => (globalThis.fetch as (...a: unknown[]) => unknown)(...args)),
 }));
 
 import { getSecretStatus, setSecret, deleteSecret, isValidSecretKey } from '@/lib/secrets';

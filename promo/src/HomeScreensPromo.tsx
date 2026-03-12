@@ -8,8 +8,6 @@ import { ModuleShowcase } from "./scenes/ModuleShowcase";
 import { Features } from "./scenes/Features";
 import { Outro } from "./scenes/Outro";
 
-const FPS = 30;
-
 export const HomeScreensPromo: React.FC = () => (
   <AbsoluteFill style={{ backgroundColor: theme.colors.bg }}>
     {/* 0-4s: Logo reveal */}
