@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { editorFetch } from '@/lib/editor-fetch';
 import Slider from '@/components/ui/Slider';
 import Button from '@/components/ui/Button';
@@ -36,6 +36,16 @@ export default function CalendarSection({ values, onChange }: Props) {
   const [verificationUrl, setVerificationUrl] = useState<string | null>(null);
   const [deviceFlowError, setDeviceFlowError] = useState<string | null>(null);
   const [deviceFlowPolling, setDeviceFlowPolling] = useState(false);
+  const pollingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelledRef = useRef(false);
+
+  // Clean up polling on unmount
+  useEffect(() => {
+    return () => {
+      cancelledRef.current = true;
+      if (pollingTimerRef.current) clearTimeout(pollingTimerRef.current);
+    };
+  }, []);
 
   const fetchCalendars = useCallback(async () => {
     try {
@@ -101,11 +111,17 @@ export default function CalendarSection({ values, onChange }: Props) {
     }
   }
 
-  async function pollForToken(code: string, interval: number, expiresIn: number) {
+  function pollForToken(code: string, interval: number, expiresIn: number) {
     const deadline = Date.now() + expiresIn * 1000;
     const pollInterval = Math.max(interval, 5) * 1000;
+    cancelledRef.current = false;
+
+    const scheduleNext = (fn: () => void) => {
+      pollingTimerRef.current = setTimeout(fn, pollInterval);
+    };
 
     const poll = async () => {
+      if (cancelledRef.current) return;
       if (Date.now() > deadline) {
         setDeviceFlowPolling(false);
         setDeviceFlowError('Code expired. Please try again.');
@@ -118,6 +134,7 @@ export default function CalendarSection({ values, onChange }: Props) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ device_code: code }),
         });
+        if (cancelledRef.current) return;
         const data = await res.json();
         if (data.status === 'success') {
           setDeviceFlowPolling(false);
@@ -128,18 +145,18 @@ export default function CalendarSection({ values, onChange }: Props) {
           return;
         }
         if (data.status === 'pending') {
-          setTimeout(poll, pollInterval);
+          scheduleNext(poll);
           return;
         }
         setDeviceFlowPolling(false);
         setDeviceFlowError(data.error || 'Authorization failed');
         setUserCode(null);
       } catch {
-        setTimeout(poll, pollInterval);
+        if (!cancelledRef.current) scheduleNext(poll);
       }
     };
 
-    setTimeout(poll, pollInterval);
+    scheduleNext(poll);
   }
 
   return (

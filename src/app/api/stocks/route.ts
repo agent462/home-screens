@@ -51,7 +51,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch any stock data' }, { status: 502 });
     }
 
-    const result = { stocks };
+    const failedSymbols = symbols.filter((_, i) => results[i].status === 'rejected');
+    const result: Record<string, unknown> = { stocks };
+    if (failedSymbols.length > 0) result.failedSymbols = failedSymbols;
     cache.set(cacheKey, result);
     return NextResponse.json(result);
   } catch (error) {

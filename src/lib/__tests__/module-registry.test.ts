@@ -15,6 +15,7 @@ const ALL_MODULE_TYPES: ModuleType[] = [
   'photo-slideshow', 'qr-code', 'year-progress', 'traffic',
   'sports', 'air-quality', 'todoist', 'rain-map',
   'multi-month', 'garbage-day', 'standings', 'affirmations',
+  'date',
 ];
 
 describe('MODULE_CATEGORIES', () => {
@@ -151,8 +152,8 @@ describe('getModuleDefinition', () => {
 });
 
 describe('getAllModuleDefinitions', () => {
-  it('returns an array of length 30', () => {
-    expect(getAllModuleDefinitions()).toHaveLength(30);
+  it('returns an array of length 31', () => {
+    expect(getAllModuleDefinitions()).toHaveLength(31);
   });
 
   it('all items have required fields', () => {
@@ -260,7 +261,7 @@ describe('getModulesByCategory', () => {
     expect(types).toHaveLength(1);
   });
 
-  it('total modules across all categories equals 29 (no duplicates, no missing)', () => {
+  it('total modules across all categories equals 31 (no duplicates, no missing)', () => {
     const grouped = getModulesByCategory();
     let total = 0;
     const allTypes = new Set<string>();
@@ -270,8 +271,8 @@ describe('getModulesByCategory', () => {
         total++;
       }
     }
-    expect(total).toBe(30);
-    expect(allTypes.size).toBe(30);
+    expect(total).toBe(31);
+    expect(allTypes.size).toBe(31);
   });
 });
 

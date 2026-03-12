@@ -48,10 +48,19 @@ export async function readConfig(): Promise<ScreenConfiguration> {
   }
 }
 
-export async function writeConfig(config: ScreenConfiguration): Promise<void> {
-  const filePath = getConfigPath();
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  const tmp = filePath + '.tmp';
-  await fs.writeFile(tmp, JSON.stringify(config, null, 2), 'utf-8');
-  await fs.rename(tmp, filePath);
+// Serialize concurrent writes so they don't race on the same .tmp file
+let writeQueue: Promise<void> = Promise.resolve();
+
+export function writeConfig(config: ScreenConfiguration): Promise<void> {
+  const next = writeQueue.then(async () => {
+    const filePath = getConfigPath();
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    const tmp = filePath + '.tmp';
+    await fs.writeFile(tmp, JSON.stringify(config, null, 2), 'utf-8');
+    await fs.rename(tmp, filePath);
+  });
+  // Always advance the queue even if the current write fails,
+  // so subsequent writes aren't blocked by a prior error.
+  writeQueue = next.catch(() => {});
+  return next;
 }
