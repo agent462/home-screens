@@ -81,7 +81,7 @@ export default function AirQualityModule({ config, style }: AirQualityModuleProp
           <div className="flex flex-wrap gap-x-4 gap-y-1 opacity-70" style={{ fontSize: '0.875em' }}>
             <span>PM2.5: {data.pm25.toFixed(1)} &mu;g/m&sup3;</span>
             <span>PM10: {data.pm10.toFixed(1)} &mu;g/m&sup3;</span>
-            <span>O&sub3;: {data.o3.toFixed(1)} &mu;g/m&sup3;</span>
+            <span>O₃: {data.o3.toFixed(1)} &mu;g/m&sup3;</span>
           </div>
         )}
 
