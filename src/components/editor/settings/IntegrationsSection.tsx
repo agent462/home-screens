@@ -8,6 +8,7 @@ type SecretKey =
   | 'openweathermap_key'
   | 'weatherapi_key'
   | 'unsplash_access_key'
+  | 'nasa_api_key'
   | 'todoist_token'
   | 'google_maps_key'
   | 'tomtom_key'
@@ -216,6 +217,28 @@ export default function IntegrationsSection() {
           />
           <p className="text-xs text-neutral-500">
             Enables browsing thousands of free HD photos by category in the background picker.
+          </p>
+        </div>
+      </div>
+
+      <hr className="my-6 border-neutral-700" />
+
+      {/* NASA */}
+      <div>
+        <h3 className="text-sm font-medium text-neutral-300 mb-3 uppercase tracking-wider">
+          Backgrounds (NASA)
+        </h3>
+        <div className="space-y-3">
+          <SecretField
+            label="API Key"
+            secretKey="nasa_api_key"
+            placeholder="Paste your NASA API key"
+            helpText="Free at api.nasa.gov — required for APOD (Picture of the Day). 1000 requests/hour."
+            status={!!status.nasa_api_key}
+            onSaved={fetchStatus}
+          />
+          <p className="text-xs text-neutral-500">
+            Enables Astronomy Picture of the Day browsing and auto-rotation. NASA&apos;s Image Library search works without a key.
           </p>
         </div>
       </div>

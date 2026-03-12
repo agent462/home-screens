@@ -10,6 +10,7 @@ export type SecretKey =
   | 'weatherapi_key'
   | 'pirateweather_key'
   | 'unsplash_access_key'
+  | 'nasa_api_key'
   | 'todoist_token'
   | 'google_maps_key'
   | 'tomtom_key'
@@ -23,6 +24,7 @@ const ALL_KEYS: SecretKey[] = [
   'weatherapi_key',
   'pirateweather_key',
   'unsplash_access_key',
+  'nasa_api_key',
   'todoist_token',
   'google_maps_key',
   'tomtom_key',

@@ -4,6 +4,7 @@ import path from 'path';
 import { readConfig } from '@/lib/config';
 import { BACKGROUNDS_DIR } from '@/lib/constants';
 import { getUnsplashAccessKey, trackDownload } from '@/lib/unsplash';
+import { NASA_APOD_API, getNasaApiKey } from '@/lib/nasa';
 import { fetchWithTimeout } from '@/lib/api-utils';
 
 const CACHE_FILE = path.join(process.cwd(), 'data', 'background-cache.json');
@@ -12,6 +13,7 @@ const BGS = path.join(process.cwd(), BACKGROUNDS_DIR);
 
 interface CacheEntry {
   path: string;
+  source: string;
   query: string;
   fetchedAt: number;
   intervalMinutes: number;
@@ -67,6 +69,34 @@ async function fetchAndSavePhoto(query: string, accessKey: string): Promise<stri
   return `/api/backgrounds/serve?file=${encodeURIComponent(filename)}`;
 }
 
+async function fetchAndSaveApod(): Promise<string | null> {
+  const apiKey = await getNasaApiKey();
+  if (!apiKey) return null;
+  const res = await fetchWithTimeout(`${NASA_APOD_API}?api_key=${apiKey}&thumbs=true`);
+  if (!res.ok) return null;
+
+  const apod = await res.json();
+  if (apod.media_type !== 'image') return null;
+
+  const imageUrl = apod.hdurl || apod.url;
+  if (!imageUrl) return null;
+
+  const imgRes = await fetchWithTimeout(imageUrl, { timeout: 30_000 });
+  if (!imgRes.ok) return null;
+
+  const buffer = Buffer.from(await imgRes.arrayBuffer());
+  const apodContentType = imgRes.headers.get('content-type') ?? '';
+  const apodExt = apodContentType.includes('png') ? '.png' : apodContentType.includes('webp') ? '.webp' : '.jpg';
+  const dateStr = (apod.date as string || '').replace(/-/g, '');
+  const filename = `nasa-apod-${dateStr}${apodExt}`;
+  const filePath = path.join(BGS, filename);
+
+  await fs.mkdir(BGS, { recursive: true });
+  await fs.writeFile(filePath, buffer);
+
+  return `/api/backgrounds/serve?file=${encodeURIComponent(filename)}`;
+}
+
 /**
  * GET /api/backgrounds/rotate?screenId=X
  *
@@ -89,7 +119,8 @@ export async function GET(request: NextRequest) {
   }
 
   const rotation = screen.backgroundRotation;
-  if (!rotation?.enabled || !rotation.query) {
+  const source = rotation?.source || 'unsplash';
+  if (!rotation?.enabled || (source === 'unsplash' && !rotation.query)) {
     return NextResponse.json({ path: screen.backgroundImage || null });
   }
 
@@ -101,6 +132,7 @@ export async function GET(request: NextRequest) {
   // Check if cached entry is still fresh
   if (
     entry &&
+    entry.source === source &&
     entry.query === rotation.query &&
     entry.intervalMinutes === rotation.intervalMinutes &&
     now - entry.fetchedAt < intervalMs
@@ -109,17 +141,23 @@ export async function GET(request: NextRequest) {
   }
 
   // Need to fetch a new background
-  const accessKey = await getUnsplashAccessKey();
-  if (!accessKey) {
-    // No API key — return cached or static fallback
-    return NextResponse.json({ path: entry?.path || screen.backgroundImage || null });
-  }
-
   try {
-    const newPath = await fetchAndSavePhoto(rotation.query, accessKey);
+    let newPath: string | null = null;
+
+    if (source === 'nasa-apod') {
+      newPath = await fetchAndSaveApod();
+    } else {
+      const accessKey = await getUnsplashAccessKey();
+      if (!accessKey) {
+        return NextResponse.json({ path: entry?.path || screen.backgroundImage || null });
+      }
+      newPath = await fetchAndSavePhoto(rotation.query, accessKey);
+    }
+
     if (newPath) {
       cache[screenId] = {
         path: newPath,
+        source,
         query: rotation.query,
         fetchedAt: now,
         intervalMinutes: rotation.intervalMinutes || 60,

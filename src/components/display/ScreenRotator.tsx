@@ -35,7 +35,7 @@ function useBackgroundRotation(screens: Screen[]) {
   // restart polling when unrelated screen fields change.
   const rotationKey = screens
     .filter((s) => s.backgroundRotation?.enabled)
-    .map((s) => `${s.id}:${s.backgroundRotation!.query}:${s.backgroundRotation!.intervalMinutes}`)
+    .map((s) => `${s.id}:${s.backgroundRotation!.source || 'unsplash'}:${s.backgroundRotation!.query}:${s.backgroundRotation!.intervalMinutes}`)
     .join('|');
 
   useEffect(() => {

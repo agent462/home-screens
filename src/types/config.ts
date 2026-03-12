@@ -71,6 +71,7 @@ export interface ModuleInstance {
 
 export interface BackgroundRotation {
   enabled: boolean;
+  source?: 'unsplash' | 'nasa-apod';
   query: string;
   intervalMinutes: number;
 }
