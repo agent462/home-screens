@@ -150,6 +150,13 @@ DISPLAY_MODE=""
 if [ -n "${DISPLAY_RES}" ]; then
   DISPLAY_MODE="${DISPLAY_RES}"
   info "Display resolution set to ${DISPLAY_MODE}."
+else
+  # Auto-detect native resolution from kernel DRM/EDID (first mode = preferred)
+  NATIVE_RES=$(cat /sys/class/drm/card*-*/modes 2>/dev/null | head -1 || true)
+  if [ -n "${NATIVE_RES}" ]; then
+    DISPLAY_MODE="${NATIVE_RES}"
+    info "Auto-detected display resolution: ${DISPLAY_MODE}"
+  fi
 fi
 
 # Save display config to kiosk.conf (consumed by kiosk-launcher.sh)
@@ -195,6 +202,15 @@ if (mode) {
       s.displayWidth = a;
       s.displayHeight = b;
     }
+  }
+} else {
+  // No custom resolution — set default dimensions based on orientation
+  if (t === '90' || t === '270') {
+    s.displayWidth = 1080;
+    s.displayHeight = 1920;
+  } else {
+    s.displayWidth = 1920;
+    s.displayHeight = 1080;
   }
 }
 fs.writeFileSync(p, JSON.stringify(c, null, 2) + '\n');
