@@ -80,6 +80,8 @@ interface SettingsState {
   sleepEndTime: string;
   screensaverMode: string;
   cursorHideSeconds: number;
+  transitionEffect: string;
+  transitionDuration: number;
 }
 
 function initSettings(settings: GlobalSettings | undefined): SettingsState {
@@ -111,6 +113,8 @@ function initSettings(settings: GlobalSettings | undefined): SettingsState {
     sleepEndTime: settings?.sleep?.schedule?.endTime ?? '06:00',
     screensaverMode: settings?.screensaver?.mode ?? 'clock',
     cursorHideSeconds: settings?.cursorHideSeconds ?? 3,
+    transitionEffect: settings?.transitionEffect ?? 'fade',
+    transitionDuration: settings?.transitionDuration ?? 0.6,
   };
 }
 
@@ -208,6 +212,8 @@ export default function SettingsPage() {
           mode: state.screensaverMode as 'clock' | 'blank' | 'off',
         },
         cursorHideSeconds: state.cursorHideSeconds,
+        transitionEffect: state.transitionEffect as GlobalSettings['transitionEffect'],
+        transitionDuration: state.transitionDuration,
       });
       await saveConfig();
       setSaveMessage('Saved');
@@ -339,6 +345,8 @@ export default function SettingsPage() {
                   displayTransform: state.displayTransform,
                   rotationInterval: state.rotationInterval,
                   cursorHideSeconds: state.cursorHideSeconds,
+                  transitionEffect: state.transitionEffect,
+                  transitionDuration: state.transitionDuration,
                 }}
                 onChange={update}
               />

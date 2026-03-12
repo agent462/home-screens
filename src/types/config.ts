@@ -120,6 +120,10 @@ export interface ScreensaverSettings {
   mode: ScreensaverMode;
 }
 
+export type TransitionEffect =
+  | 'fade' | 'slide' | 'slide-up' | 'zoom'
+  | 'flip' | 'blur' | 'crossfade' | 'none';
+
 export interface GlobalSettings {
   rotationIntervalMs: number;
   displayWidth: number;
@@ -136,6 +140,8 @@ export interface GlobalSettings {
   cursorHideSeconds?: number;
   activeProfile?: string;
   piVariant?: 'desktop' | 'lite';
+  transitionEffect?: TransitionEffect;
+  transitionDuration?: number;
 }
 
 export interface Profile {

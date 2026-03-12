@@ -3,12 +3,25 @@
 import Slider from '@/components/ui/Slider';
 import { DISPLAY_PRESETS, DISPLAY_TRANSFORMS } from '@/lib/constants';
 
+const TRANSITION_OPTIONS = [
+  { value: 'fade', label: 'Fade' },
+  { value: 'slide', label: 'Slide Left' },
+  { value: 'slide-up', label: 'Slide Up' },
+  { value: 'zoom', label: 'Zoom' },
+  { value: 'flip', label: '3D Flip' },
+  { value: 'blur', label: 'Blur' },
+  { value: 'crossfade', label: 'Crossfade (overlap)' },
+  { value: 'none', label: 'None (instant)' },
+] as const;
+
 interface DisplaySettings {
   displayWidth: number;
   displayHeight: number;
   displayTransform: string;
   rotationInterval: number;
   cursorHideSeconds: number;
+  transitionEffect: string;
+  transitionDuration: number;
 }
 
 interface Props {
@@ -17,7 +30,7 @@ interface Props {
 }
 
 export default function DisplaySection({ values, onChange }: Props) {
-  const { displayWidth, displayHeight, displayTransform, rotationInterval, cursorHideSeconds } = values;
+  const { displayWidth, displayHeight, displayTransform, rotationInterval, cursorHideSeconds, transitionEffect, transitionDuration } = values;
 
   return (
     <section>
@@ -65,6 +78,7 @@ export default function DisplaySection({ values, onChange }: Props) {
           Physical rotation applied via wlr-randr on the kiosk. Takes effect on next boot.
         </p>
       </label>
+      <hr className="my-6 border-neutral-700" />
       <div className="mb-3">
         <Slider
           label="Screen Rotation (seconds)"
@@ -79,6 +93,38 @@ export default function DisplaySection({ values, onChange }: Props) {
           Only applies when you have multiple screens configured.
         </p>
       </div>
+      <label className="block mb-3">
+        <span className="text-xs text-neutral-400">Transition Effect</span>
+        <select
+          value={transitionEffect}
+          onChange={(e) => onChange({ transitionEffect: e.target.value })}
+          className="mt-1 block w-full rounded-md bg-neutral-800 border border-neutral-600 text-sm text-neutral-200 px-3 py-2 focus:outline-none focus:border-blue-500"
+        >
+          {TRANSITION_OPTIONS.map((t) => (
+            <option key={t.value} value={t.value}>{t.label}</option>
+          ))}
+        </select>
+        <p className="text-xs text-neutral-500 mt-1">
+          Animation style when cycling between screens. Blur may be GPU-intensive on low-power devices.
+        </p>
+      </label>
+      {transitionEffect !== 'none' && (
+        <div className="mb-3">
+          <Slider
+            label="Transition Duration (seconds)"
+            value={transitionDuration}
+            min={0.3}
+            max={2}
+            step={0.1}
+            displayValue={`${transitionDuration.toFixed(1)}s`}
+            onChange={(v) => onChange({ transitionDuration: v })}
+          />
+          <p className="text-xs text-neutral-500 mt-1">
+            How long the transition animation takes between screens.
+          </p>
+        </div>
+      )}
+      <hr className="my-6 border-neutral-700" />
       <div className="mb-3">
         <Slider
           label="Hide Cursor After (seconds)"

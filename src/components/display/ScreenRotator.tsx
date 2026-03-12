@@ -11,6 +11,7 @@ import { useDisplayCommands, useStatusReporter } from '@/hooks/useDisplayCommand
 import { useFetchData } from '@/hooks/useFetchData';
 import { useTZClock } from '@/hooks/useTZClock';
 import { resolveProfileScreens } from '@/lib/schedule';
+import { getTransitionVariants } from '@/lib/transitions';
 import { WEATHER_REFRESH_MS, CALENDAR_REFRESH_MS, DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT } from '@/lib/constants';
 import { displayCache } from '@/lib/display-cache';
 import { prefetchScreen } from '@/lib/prefetch';
@@ -316,6 +317,10 @@ export default function ScreenRotator({ screens: initialScreens, settings: initi
     displayState,
   );
 
+  const tv = getTransitionVariants(settings.transitionEffect, settings.transitionDuration);
+  const firstRender = useRef(true);
+  useEffect(() => { firstRender.current = false; }, []);
+
   if (screens.length === 0) {
     return (
       <div style={{ width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666' }}>
@@ -325,14 +330,15 @@ export default function ScreenRotator({ screens: initialScreens, settings: initi
   }
 
   return (
-    <div ref={cursorRef} style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden', backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <AnimatePresence mode="wait">
+    <div ref={cursorRef} style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden', backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', perspective: settings.transitionEffect === 'flip' ? 1200 : undefined }}>
+      <AnimatePresence mode={tv.mode}>
         <motion.div
           key={currentScreen.id}
-          initial={false}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 1.02 }}
-          transition={{ duration: 0.6, ease: 'easeInOut' }}
+          initial={firstRender.current ? false : tv.initial}
+          animate={tv.animate}
+          exit={tv.exit}
+          transition={tv.transition}
+          style={tv.mode === 'sync' ? { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' } : undefined}
         >
           <ScreenRenderer screen={currentScreen} settings={settings} rotatingBackground={rotatingBackgrounds[currentScreen.id]} sharedData={sharedData} displayW={displayW} displayH={displayH} scale={scale} />
         </motion.div>
