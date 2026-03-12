@@ -125,19 +125,19 @@ mkdir -p data
 # --- Step 5: Display configuration ---
 echo ""
 echo "  How is your display oriented?"
-echo "  1) Landscape (default, no rotation)"
-echo "  2) Portrait (rotated 90° clockwise)"
-echo "  3) Portrait (rotated 90° counter-clockwise)"
+echo "  1) Portrait (default, rotated 90° clockwise)"
+echo "  2) Portrait (rotated 90° counter-clockwise)"
+echo "  3) Landscape (no rotation)"
 echo "  4) Inverted (rotated 180°)"
 echo ""
 read -rp "  Display orientation [1]: " ORIENT_CHOICE
 ORIENT_CHOICE="${ORIENT_CHOICE:-1}"
 
 case "${ORIENT_CHOICE}" in
-  2) WLR_TRANSFORM="90"  ;;
-  3) WLR_TRANSFORM="270" ;;
+  2) WLR_TRANSFORM="270" ;;
+  3) WLR_TRANSFORM=""     ;;
   4) WLR_TRANSFORM="180" ;;
-  *) WLR_TRANSFORM=""     ;;
+  *) WLR_TRANSFORM="90"  ;;
 esac
 
 echo ""
@@ -152,13 +152,54 @@ if [ -n "${DISPLAY_RES}" ]; then
   info "Display resolution set to ${DISPLAY_MODE}."
 fi
 
-# Save display config
+# Save display config to kiosk.conf (consumed by kiosk-launcher.sh)
 KIOSK_CONF="${APP_DIR}/data/kiosk.conf"
 echo "DISPLAY_TRANSFORM=${WLR_TRANSFORM}" > "${KIOSK_CONF}"
 echo "DISPLAY_MODE=${DISPLAY_MODE}" >> "${KIOSK_CONF}"
 if [ -n "${WLR_TRANSFORM}" ]; then
   info "Display will be rotated ${WLR_TRANSFORM}° on boot."
 fi
+
+# Persist display settings into config.json so upgrades stay in sync.
+# upgrade.sh regenerates kiosk.conf from config.json, so without this
+# the user's install-time choices would be lost on the first upgrade.
+CONFIG_FILE="${APP_DIR}/data/config.json"
+node -e "
+const fs = require('fs');
+const p = '${CONFIG_FILE}';
+let c;
+try { c = JSON.parse(fs.readFileSync(p, 'utf-8')); } catch {
+  c = {
+    version: 1,
+    settings: {
+      rotationIntervalMs: 30000,
+      displayWidth: 1080, displayHeight: 1920, displayTransform: '90',
+      latitude: 0, longitude: 0,
+      weather: { provider: 'weatherapi', latitude: 0, longitude: 0, units: 'imperial' },
+      calendar: { googleCalendarId: '', googleCalendarIds: [], maxEvents: 10, daysAhead: 7 }
+    },
+    screens: [{ id: 'default', name: 'Screen 1', backgroundImage: '', modules: [] }]
+  };
+}
+const s = c.settings = c.settings || {};
+const t = '${WLR_TRANSFORM}';
+s.displayTransform = t || 'normal';
+const mode = '${DISPLAY_MODE}';
+if (mode) {
+  const [a, b] = mode.split('x').map(Number);
+  if (a && b) {
+    if (t === '90' || t === '270') {
+      s.displayWidth = Math.min(a, b);
+      s.displayHeight = Math.max(a, b);
+    } else {
+      s.displayWidth = a;
+      s.displayHeight = b;
+    }
+  }
+}
+fs.writeFileSync(p, JSON.stringify(c, null, 2) + '\n');
+"
+info "Display settings saved to config.json."
 
 # --- Step 6: System setup (services, kiosk, boot target, autologin) ---
 info "Configuring system..."

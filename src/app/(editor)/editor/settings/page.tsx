@@ -96,7 +96,7 @@ function initSettings(settings: GlobalSettings | undefined): SettingsState {
     rotationInterval: (settings?.rotationIntervalMs ?? 30000) / 1000,
     displayWidth: settings?.displayWidth ?? 1080,
     displayHeight: settings?.displayHeight ?? 1920,
-    displayTransform: settings?.displayTransform ?? 'normal',
+    displayTransform: settings?.displayTransform ?? '90',
     timezone: settings?.timezone ?? '',
     sleepEnabled: settings?.sleep?.enabled ?? false,
     dimAfterMinutes: settings?.sleep?.dimAfterMinutes ?? 10,

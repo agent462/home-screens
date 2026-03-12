@@ -14,6 +14,7 @@ const DEFAULT_CONFIG: ScreenConfiguration = {
     rotationIntervalMs: 30000,
     displayWidth: 1080,
     displayHeight: 1920,
+    displayTransform: '90',
     latitude: 0,
     longitude: 0,
     weather: {
