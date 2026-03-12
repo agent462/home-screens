@@ -6,40 +6,30 @@ set -euo pipefail
 #
 # Usage:
 #   git clone https://github.com/agent462/home-screens.git
-#   ~/home-screens/scripts/install.sh
+#   ~/home-screens/scripts/install.sh          # Pi OS with Desktop
+#   ~/home-screens/scripts/install.sh --lite   # Pi OS Lite (no desktop)
 
 INSTALL_BASE="/opt/home-screens"
 APP_DIR="${INSTALL_BASE}/current"
 REPO="agent462/home-screens"
 NODE_MAJOR=22
 
-# --- Colors ---
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
+# --- Shared functions ---
+source "$(dirname "$0")/lib/common.sh"
 
-info()  { echo -e "${GREEN}[*]${NC} $1"; }
-warn()  { echo -e "${YELLOW}[!]${NC} $1"; }
-error() { echo -e "${RED}[x]${NC} $1"; exit 1; }
-
-# Reattach stdin to the terminal for interactive prompts
-# (needed when piped or redirected).
-if [ ! -t 0 ]; then
-  exec < /dev/tty
-fi
+# --- Parse flags ---
+PI_VARIANT="desktop"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --lite) PI_VARIANT="lite"; shift ;;
+    *)      error "Unknown option: $1" ;;
+  esac
+done
 
 # --- Preflight ---
-if [ "$(uname -m)" != "aarch64" ]; then
-  if [ "$(uname -m)" = "armv7l" ]; then
-    error "32-bit Raspberry Pi OS detected. Home Screens requires 64-bit (aarch64)."
-  fi
-  warn "This doesn't look like a Raspberry Pi ($(uname -m)). Continuing anyway..."
-fi
-
-if [ "$(id -u)" -eq 0 ]; then
-  error "Don't run this script as root. It will use sudo when needed."
-fi
+ensure_tty
+check_arch
+check_not_root
 
 # --- Step 1: Bootstrap packages ---
 info "Installing bootstrap packages..."
@@ -47,22 +37,7 @@ sudo apt-get update -qq
 sudo apt-get install -y -qq curl
 
 # --- Step 2: Node.js ---
-if command -v node &>/dev/null; then
-  CURRENT_NODE=$(node -v | sed 's/v//' | cut -d. -f1)
-  if [ "${CURRENT_NODE}" -ge "${NODE_MAJOR}" ]; then
-    info "Node.js $(node -v) already installed, skipping."
-  else
-    warn "Node.js $(node -v) is too old. Installing Node.js ${NODE_MAJOR}..."
-    curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | sudo -E bash -
-    sudo apt-get install -y -qq nodejs
-  fi
-else
-  info "Installing Node.js ${NODE_MAJOR}..."
-  curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | sudo -E bash -
-  sudo apt-get install -y -qq nodejs
-fi
-
-info "Node $(node -v) / npm $(npm -v)"
+install_node "${NODE_MAJOR}"
 
 # --- Step 3: Download latest release ---
 info "Fetching latest release..."
@@ -160,9 +135,12 @@ else
 fi
 
 # Save display config to kiosk.conf (consumed by kiosk-launcher.sh)
+# Values are quoted to match the format upgrade.sh generates from config.json.
 KIOSK_CONF="${APP_DIR}/data/kiosk.conf"
-echo "DISPLAY_TRANSFORM=${WLR_TRANSFORM}" > "${KIOSK_CONF}"
-echo "DISPLAY_MODE=${DISPLAY_MODE}" >> "${KIOSK_CONF}"
+: > "${KIOSK_CONF}"
+[ -n "${DISPLAY_MODE}" ] && echo "DISPLAY_MODE=\"${DISPLAY_MODE}\"" >> "${KIOSK_CONF}"
+[ -n "${WLR_TRANSFORM}" ] && echo "DISPLAY_TRANSFORM=\"${WLR_TRANSFORM}\"" >> "${KIOSK_CONF}"
+[ "${PI_VARIANT}" != "desktop" ] && echo "PI_VARIANT=\"${PI_VARIANT}\"" >> "${KIOSK_CONF}"
 if [ -n "${WLR_TRANSFORM}" ]; then
   info "Display will be rotated ${WLR_TRANSFORM}° on boot."
 fi
@@ -172,10 +150,10 @@ fi
 # the user's install-time choices would be lost on the first upgrade.
 CONFIG_FILE="${APP_DIR}/data/config.json"
 node -e "
+const [, configFile, transform, mode, variant] = process.argv;
 const fs = require('fs');
-const p = '${CONFIG_FILE}';
 let c;
-try { c = JSON.parse(fs.readFileSync(p, 'utf-8')); } catch {
+try { c = JSON.parse(fs.readFileSync(configFile, 'utf-8')); } catch {
   c = {
     version: 1,
     settings: {
@@ -189,13 +167,11 @@ try { c = JSON.parse(fs.readFileSync(p, 'utf-8')); } catch {
   };
 }
 const s = c.settings = c.settings || {};
-const t = '${WLR_TRANSFORM}';
-s.displayTransform = t || 'normal';
-const mode = '${DISPLAY_MODE}';
+s.displayTransform = transform || 'normal';
 if (mode) {
   const [a, b] = mode.split('x').map(Number);
   if (a && b) {
-    if (t === '90' || t === '270') {
+    if (transform === '90' || transform === '270') {
       s.displayWidth = Math.min(a, b);
       s.displayHeight = Math.max(a, b);
     } else {
@@ -205,7 +181,7 @@ if (mode) {
   }
 } else {
   // No custom resolution — set default dimensions based on orientation
-  if (t === '90' || t === '270') {
+  if (transform === '90' || transform === '270') {
     s.displayWidth = 1080;
     s.displayHeight = 1920;
   } else {
@@ -213,8 +189,9 @@ if (mode) {
     s.displayHeight = 1080;
   }
 }
-fs.writeFileSync(p, JSON.stringify(c, null, 2) + '\n');
-"
+if (variant !== 'desktop') s.piVariant = variant;
+fs.writeFileSync(configFile, JSON.stringify(c, null, 2) + '\n');
+" "${CONFIG_FILE}" "${WLR_TRANSFORM}" "${DISPLAY_MODE}" "${PI_VARIANT}"
 info "Display settings saved to config.json."
 
 # --- Step 6: System setup (services, kiosk, boot target, autologin) ---
@@ -224,7 +201,11 @@ bash "${APP_DIR}/scripts/upgrade.sh" setup-system
 # --- Done ---
 echo ""
 echo -e "${GREEN}============================================${NC}"
-echo -e "${GREEN}  Installation complete!${NC}"
+if [ "${PI_VARIANT}" = "lite" ]; then
+  echo -e "${GREEN}  Installation complete! (Pi OS Lite)${NC}"
+else
+  echo -e "${GREEN}  Installation complete!${NC}"
+fi
 echo -e "${GREEN}============================================${NC}"
 echo ""
 echo "  Display URL:  http://$(hostname -I | awk '{print $1}'):3000/display"

@@ -35,6 +35,15 @@ MAX_BACKUPS=6
 # action's recovery check handles this, so we must not abort here.
 cd "${APP_DIR}" 2>/dev/null || true
 
+# Shared functions
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+[ -f "${SCRIPT_DIR}/lib/common.sh" ] && source "${SCRIPT_DIR}/lib/common.sh"
+
+# Read variant (default: desktop for existing installs)
+PI_VARIANT="desktop"
+[ -f "${APP_DIR}/data/kiosk.conf" ] && source "${APP_DIR}/data/kiosk.conf"
+PI_VARIANT="${PI_VARIANT:-desktop}"
+
 action="${1:-}"
 shift || true
 
@@ -284,12 +293,28 @@ case "${action}" in
 
       pkill chromium 2>/dev/null || true
       sleep 2
-      WAYLAND_DISPLAY="${WAYLAND_DISPLAY}" XDG_RUNTIME_DIR="/run/user/$(id -u)" \
-        nohup chromium --kiosk --noerrdialogs --disable-infobars --no-first-run \
-          --disable-session-crashed-bubble --disable-translate \
-          --check-for-update-interval=31536000 --password-store=basic \
-          --ozone-platform=wayland --remote-debugging-port=9222 \
-          http://localhost:3000/display > /dev/null 2>&1 &
+      # Detect whether dbus-run-session is needed at runtime rather than
+      # relying solely on kiosk.conf — self-healing if the config is missing.
+      NEED_DBUS=false
+      if [ "${PI_VARIANT}" = "lite" ] || [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
+        command -v dbus-run-session &>/dev/null && NEED_DBUS=true
+      fi
+
+      if [ "${NEED_DBUS}" = true ]; then
+        WAYLAND_DISPLAY="${WAYLAND_DISPLAY}" XDG_RUNTIME_DIR="/run/user/$(id -u)" \
+          nohup dbus-run-session -- chromium --kiosk --noerrdialogs --disable-infobars --no-first-run \
+            --disable-session-crashed-bubble --disable-translate \
+            --check-for-update-interval=31536000 --password-store=basic \
+            --ozone-platform=wayland --remote-debugging-port=9222 \
+            http://localhost:3000/display > /dev/null 2>&1 &
+      else
+        WAYLAND_DISPLAY="${WAYLAND_DISPLAY}" XDG_RUNTIME_DIR="/run/user/$(id -u)" \
+          nohup chromium --kiosk --noerrdialogs --disable-infobars --no-first-run \
+            --disable-session-crashed-bubble --disable-translate \
+            --check-for-update-interval=31536000 --password-store=basic \
+            --ozone-platform=wayland --remote-debugging-port=9222 \
+            http://localhost:3000/display > /dev/null 2>&1 &
+      fi
       echo "{\"ok\":true,\"method\":\"relaunch\"}"
     fi
     ;;
@@ -385,17 +410,34 @@ case "${action}" in
     changed=""
 
     # 0. Ensure required system packages are installed
-    REQUIRED_PACKAGES="chromium cage xdotool unclutter wlr-randr fonts-noto-color-emoji"
+    REQUIRED_PACKAGES="chromium cage xdotool unclutter wlr-randr fonts-noto-color-emoji plymouth"
     missing=""
     for pkg in ${REQUIRED_PACKAGES}; do
       if ! dpkg -s "${pkg}" &>/dev/null; then
         missing="${missing} ${pkg}"
       fi
     done
+    if [ "${PI_VARIANT}" = "lite" ]; then
+      for pkg in fonts-noto-core libpam-systemd dbus-user-session; do
+        if ! dpkg -s "${pkg}" &>/dev/null; then
+          missing="${missing} ${pkg}"
+        fi
+      done
+    fi
     if [ -n "${missing}" ]; then
       sudo apt-get update -qq
       sudo apt-get install -y -qq ${missing}
       changed="${changed}packages,"
+    fi
+
+    # Ensure GPU access for cage/Chromium on Lite (Desktop adds these by default)
+    if [ "${PI_VARIANT}" = "lite" ]; then
+      for grp in video render; do
+        if getent group "${grp}" >/dev/null 2>&1 && ! id -nG "${USER}" | grep -qw "${grp}"; then
+          sudo usermod -aG "${grp}" "${USER}"
+          changed="${changed}${grp}-group,"
+        fi
+      done
     fi
 
     # 1. Ensure fontconfig prioritises emoji font for Chromium
@@ -516,6 +558,7 @@ var mh = Math.min(w, h);
 var lines = [];
 if (mw && mh) lines.push('DISPLAY_MODE="' + mw + 'x' + mh + '"');
 if (s.displayTransform && s.displayTransform !== "normal") lines.push('DISPLAY_TRANSFORM="' + s.displayTransform + '"');
+if (s.piVariant) lines.push('PI_VARIANT="' + s.piVariant + '"');
 console.log(lines.join("\\n"));
 GENEOF
       )
@@ -570,17 +613,66 @@ exec chromium --kiosk \
       changed="${changed}launcher,"
     fi
 
-    # 9. Cage auto-launch in .bash_profile
-    PROFILE="${HOME}/.bash_profile"
-    KIOSK_BLOCK="# --- Home Screens Kiosk ---
-if [ \"\$(tty)\" = \"/dev/tty1\" ]; then
-  exec cage -s -- ${APP_DIR}/scripts/kiosk-launcher.sh
-fi
-# --- End Kiosk ---"
-
-    if ! grep -q "Home Screens Kiosk" "${PROFILE}" 2>/dev/null; then
-      echo "${KIOSK_BLOCK}" >> "${PROFILE}"
+    # 9. Cage auto-launch in .bash_profile (idempotent: updates stale blocks)
+    if write_kiosk_block "${PI_VARIANT}" "${APP_DIR}"; then
       changed="${changed}bash-profile,"
+    fi
+
+    # 10. Plymouth boot splash
+    THEME_SRC="${APP_DIR}/scripts/boot-splash"
+    THEME_DIR="/usr/share/plymouth/themes/home-screens"
+    if [ -d "${THEME_SRC}" ]; then
+      theme_changed=false
+      for f in home-screens.plymouth home-screens.script logo.png; do
+        if [ -f "${THEME_SRC}/${f}" ] && { [ ! -f "${THEME_DIR}/${f}" ] || ! cmp -s "${THEME_SRC}/${f}" "${THEME_DIR}/${f}"; }; then
+          theme_changed=true
+        fi
+      done
+
+      if [ "${theme_changed}" = true ]; then
+        sudo mkdir -p "${THEME_DIR}"
+        sudo cp "${THEME_SRC}/home-screens.plymouth" "${THEME_DIR}/"
+        sudo cp "${THEME_SRC}/home-screens.script" "${THEME_DIR}/"
+        [ -f "${THEME_SRC}/logo.png" ] && sudo cp "${THEME_SRC}/logo.png" "${THEME_DIR}/"
+      fi
+
+      current_theme=$(plymouth-set-default-theme 2>/dev/null || true)
+      if [ "${current_theme}" != "home-screens" ] || [ "${theme_changed}" = true ]; then
+        sudo plymouth-set-default-theme home-screens
+        sudo update-initramfs -u
+        changed="${changed}plymouth,"
+      fi
+    fi
+
+    # 11. Quiet boot (suppress kernel messages, hide cursor/logo)
+    CMDLINE="/boot/firmware/cmdline.txt"
+    if [ -f "${CMDLINE}" ]; then
+      cmdline_updated=false
+      current_cmdline=$(cat "${CMDLINE}")
+      for param in quiet "loglevel=0" "logo.nologo" "vt.global_cursor_default=0" "consoleblank=0" splash; do
+        if ! echo " ${current_cmdline} " | grep -q " ${param} "; then
+          current_cmdline="${current_cmdline} ${param}"
+          cmdline_updated=true
+        fi
+      done
+      if [ "${cmdline_updated}" = true ]; then
+        echo "${current_cmdline}" | sudo tee "${CMDLINE}" > /dev/null
+        changed="${changed}cmdline,"
+      fi
+    fi
+
+    # 12. Disable firmware rainbow splash
+    CONFIG_TXT="/boot/firmware/config.txt"
+    if [ -f "${CONFIG_TXT}" ]; then
+      if grep -q "^disable_splash=" "${CONFIG_TXT}"; then
+        if ! grep -q "^disable_splash=1" "${CONFIG_TXT}"; then
+          sudo sed -i 's/^disable_splash=.*/disable_splash=1/' "${CONFIG_TXT}"
+          changed="${changed}config-txt,"
+        fi
+      elif ! grep -q "^disable_splash=1" "${CONFIG_TXT}"; then
+        echo "disable_splash=1" | sudo tee -a "${CONFIG_TXT}" > /dev/null
+        changed="${changed}config-txt,"
+      fi
     fi
 
     # Remove trailing comma

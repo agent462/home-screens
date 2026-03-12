@@ -5,11 +5,13 @@ Home Screens is designed to run as a dedicated kiosk display on a Raspberry Pi. 
 ## Requirements
 
 - Raspberry Pi 4 or 5 (2 GB+ RAM recommended)
-- Raspberry Pi OS (Bookworm or later)
+- Raspberry Pi OS or Raspberry Pi OS Lite (Bookworm or later)
 - A display connected via HDMI
 - Network connection (Ethernet or Wi-Fi)
 
 ## Install
+
+### Raspberry Pi OS (with Desktop)
 
 Clone the repo and run the install script:
 
@@ -18,14 +20,28 @@ git clone https://github.com/agent462/home-screens.git
 ~/home-screens/scripts/install.sh
 ```
 
-The script handles everything:
+### Raspberry Pi OS Lite (no desktop)
+
+If you're running the headless Lite image (no desktop environment), use the Lite install script instead:
+
+```bash
+git clone https://github.com/agent462/home-screens.git
+~/home-screens/scripts/install-lite.sh
+```
+
+This installs additional packages that Pi OS Lite lacks (fonts, D-Bus session bus, logind integration) and configures the kiosk to launch correctly without a desktop environment.
+
+### What the installer does
 
 1. **Node.js 22** — installs via NodeSource
 2. **Latest release** — downloads the pre-built tarball from GitHub Releases to `/opt/home-screens/`
-3. **Chromium** — installs the browser for kiosk mode
+3. **Chromium + cage** — installs the browser and Wayland kiosk compositor
 4. **systemd service** — creates and enables the `home-screens` server
-5. **Cage kiosk** — configures Chromium in fullscreen kiosk mode
+5. **Kiosk auto-launch** — configures Chromium in fullscreen kiosk mode via cage on TTY1
 6. **Autologin** — configures automatic login for the kiosk user
+7. **Boot splash** — Plymouth theme with quiet boot (no kernel text, no rainbow screen)
+
+On Lite installs, additional packages are installed: `fonts-noto-core` (base fonts), `libpam-systemd` (session management), and `dbus-user-session` (D-Bus session bus).
 
 ## Post-Install
 
@@ -68,8 +84,6 @@ journalctl -u home-screens -f
 sudo systemctl restart home-screens
 ```
 
-Stopping the `home-screens` service also stops the kiosk.
-
 ## Manual Start
 
 To run without systemd (useful for debugging):
@@ -109,20 +123,19 @@ If an upgrade causes problems, roll back to the previous version:
 ### Chromium won't start
 
 1. Make sure you're logged in (autologin should handle this)
-2. Check the kiosk service: `sudo systemctl status home-screens-kiosk`
-3. Try starting manually: `bash scripts/start-display.sh`
+2. Check that cage is running: `pgrep cage`
+3. Check `.bash_profile` has the kiosk block: `grep 'Home Screens Kiosk' ~/.bash_profile`
+4. Try starting manually: `bash scripts/start-display.sh`
+5. On Lite installs, verify D-Bus is available: `echo $DBUS_SESSION_BUS_ADDRESS`
 
 ### Screen keeps going black
 
-Screen blanking may still be active. Disable it:
+The Wayland compositor (cage) should prevent screen blanking. If it persists, check for DPMS settings:
 
 ```bash
-xset s off
-xset -dpms
-xset s nofade
+# Check current display power state
+wlr-randr
 ```
-
-The install script should have done this, but some Pi OS updates re-enable it.
 
 ### Can't reach the editor from another device
 

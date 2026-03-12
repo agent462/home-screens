@@ -10,9 +10,8 @@ set -euo pipefail
 #   bash scripts/rotate-display.sh 180      # inverted
 #   bash scripts/rotate-display.sh 0        # landscape (no rotation)
 
-GREEN='\033[0;32m'
-NC='\033[0m'
-info() { echo -e "${GREEN}[*]${NC} $1"; }
+# --- Shared functions ---
+source "$(dirname "$0")/lib/common.sh"
 
 # Detect the output name
 OUTPUT=$(wlr-randr 2>/dev/null | head -1 | awk '{print $1}' || echo "HDMI-A-1")
@@ -42,16 +41,24 @@ else
 fi
 
 # Persist in kiosk.conf (used by cage kiosk launcher)
+# Read-modify-write: preserve existing values (DISPLAY_MODE, PI_VARIANT, etc.)
 APP_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 KIOSK_CONF="${APP_DIR}/data/kiosk.conf"
 
-if [ "${ANGLE}" = "0" ]; then
-  echo "DISPLAY_TRANSFORM=" > "${KIOSK_CONF}"
-  info "Rotation cleared. Will take effect on next reboot."
-else
-  echo "DISPLAY_TRANSFORM=${ANGLE}" > "${KIOSK_CONF}"
-  info "Rotation persisted. Will take effect on next reboot."
+# Load existing values
+DISPLAY_MODE=""
+PI_VARIANT=""
+[ -f "${KIOSK_CONF}" ] && source "${KIOSK_CONF}"
+
+# Write all values back with the updated transform
+: > "${KIOSK_CONF}"
+[ -n "${DISPLAY_MODE}" ] && echo "DISPLAY_MODE=\"${DISPLAY_MODE}\"" >> "${KIOSK_CONF}"
+if [ "${ANGLE}" != "0" ]; then
+  echo "DISPLAY_TRANSFORM=\"${ANGLE}\"" >> "${KIOSK_CONF}"
 fi
+[ -n "${PI_VARIANT}" ] && echo "PI_VARIANT=\"${PI_VARIANT}\"" >> "${KIOSK_CONF}"
+
+info "Rotation persisted. Will take effect on next reboot."
 
 # Also update labwc autostart if it exists (legacy support)
 AUTOSTART="${HOME}/.config/labwc/autostart"

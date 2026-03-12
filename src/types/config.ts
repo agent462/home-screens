@@ -134,6 +134,7 @@ export interface GlobalSettings {
   sleep?: SleepSettings;
   screensaver?: ScreensaverSettings;
   activeProfile?: string;
+  piVariant?: 'desktop' | 'lite';
 }
 
 export interface Profile {
