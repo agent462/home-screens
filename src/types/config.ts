@@ -28,7 +28,8 @@ export type ModuleType =
   | 'multi-month'
   | 'garbage-day'
   | 'standings'
-  | 'affirmations';
+  | 'affirmations'
+  | 'date';
 
 export interface ModuleStyle {
   opacity: number;
@@ -162,13 +163,33 @@ export const DEFAULT_MODULE_STYLE: ModuleStyle = {
 };
 
 // Clock module config
+export type ClockView =
+  | 'classic' | 'digital' | 'analog' | 'minimal' | 'flip'
+  | 'word' | 'binary' | 'vertical' | 'split' | 'progress'
+  | 'fuzzy' | 'world' | 'dot-matrix' | 'radial' | 'arc'
+  | 'neon' | 'bar' | 'elapsed';
+
+export interface WorldClockZone {
+  label: string;
+  timezone: string;
+}
+
 export interface ClockConfig {
+  view: ClockView;
   format24h: boolean;
   showSeconds: boolean;
   showDate: boolean;
   dateFormat: string;
   showWeekNumber: boolean;
   showDayOfYear: boolean;
+  // View-specific
+  showNumerals: boolean;        // analog: hour numbers on face
+  animateFlip: boolean;         // flip: show flip animation on digit change
+  accentColor: string;          // shared accent for several views
+  worldZones: WorldClockZone[]; // world: additional timezones (max 3)
+  referenceTime: string;        // elapsed: ISO timestamp or time string
+  referenceLabel: string;       // elapsed: label ("market open", "shift start")
+  countUp: boolean;             // elapsed: count up (true) or down (false)
 }
 
 // Calendar module config
@@ -483,6 +504,19 @@ export interface AffirmationsConfig {
   showCategoryLabel: boolean;
   timeAware: boolean;
   customEntries: CustomAffirmation[];
+  accentColor: string;
+}
+
+// Date module config
+export type DateView = 'full' | 'minimal' | 'stacked' | 'editorial' | 'banner';
+
+export interface DateConfig {
+  view: DateView;
+  dateFormat: string;
+  showDayName: boolean;
+  showYear: boolean;
+  showWeekNumber: boolean;
+  showDayOfYear: boolean;
   accentColor: string;
 }
 

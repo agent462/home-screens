@@ -6,6 +6,7 @@ import {
   Newspaper, TrendingUp, Bitcoin, BookOpen, History,
   Moon, Sunrise, Image, QrCode, BarChart3, Car, Trophy, Wind,
   ListChecks, CloudRain, CalendarRange, Trash2, Medal, Sparkles,
+  Calendar,
 } from 'lucide-react';
 import { DEFAULT_MODULE_SIZES } from './constants';
 
@@ -70,12 +71,20 @@ registerModule({
   icon: Clock,
   category: 'Time & Date',
   defaultConfig: {
+    view: 'classic',
     format24h: false,
     showSeconds: true,
     showDate: true,
     dateFormat: 'EEEE, MMMM d',
     showWeekNumber: false,
     showDayOfYear: false,
+    showNumerals: false,
+    animateFlip: true,
+    accentColor: '#22d3ee',
+    worldZones: [],
+    referenceTime: '',
+    referenceLabel: '',
+    countUp: true,
   },
   defaultSize: DEFAULT_MODULE_SIZES.clock,
 });
@@ -507,4 +516,21 @@ registerModule({
     accentColor: '#a78bfa',
   },
   defaultSize: DEFAULT_MODULE_SIZES.affirmations,
+});
+
+registerModule({
+  type: 'date',
+  label: 'Date',
+  icon: Calendar,
+  category: 'Time & Date',
+  defaultConfig: {
+    view: 'full',
+    dateFormat: 'MMMM d',
+    showDayName: true,
+    showYear: false,
+    showWeekNumber: false,
+    showDayOfYear: false,
+    accentColor: '#22d3ee',
+  },
+  defaultSize: DEFAULT_MODULE_SIZES.date,
 });

@@ -1,0 +1,116 @@
+'use client';
+
+import type { ClockViewProps } from './types';
+
+/**
+ * Progress clock — SVG ring showing how far through the day we are,
+ * with time and percentage centered inside the ring.
+ */
+export default function ClockProgressView({ config, now, scaledFontSize, containerRef }: ClockViewProps) {
+  const hours = now.getHours();
+  const minutes = now.getMinutes();
+  const seconds = now.getSeconds();
+
+  const h = config.format24h ? hours : hours % 12 || 12;
+  const hStr = config.format24h ? String(h).padStart(2, '0') : String(h);
+  const mStr = String(minutes).padStart(2, '0');
+  const sStr = String(seconds).padStart(2, '0');
+  const ampm = config.format24h ? '' : hours >= 12 ? 'PM' : 'AM';
+
+  const timeStr = config.showSeconds
+    ? `${hStr}:${mStr}:${sStr}`
+    : `${hStr}:${mStr}`;
+
+  // Day progress: fraction of 24h elapsed (include seconds for smooth movement)
+  const totalSeconds = hours * 3600 + minutes * 60 + seconds;
+  const percentage = (totalSeconds / 86400) * 100;
+
+  const accentColor = config.accentColor || '#ffffff';
+
+  // SVG dimensions — fit within container
+  const svgSize = 200;
+  const center = svgSize / 2;
+  const strokeWidth = 8;
+  const radius = (svgSize - strokeWidth * 2) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const dashOffset = circumference * (1 - percentage / 100);
+
+  const timeFontSize = scaledFontSize * 1.8;
+  const percentFontSize = scaledFontSize * 0.85;
+
+  return (
+    <div
+      ref={containerRef}
+      className="w-full h-full flex items-center justify-center"
+    >
+      <div className="relative" style={{ width: '70%', maxWidth: 280, aspectRatio: '1' }}>
+        {/* SVG Ring */}
+        <svg
+          viewBox={`0 0 ${svgSize} ${svgSize}`}
+          className="w-full h-full"
+          style={{ transform: 'rotate(-90deg)' }}
+        >
+          {/* Track */}
+          <circle
+            cx={center}
+            cy={center}
+            r={radius}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={strokeWidth}
+            opacity={0.1}
+          />
+          {/* Progress arc */}
+          <circle
+            cx={center}
+            cy={center}
+            r={radius}
+            fill="none"
+            stroke={accentColor}
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={dashOffset}
+            style={{
+              transition: 'stroke-dashoffset 1s ease',
+              filter: `drop-shadow(0 0 4px ${accentColor}40)`,
+            }}
+          />
+        </svg>
+
+        {/* Center content */}
+        <div
+          className="absolute inset-0 flex flex-col items-center justify-center"
+        >
+          <div
+            className="tabular-nums font-light tracking-wide"
+            style={{ fontSize: timeFontSize, lineHeight: 1 }}
+            suppressHydrationWarning
+          >
+            {timeStr}
+          </div>
+          {ampm && (
+            <div
+              className="uppercase tracking-widest opacity-40 font-light"
+              style={{ fontSize: scaledFontSize * 0.55, marginTop: 2 }}
+              suppressHydrationWarning
+            >
+              {ampm}
+            </div>
+          )}
+          <div
+            className="tabular-nums font-light opacity-50"
+            style={{
+              fontSize: percentFontSize,
+              marginTop: scaledFontSize * 0.3,
+              color: accentColor,
+            }}
+            suppressHydrationWarning
+          >
+            {percentage.toFixed(1)}%
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

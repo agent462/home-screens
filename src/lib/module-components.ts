@@ -6,7 +6,7 @@ import type { ModuleType } from '@/types/config';
 // type). We assert the record type because ComponentType is contravariant in
 // props, preventing direct assignment of specific component types.
 export const moduleComponents = {
-  clock: dynamic(() => import('@/components/modules/ClockModule')),
+  clock: dynamic(() => import('@/components/modules/clock/ClockModule')),
   calendar: dynamic(() => import('@/components/modules/CalendarModule')),
   weather: dynamic(() => import('@/components/modules/weather/WeatherModule')),
   countdown: dynamic(() => import('@/components/modules/CountdownModule')),
@@ -36,4 +36,5 @@ export const moduleComponents = {
   'garbage-day': dynamic(() => import('@/components/modules/GarbageDayModule')),
   standings: dynamic(() => import('@/components/modules/standings/StandingsModule')),
   affirmations: dynamic(() => import('@/components/modules/AffirmationsModule')),
+  date: dynamic(() => import('@/components/modules/date/DateModule')),
 } as unknown as Record<ModuleType, ComponentType<Record<string, unknown>>>;

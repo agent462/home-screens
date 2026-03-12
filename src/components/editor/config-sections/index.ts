@@ -26,3 +26,4 @@ export { GarbageDayConfigSection } from './GarbageDayConfigSection';
 export { MultiMonthConfigSection } from './MultiMonthConfigSection';
 export { StandingsConfigSection } from './StandingsConfigSection';
 export { AffirmationsConfigSection } from './AffirmationsConfigSection';
+export { DateConfigSection } from './DateConfigSection';

@@ -73,4 +73,5 @@ export const DEFAULT_MODULE_SIZES: Record<string, { w: number; h: number }> = {
   'garbage-day': { w: 350, h: 320 },
   standings: { w: 500, h: 500 },
   affirmations: { w: 500, h: 200 },
+  date: { w: 400, h: 200 },
 };
