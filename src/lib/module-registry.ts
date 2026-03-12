@@ -113,6 +113,7 @@ registerModule({
     showPrecipAmount: false,
     showHumidity: false,
     showWind: false,
+    hideWhenNoAlerts: false,
   },
   defaultSize: DEFAULT_MODULE_SIZES.weather,
 });

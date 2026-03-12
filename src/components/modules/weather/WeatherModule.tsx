@@ -51,6 +51,14 @@ export default function WeatherModule({ config, style, hourly, forecast, minutel
   const scaleFactor = SCALE_FACTORS[view] ?? 0.09;
   const { containerRef, scaledFontSize } = useScaledFontSize(style.fontSize, scaleFactor);
 
+  // Hide the entire module when alerts view has no active alerts
+  // Only hide when alerts is defined (data loaded from a supported provider)
+  if (view === 'alerts' && config.hideWhenNoAlerts && alerts !== undefined) {
+    const now = Math.floor(Date.now() / 1000);
+    const activeAlerts = alerts.filter((a) => a.expires > now);
+    if (activeAlerts.length === 0) return null;
+  }
+
   const ViewComponent = VIEW_COMPONENTS[view] ?? WeatherHourlyView;
 
   return (

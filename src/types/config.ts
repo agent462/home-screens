@@ -204,6 +204,7 @@ export interface WeatherConfig {
   showPressure: boolean;
   showVisibility: boolean;
   showDewPoint: boolean;
+  hideWhenNoAlerts: boolean;
 }
 
 

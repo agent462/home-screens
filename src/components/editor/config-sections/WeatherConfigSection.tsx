@@ -43,6 +43,7 @@ export function WeatherConfigSection({ mod, screenId }: { mod: ModuleInstance; s
     showPressure?: boolean;
     showVisibility?: boolean;
     showDewPoint?: boolean;
+    hideWhenNoAlerts?: boolean;
   }>(mod, screenId);
 
   const globalProvider = useEditorStore((s) => s.config?.settings?.weather?.provider);
@@ -91,6 +92,9 @@ export function WeatherConfigSection({ mod, screenId }: { mod: ModuleInstance; s
           ))}
         </select>
       </label>
+      {view === 'alerts' && caps.alerts && (
+        <Toggle label="Hide When No Alerts" checked={!!c.hideWhenNoAlerts} onChange={(v) => set({ hideWhenNoAlerts: v })} />
+      )}
       {showsStats && (
         <label className="flex flex-col gap-0.5">
           <span className="text-xs text-neutral-400">Icon Style</span>
