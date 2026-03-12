@@ -239,7 +239,7 @@ export default function SystemSection({ onUpgrade, onRollback, onRebuild }: Prop
           </div>
         )}
 
-        {!versionInfo.buildPending && versionInfo.updateAvailable && versionInfo.latest && (
+        {versionInfo.updateAvailable && versionInfo.latest && (
           <div className="mt-3 rounded-lg bg-blue-950/50 border border-blue-800/50 p-3">
             <div className="flex items-center justify-between">
               <div>
