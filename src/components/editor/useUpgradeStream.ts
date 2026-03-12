@@ -268,11 +268,19 @@ export function useWaitForServer(done: boolean): string | null {
       const deadline = Date.now() + 60000; // 60s max wait
       while (!cancelled && Date.now() < deadline) {
         try {
-          const res = await fetch('/api/config', { cache: 'no-store' });
+          // Poll /api/system/version which returns { upgradeRunning }.
+          // The OLD server (still alive during nohup delay) returns
+          // upgradeRunning: true. The NEW server starts fresh with
+          // upgradeRunning: false — so we only reload once the new
+          // server is confirmed ready.
+          const res = await fetch('/api/system/version', { cache: 'no-store' });
           if (res.ok) {
-            setReloadStatus('Reloading...');
-            window.location.reload();
-            return;
+            const data = await res.json();
+            if (!data.upgradeRunning) {
+              setReloadStatus('Reloading...');
+              window.location.reload();
+              return;
+            }
           }
         } catch {
           // Server not ready yet
