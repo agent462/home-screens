@@ -160,6 +160,14 @@ registerModule({
   defaultConfig: {
     content: 'Hello, World!',
     alignment: 'center',
+    orientation: 'horizontal',
+    verticalAlign: 'center',
+    effect: 'none',
+    textTransform: 'none',
+    letterSpacing: 0,
+    gradientFrom: '#a78bfa',
+    gradientTo: '#22d3ee',
+    gradientAngle: 90,
   },
   defaultSize: DEFAULT_MODULE_SIZES.text,
 });

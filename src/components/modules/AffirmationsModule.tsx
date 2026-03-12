@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useTypewriter } from '@/hooks/useTypewriter';
 import type { AffirmationsConfig, AffirmationsCategory, ModuleStyle } from '@/types/config';
 import { useTZClock } from '@/hooks/useTZClock';
 import ModuleWrapper from './ModuleWrapper';
@@ -203,24 +204,7 @@ function MinimalView({ entry, showCategory }: { entry: Entry; showCategory: bool
 }
 
 function TypewriterView({ entry, accentColor, showCategory }: { entry: Entry; accentColor: string; showCategory: boolean }) {
-  const [displayed, setDisplayed] = useState('');
-  const [done, setDone] = useState(false);
-
-  useEffect(() => {
-    setDisplayed('');
-    setDone(false);
-    let i = 0;
-    const id = setInterval(() => {
-      i++;
-      if (i > entry.text.length) {
-        setDone(true);
-        clearInterval(id);
-      } else {
-        setDisplayed(entry.text.slice(0, i));
-      }
-    }, 35);
-    return () => clearInterval(id);
-  }, [entry.text]);
+  const { displayed, done } = useTypewriter(entry.text, true);
 
   return (
     <div className="flex flex-col items-center justify-center h-full gap-2 px-4">

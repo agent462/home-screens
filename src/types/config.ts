@@ -251,6 +251,37 @@ export interface DadJokeConfig {
 export interface TextConfig {
   content: string;
   alignment: 'left' | 'center' | 'right';
+  orientation?: 'horizontal' | 'vertical' | 'sideways';
+  verticalAlign?: 'top' | 'center' | 'bottom';
+  // Rich text
+  markdown?: boolean;
+  // Auto-fit to container
+  autoFit?: boolean;
+  // Text effects
+  effect?: 'none' | 'typewriter' | 'fade-in' | 'gradient-sweep' | 'glow';
+  // Content rotation (split by separator)
+  rotationEnabled?: boolean;
+  rotationIntervalMs?: number;
+  rotationSeparator?: string;
+  // Gradient text
+  gradientEnabled?: boolean;
+  gradientFrom?: string;
+  gradientTo?: string;
+  gradientAngle?: number;
+  // Typography
+  textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
+  letterSpacing?: number;
+  // Icon prefix (emoji or short text)
+  icon?: string;
+  // Dynamic template variables ({{time}}, {{date}}, {{greeting}}, etc.)
+  templateVariables?: boolean;
+  // Marquee scrolling
+  marquee?: boolean;
+  marqueeSpeed?: number;
+  marqueeDirection?: 'left' | 'right' | 'up' | 'down';
+  // Decorative
+  showDividers?: boolean;
+  accentColor?: string;
 }
 
 // Image module config
