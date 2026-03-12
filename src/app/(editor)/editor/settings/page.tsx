@@ -16,6 +16,7 @@ import {
   Database,
   Shield,
   Layers,
+  Activity,
 } from 'lucide-react';
 
 import HomeScreensLogo from '@/components/brand/HomeScreensLogo';
@@ -29,6 +30,7 @@ import CalendarSection from '@/components/editor/settings/CalendarSection';
 import ProfilesSection from '@/components/editor/settings/ProfilesSection';
 import SystemSection from '@/components/editor/settings/SystemSection';
 import SecuritySection from '@/components/editor/settings/SecuritySection';
+import StatsSection from '@/components/editor/settings/StatsSection';
 import UpgradeModal from '@/components/editor/UpgradeModal';
 import { useConfirmStore } from '@/stores/confirm-store';
 
@@ -44,6 +46,7 @@ const TABS = [
   { id: 'integrations', label: 'Integrations', icon: Plug },
   { id: 'security', label: 'Security', icon: Shield },
   { id: 'data', label: 'Data', icon: Database },
+  { id: 'stats', label: 'Stats', icon: Activity },
   { id: 'system', label: 'System', icon: Server },
 ] as const;
 
@@ -265,7 +268,7 @@ export default function SettingsPage() {
     );
   }
 
-  const showSaveButton = activeTab !== 'system' && activeTab !== 'data' && activeTab !== 'integrations' && activeTab !== 'security' && activeTab !== 'profiles';
+  const showSaveButton = activeTab !== 'system' && activeTab !== 'data' && activeTab !== 'integrations' && activeTab !== 'security' && activeTab !== 'profiles' && activeTab !== 'stats';
 
   return (
     <div className="h-screen flex flex-col">
@@ -432,6 +435,10 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </section>
+            )}
+
+            {activeTab === 'stats' && (
+              <StatsSection />
             )}
 
             {activeTab === 'system' && (

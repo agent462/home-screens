@@ -8,6 +8,8 @@
  * what the display is currently showing.
  */
 
+import type { CacheStats } from './display-cache';
+
 export type DisplayCommandType =
   | 'wake'
   | 'sleep'
@@ -33,6 +35,7 @@ export interface DisplayStatus {
   activeProfile: string | null;
   displayState: 'active' | 'dimmed' | 'asleep';
   timestamp: number;
+  cacheStats?: CacheStats;
 }
 
 const commandQueue: DisplayCommand[] = [];

@@ -89,6 +89,87 @@ describe('displayCache', () => {
     });
   });
 
+  // ── getStats ────────────────────────────────────────────────────
+
+  describe('getStats', () => {
+    it('returns zeroes on empty cache', () => {
+      const stats = displayCache.getStats();
+      expect(stats.entries).toBe(0);
+      expect(stats.maxEntries).toBe(100);
+      expect(stats.fresh).toBe(0);
+      expect(stats.stale).toBe(0);
+      expect(stats.hits).toBe(0);
+      expect(stats.misses).toBe(0);
+      expect(stats.evictions).toBe(0);
+      expect(stats.details).toEqual([]);
+    });
+
+    it('counts fresh and stale entries', () => {
+      displayCache.set('/api/a', 1, 5000);
+      displayCache.set('/api/b', 2, 1000);
+      vi.advanceTimersByTime(1001); // b is now stale, a is still fresh
+
+      const stats = displayCache.getStats();
+      expect(stats.entries).toBe(2);
+      expect(stats.fresh).toBe(1);
+      expect(stats.stale).toBe(1);
+    });
+
+    it('tracks hits and misses', () => {
+      displayCache.set('/api/a', 1, 60_000);
+      displayCache.get('/api/a'); // hit
+      displayCache.get('/api/a'); // hit
+      displayCache.get('/api/missing'); // miss
+
+      const stats = displayCache.getStats();
+      expect(stats.hits).toBe(2);
+      expect(stats.misses).toBe(1);
+    });
+
+    it('tracks evictions', () => {
+      for (let i = 0; i < 100; i++) {
+        displayCache.set(`/api/item-${i}`, i, 60_000);
+        vi.advanceTimersByTime(1);
+      }
+      // Trigger eviction by adding entry 101
+      displayCache.set('/api/item-100', 100, 60_000);
+
+      const stats = displayCache.getStats();
+      expect(stats.evictions).toBe(1);
+    });
+
+    it('returns sorted details', () => {
+      displayCache.set('/api/z', 1, 60_000);
+      displayCache.set('/api/a', 2, 30_000);
+
+      const stats = displayCache.getStats();
+      expect(stats.details).toHaveLength(2);
+      expect(stats.details[0].url).toBe('/api/a');
+      expect(stats.details[1].url).toBe('/api/z');
+      expect(stats.details[0].ttlMs).toBe(30_000);
+      expect(stats.details[1].ttlMs).toBe(60_000);
+    });
+
+    it('includes inflight count', async () => {
+      let resolveFetch!: () => void;
+      const fetchPromise = new Promise<void>((r) => { resolveFetch = r; });
+
+      vi.stubGlobal('fetch', vi.fn(() =>
+        fetchPromise.then(() => ({
+          ok: true,
+          json: () => Promise.resolve({ data: 1 }),
+        })),
+      ));
+
+      const p = displayCache.prefetch('/api/test', 60_000);
+      expect(displayCache.getStats().inflight).toBe(1);
+
+      resolveFetch();
+      await p;
+      expect(displayCache.getStats().inflight).toBe(0);
+    });
+  });
+
   // ── clear ────────────────────────────────────────────────────────
 
   describe('clear', () => {
@@ -100,6 +181,30 @@ describe('displayCache', () => {
 
       expect(displayCache.get('/api/a')).toBeNull();
       expect(displayCache.get('/api/b')).toBeNull();
+    });
+
+    it('resets hit/miss/eviction counters', () => {
+      // Generate some hits, misses, and an eviction
+      for (let i = 0; i < 100; i++) {
+        displayCache.set(`/api/item-${i}`, i, 60_000);
+        vi.advanceTimersByTime(1);
+      }
+      displayCache.set('/api/overflow', 'x', 60_000); // eviction
+      displayCache.get('/api/overflow'); // hit
+      displayCache.get('/api/nonexistent'); // miss
+
+      const before = displayCache.getStats();
+      expect(before.hits).toBeGreaterThan(0);
+      expect(before.misses).toBeGreaterThan(0);
+      expect(before.evictions).toBeGreaterThan(0);
+
+      displayCache.clear();
+
+      const after = displayCache.getStats();
+      expect(after.hits).toBe(0);
+      expect(after.misses).toBe(0);
+      expect(after.evictions).toBe(0);
+      expect(after.entries).toBe(0);
     });
   });
 

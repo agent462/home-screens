@@ -12,12 +12,32 @@ interface CacheEntry {
   lastAccessed: number;
 }
 
+export interface CacheStats {
+  entries: number;
+  maxEntries: number;
+  fresh: number;
+  stale: number;
+  inflight: number;
+  hits: number;
+  misses: number;
+  evictions: number;
+  details: Array<{
+    url: string;
+    ageMs: number;
+    ttlMs: number;
+    stale: boolean;
+  }>;
+}
+
 const MAX_ENTRIES = 100;
 
 class DisplayDataCache {
   private cache = new Map<string, CacheEntry>();
   private inflight = new Map<string, Promise<void>>();
   private generation = 0;
+  private _hits = 0;
+  private _misses = 0;
+  private _evictions = 0;
 
   /**
    * Returns cached data + staleness flag.
@@ -25,7 +45,11 @@ class DisplayDataCache {
    */
   get<T>(url: string): { data: T; stale: boolean } | null {
     const entry = this.cache.get(url);
-    if (!entry) return null;
+    if (!entry) {
+      this._misses++;
+      return null;
+    }
+    this._hits++;
     entry.lastAccessed = Date.now();
     const stale = Date.now() - entry.fetchedAt > entry.ttlMs;
     return { data: entry.data as T, stale };
@@ -61,11 +85,49 @@ class DisplayDataCache {
     return p;
   }
 
-  /** Clear all entries (call on config change) */
+  /** Clear all entries and reset stats (call on config change) */
   clear(): void {
     this.generation++;
     this.cache.clear();
     this.inflight.clear();
+    this._hits = 0;
+    this._misses = 0;
+    this._evictions = 0;
+  }
+
+  /** Returns aggregate cache statistics for reporting. */
+  getStats(): CacheStats {
+    const now = Date.now();
+    let fresh = 0;
+    let stale = 0;
+    const details: CacheStats['details'] = [];
+
+    for (const [url, entry] of this.cache) {
+      const isStale = now - entry.fetchedAt > entry.ttlMs;
+      if (isStale) stale++;
+      else fresh++;
+      details.push({
+        url,
+        ageMs: now - entry.fetchedAt,
+        ttlMs: entry.ttlMs,
+        stale: isStale,
+      });
+    }
+
+    // Sort details by URL for stable display order
+    details.sort((a, b) => a.url.localeCompare(b.url));
+
+    return {
+      entries: this.cache.size,
+      maxEntries: MAX_ENTRIES,
+      fresh,
+      stale,
+      inflight: this.inflight.size,
+      hits: this._hits,
+      misses: this._misses,
+      evictions: this._evictions,
+      details,
+    };
   }
 
   private async doFetch(url: string, ttlMs: number): Promise<void> {
@@ -90,7 +152,10 @@ class DisplayDataCache {
         oldest = key;
       }
     }
-    if (oldest) this.cache.delete(oldest);
+    if (oldest) {
+      this.cache.delete(oldest);
+      this._evictions++;
+    }
   }
 }
 

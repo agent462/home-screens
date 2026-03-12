@@ -1,0 +1,488 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { editorFetch } from '@/lib/editor-fetch';
+import Button from '@/components/ui/Button';
+import type { CacheStats } from '@/lib/display-cache';
+import type { DisplayStatus } from '@/lib/display-commands';
+
+/* ─── Types ──────────────────────────────────── */
+
+interface DiskInfo {
+  total: number;
+  used: number;
+  free: number;
+  dataDir: {
+    config: number;
+    backups: number;
+    backgrounds: number;
+    total: number;
+  };
+}
+
+interface SystemStats {
+  disk: DiskInfo;
+  os: {
+    hostname: string;
+    platform: string;
+    arch: string;
+    uptime: number;
+    nodeVersion: string;
+  };
+  memory: {
+    total: number;
+    free: number;
+    used: number;
+  };
+  app: {
+    screens: number;
+    modules: number;
+    moduleTypes: Record<string, number>;
+    profiles: number;
+    configuredSecrets: string[];
+    configSize: number;
+  };
+}
+
+/* ─── Helpers ────────────────────────────────── */
+
+function formatBytes(bytes: number): string {
+  if (bytes <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  const value = bytes / Math.pow(1024, i);
+  return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[i]}`;
+}
+
+function formatUptime(seconds: number): string {
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const parts: string[] = [];
+  if (d > 0) parts.push(`${d}d`);
+  if (h > 0) parts.push(`${h}h`);
+  parts.push(`${m}m`);
+  return parts.join(' ');
+}
+
+function formatAge(ms: number): string {
+  if (ms < 1000) return '<1s';
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  return `${h}h ${m % 60}m`;
+}
+
+function formatDuration(ms: number): string {
+  const s = ms / 1000;
+  if (s < 60) return `${s}s`;
+  return `${Math.round(s / 60)}m`;
+}
+
+/** Shorten API URL for display: /api/weather?lat=40.7... → /api/weather */
+function shortenUrl(url: string): string {
+  const qIndex = url.indexOf('?');
+  return qIndex >= 0 ? url.slice(0, qIndex) : url;
+}
+
+function barColor(percent: number): string {
+  if (percent > 90) return 'bg-red-500';
+  if (percent > 70) return 'bg-yellow-500';
+  return 'bg-emerald-500';
+}
+
+const INTEGRATION_LABELS: Record<string, string> = {
+  openweathermap_key: 'OpenWeatherMap',
+  weatherapi_key: 'WeatherAPI',
+  pirateweather_key: 'Pirate Weather',
+  unsplash_access_key: 'Unsplash',
+  nasa_api_key: 'NASA',
+  todoist_token: 'Todoist',
+  google_maps_key: 'Google Maps',
+  tomtom_key: 'TomTom',
+  google_client_id: 'Google OAuth',
+  google_client_secret: 'Google Secret',
+};
+
+/* ─── Shared Bar Component ───────────────────── */
+
+function UsageBar({ percent, label, detail }: { percent: number; label: string; detail: string }) {
+  return (
+    <div>
+      <div className="flex items-center justify-between text-xs mb-1">
+        <span className="text-neutral-400">{label}</span>
+        <span className="text-neutral-300">{detail}</span>
+      </div>
+      <div className="h-2.5 bg-neutral-700 rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${barColor(percent)}`}
+          style={{ width: `${Math.min(percent, 100)}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/* ─── Component ──────────────────────────────── */
+
+export default function StatsSection() {
+  const [stats, setStats] = useState<SystemStats | null>(null);
+  const [displayStatus, setDisplayStatus] = useState<DisplayStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showCacheDetails, setShowCacheDetails] = useState(false);
+
+  const fetchStats = useCallback(async () => {
+    try {
+      const res = await editorFetch('/api/system/stats');
+      if (res.ok) {
+        setStats(await res.json());
+        setError(null);
+      } else {
+        setError('Failed to load system stats');
+      }
+    } catch {
+      setError('Failed to reach server');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const fetchDisplayStatus = useCallback(async () => {
+    try {
+      const res = await editorFetch('/api/display/status');
+      if (res.ok) {
+        setDisplayStatus(await res.json());
+      } else {
+        setDisplayStatus(null);
+      }
+    } catch {
+      // display may not be connected
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStats();
+    fetchDisplayStatus();
+    // Poll display status every 5s — display reports every 30s (and on state changes),
+    // so the editor may see the same cached value between reports
+    const id = setInterval(fetchDisplayStatus, 5_000);
+    return () => clearInterval(id);
+  }, [fetchStats, fetchDisplayStatus]);
+
+  if (loading) {
+    return (
+      <div className="text-sm text-neutral-500 py-8 text-center">
+        Loading stats...
+      </div>
+    );
+  }
+
+  if (error || !stats) {
+    return (
+      <div className="text-sm text-red-400 py-8 text-center">
+        {error || 'Failed to load stats'}
+      </div>
+    );
+  }
+
+  const diskPercent = stats.disk.total > 0 ? (stats.disk.used / stats.disk.total) * 100 : 0;
+  const memPercent = stats.memory.total > 0 ? (stats.memory.used / stats.memory.total) * 100 : 0;
+  // Guard against malformed cacheStats from older display clients or bad POSTs
+  const rawCache = displayStatus?.cacheStats;
+  const cacheStats: CacheStats | undefined = rawCache?.details
+    ? rawCache
+    : rawCache ? { ...rawCache, details: [] } : undefined;
+  const cachePercent = cacheStats ? (cacheStats.entries / cacheStats.maxEntries) * 100 : 0;
+  const hitRate = cacheStats && (cacheStats.hits + cacheStats.misses) > 0
+    ? (cacheStats.hits / (cacheStats.hits + cacheStats.misses)) * 100
+    : 0;
+
+  const statusAge = displayStatus ? Date.now() - displayStatus.timestamp : null;
+  const displayConnected = statusAge !== null && statusAge < 60_000;
+
+  // Deduplicate google_client_id + google_client_secret into a single "Google OAuth" entry
+  const secretsForDisplay = stats.app.configuredSecrets.filter(k => k !== 'google_client_secret');
+  const allIntegrationKeys = Object.keys(INTEGRATION_LABELS).filter(k => k !== 'google_client_secret');
+
+  return (
+    <div className="space-y-0 divide-y divide-neutral-600 [&>section]:py-5 [&>section:first-child]:pt-0 [&>section:last-child]:pb-0">
+      {/* ─── Display Status ──────────────────── */}
+      <section>
+        <h3 className="text-sm font-medium text-neutral-300 mb-3 uppercase tracking-wider">
+          Display Status
+        </h3>
+        {displayConnected && displayStatus ? (
+          <div className="rounded-md bg-neutral-800/50 border border-neutral-700 p-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${
+                  displayStatus.displayState === 'active' ? 'bg-emerald-400' :
+                  displayStatus.displayState === 'dimmed' ? 'bg-yellow-400' : 'bg-neutral-500'
+                }`} />
+                <span className="text-sm text-neutral-200 capitalize">
+                  {displayStatus.displayState}
+                </span>
+              </div>
+              <span className="text-xs text-neutral-500">
+                Last seen {formatAge(statusAge!)} ago
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-xs">
+              <div className="text-neutral-500">Screen</div>
+              <div className="text-neutral-300">
+                {displayStatus.currentScreen.name}
+                <span className="text-neutral-500 ml-1">
+                  ({displayStatus.currentScreen.index + 1}/{displayStatus.screenCount})
+                </span>
+              </div>
+              {displayStatus.activeProfile && (
+                <>
+                  <div className="text-neutral-500">Profile</div>
+                  <div className="text-neutral-300">{displayStatus.activeProfile}</div>
+                </>
+              )}
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-neutral-500">
+            No display connected. Open <span className="font-mono text-neutral-400">/display</span> to start.
+          </p>
+        )}
+      </section>
+
+      {/* ─── Data Cache ──────────────────────── */}
+      <section>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-medium text-neutral-300 uppercase tracking-wider">
+            Data Cache
+          </h3>
+          {cacheStats && cacheStats.details.length > 0 && (
+            <button
+              onClick={() => setShowCacheDetails(!showCacheDetails)}
+              className="text-xs text-blue-400 hover:text-blue-300"
+            >
+              {showCacheDetails ? 'Hide Details' : 'Show Details'}
+            </button>
+          )}
+        </div>
+        {displayConnected && cacheStats ? (
+          <div className="space-y-3">
+            <UsageBar
+              percent={cachePercent}
+              label="Entries"
+              detail={`${cacheStats.entries} / ${cacheStats.maxEntries}`}
+            />
+            <div className="grid grid-cols-3 gap-3">
+              <Stat label="Fresh" value={String(cacheStats.fresh)} color="text-emerald-400" />
+              <Stat label="Stale" value={String(cacheStats.stale)} color={cacheStats.stale > 0 ? 'text-yellow-400' : 'text-neutral-300'} />
+              <Stat label="Inflight" value={String(cacheStats.inflight)} />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <Stat label="Hits" value={cacheStats.hits.toLocaleString()} />
+              <Stat label="Misses" value={cacheStats.misses.toLocaleString()} />
+              <Stat label="Hit Rate" value={hitRate > 0 ? `${hitRate.toFixed(1)}%` : '—'} color={hitRate >= 90 ? 'text-emerald-400' : hitRate >= 70 ? 'text-yellow-400' : 'text-neutral-300'} />
+            </div>
+            {cacheStats.evictions > 0 && (
+              <p className="text-xs text-neutral-500">
+                {cacheStats.evictions} LRU eviction{cacheStats.evictions !== 1 ? 's' : ''}
+              </p>
+            )}
+
+            {showCacheDetails && cacheStats.details.length > 0 && (
+              <div className="max-h-48 overflow-y-auto rounded-md border border-neutral-700">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-neutral-500 border-b border-neutral-700">
+                      <th className="text-left px-2 py-1.5 font-medium">URL</th>
+                      <th className="text-right px-2 py-1.5 font-medium">Age</th>
+                      <th className="text-right px-2 py-1.5 font-medium">TTL</th>
+                      <th className="text-right px-2 py-1.5 font-medium">State</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-neutral-800">
+                    {cacheStats.details.map((d) => (
+                      <tr key={d.url} className="hover:bg-neutral-800/50">
+                        <td className="px-2 py-1.5 text-neutral-300 font-mono truncate max-w-[200px]">
+                          {shortenUrl(d.url)}
+                        </td>
+                        <td className="px-2 py-1.5 text-neutral-400 text-right whitespace-nowrap">
+                          {formatAge(d.ageMs)}
+                        </td>
+                        <td className="px-2 py-1.5 text-neutral-400 text-right whitespace-nowrap">
+                          {formatDuration(d.ttlMs)}
+                        </td>
+                        <td className="px-2 py-1.5 text-right">
+                          <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                            d.stale
+                              ? 'bg-yellow-900/50 text-yellow-400'
+                              : 'bg-emerald-900/50 text-emerald-400'
+                          }`}>
+                            {d.stale ? 'stale' : 'fresh'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="text-xs text-neutral-500">
+            Cache stats are reported by the display client. No display connected.
+          </p>
+        )}
+      </section>
+
+      {/* ─── Disk Usage ──────────────────────── */}
+      <section>
+        <h3 className="text-sm font-medium text-neutral-300 mb-3 uppercase tracking-wider">
+          Disk Usage
+        </h3>
+        <div className="space-y-3">
+          {stats.disk.total > 0 ? (
+            <UsageBar
+              percent={diskPercent}
+              label="Filesystem"
+              detail={`${formatBytes(stats.disk.used)} / ${formatBytes(stats.disk.total)}`}
+            />
+          ) : (
+            <p className="text-xs text-neutral-500">Disk stats unavailable</p>
+          )}
+          {stats.disk.total > 0 && (
+            <p className="text-xs text-neutral-500">
+              {diskPercent.toFixed(1)}% used &middot; {formatBytes(stats.disk.free)} free
+            </p>
+          )}
+
+          <div className="rounded-md bg-neutral-800/50 border border-neutral-700 overflow-hidden">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-neutral-700 text-neutral-500">
+                  <th className="text-left px-3 py-2 font-medium">Home Screens Data</th>
+                  <th className="text-right px-3 py-2 font-medium">Size</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-800">
+                <DataRow label="Backgrounds" size={stats.disk.dataDir.backgrounds} />
+                <DataRow label="Config Backups" size={stats.disk.dataDir.backups} />
+                <DataRow label="Configuration" size={stats.disk.dataDir.config} />
+                <tr className="border-t border-neutral-700">
+                  <td className="px-3 py-2 text-neutral-300 font-medium">Total</td>
+                  <td className="px-3 py-2 text-right text-neutral-200 font-medium">
+                    {formatBytes(stats.disk.dataDir.total)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── Configuration ───────────────────── */}
+      <section>
+        <h3 className="text-sm font-medium text-neutral-300 mb-3 uppercase tracking-wider">
+          Configuration
+        </h3>
+        <div className="space-y-3">
+          <div className="grid grid-cols-3 gap-3">
+            <Stat label="Screens" value={String(stats.app.screens)} />
+            <Stat label="Modules" value={String(stats.app.modules)} />
+            <Stat label="Profiles" value={String(stats.app.profiles)} />
+          </div>
+
+          {Object.keys(stats.app.moduleTypes).length > 0 && (
+            <div>
+              <p className="text-xs text-neutral-500 mb-1.5">Module breakdown</p>
+              <div className="flex flex-wrap gap-1.5">
+                {Object.entries(stats.app.moduleTypes)
+                  .sort(([, a], [, b]) => b - a)
+                  .map(([type, count]) => (
+                    <span key={type} className="inline-flex items-center gap-1 bg-neutral-800 rounded px-2 py-0.5 text-xs text-neutral-300">
+                      {type}
+                      <span className="text-neutral-500">&times;{count}</span>
+                    </span>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <p className="text-xs text-neutral-500 mb-1.5">
+              Integrations {secretsForDisplay.length}/{allIntegrationKeys.length} configured
+            </p>
+            <div className="flex flex-wrap gap-x-3 gap-y-1">
+              {allIntegrationKeys.map((key) => {
+                const configured = secretsForDisplay.includes(key);
+                return (
+                  <span key={key} className="flex items-center gap-1.5 text-xs">
+                    <span className={`w-1.5 h-1.5 rounded-full ${configured ? 'bg-emerald-400' : 'bg-neutral-600'}`} />
+                    <span className={configured ? 'text-neutral-300' : 'text-neutral-500'}>
+                      {INTEGRATION_LABELS[key] ?? key}
+                    </span>
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── Server ──────────────────────────── */}
+      <section>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-medium text-neutral-300 uppercase tracking-wider">
+            Server
+          </h3>
+          <Button variant="secondary" size="sm" onClick={fetchStats}>
+            Refresh
+          </Button>
+        </div>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+            <div className="text-neutral-500">Hostname</div>
+            <div className="text-neutral-300 font-mono">{stats.os.hostname}</div>
+            <div className="text-neutral-500">Platform</div>
+            <div className="text-neutral-300">{stats.os.platform} / {stats.os.arch}</div>
+            <div className="text-neutral-500">Node.js</div>
+            <div className="text-neutral-300 font-mono">{stats.os.nodeVersion}</div>
+            <div className="text-neutral-500">Uptime</div>
+            <div className="text-neutral-300">{formatUptime(stats.os.uptime)}</div>
+          </div>
+
+          <UsageBar
+            percent={memPercent}
+            label="Memory"
+            detail={`${formatBytes(stats.memory.used)} / ${formatBytes(stats.memory.total)}`}
+          />
+          <p className="text-xs text-neutral-500">
+            {memPercent.toFixed(1)}% used &middot; {formatBytes(stats.memory.free)} free
+          </p>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+/* ─── Small Subcomponents ────────────────────── */
+
+function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
+  return (
+    <div className="rounded-md bg-neutral-800/50 border border-neutral-700 px-3 py-2">
+      <p className="text-[10px] text-neutral-500 uppercase tracking-wider">{label}</p>
+      <p className={`text-lg font-semibold ${color ?? 'text-neutral-200'}`}>{value}</p>
+    </div>
+  );
+}
+
+function DataRow({ label, size }: { label: string; size: number }) {
+  return (
+    <tr>
+      <td className="px-3 py-2 text-neutral-400">{label}</td>
+      <td className="px-3 py-2 text-right text-neutral-300">{formatBytes(size)}</td>
+    </tr>
+  );
+}

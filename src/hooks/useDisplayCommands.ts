@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import type { DisplayCommand } from '@/lib/display-commands';
+import { displayCache } from '@/lib/display-cache';
 
 export interface CommandHandlers {
   wake: () => void;
@@ -145,6 +146,7 @@ function reportStatus(s: {
       activeProfile: s.activeProfile ?? null,
       displayState: s.displayState,
       timestamp: Date.now(),
+      cacheStats: displayCache.getStats(),
     }),
   }).catch(() => {});
 }
