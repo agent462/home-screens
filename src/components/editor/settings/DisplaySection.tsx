@@ -8,6 +8,7 @@ interface DisplaySettings {
   displayHeight: number;
   displayTransform: string;
   rotationInterval: number;
+  cursorHideSeconds: number;
 }
 
 interface Props {
@@ -16,7 +17,7 @@ interface Props {
 }
 
 export default function DisplaySection({ values, onChange }: Props) {
-  const { displayWidth, displayHeight, displayTransform, rotationInterval } = values;
+  const { displayWidth, displayHeight, displayTransform, rotationInterval, cursorHideSeconds } = values;
 
   return (
     <section>
@@ -76,6 +77,19 @@ export default function DisplaySection({ values, onChange }: Props) {
         <p className="text-xs text-neutral-500 mt-1">
           How long each screen is shown before automatically cycling to the next.
           Only applies when you have multiple screens configured.
+        </p>
+      </div>
+      <div className="mb-3">
+        <Slider
+          label="Hide Cursor After (seconds)"
+          value={cursorHideSeconds}
+          min={1}
+          max={30}
+          step={1}
+          onChange={(v) => onChange({ cursorHideSeconds: v })}
+        />
+        <p className="text-xs text-neutral-500 mt-1">
+          The mouse cursor is hidden after this many seconds of inactivity. Move the mouse to show it again.
         </p>
       </div>
     </section>

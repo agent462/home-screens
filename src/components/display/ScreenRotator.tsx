@@ -14,6 +14,7 @@ import { resolveProfileScreens } from '@/lib/schedule';
 import { WEATHER_REFRESH_MS, CALENDAR_REFRESH_MS, DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT } from '@/lib/constants';
 import { displayCache } from '@/lib/display-cache';
 import { prefetchScreen } from '@/lib/prefetch';
+import { useIdleCursor } from '@/hooks/useIdleCursor';
 
 /** How often the display polls for config changes (ms) */
 const CONFIG_POLL_MS = 3_000;
@@ -211,6 +212,7 @@ function usePrefetchNextScreen(
 
 export default function ScreenRotator({ screens: initialScreens, settings: initialSettings, profiles: initialProfiles }: ScreenRotatorProps) {
   const { screens: allScreens, settings, profiles } = useLiveConfig(initialScreens, initialSettings, initialProfiles);
+  const cursorRef = useIdleCursor(settings.cursorHideSeconds ?? 3);
   const [currentIndex, setCurrentIndex] = useState(0);
   // Bumped on manual navigation to reset the auto-rotation timer
   const [rotationEpoch, setRotationEpoch] = useState(0);
@@ -323,7 +325,7 @@ export default function ScreenRotator({ screens: initialScreens, settings: initi
   }
 
   return (
-    <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden', backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div ref={cursorRef} style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden', backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <AnimatePresence mode="wait">
         <motion.div
           key={currentScreen.id}

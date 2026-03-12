@@ -79,6 +79,7 @@ interface SettingsState {
   sleepStartTime: string;
   sleepEndTime: string;
   screensaverMode: string;
+  cursorHideSeconds: number;
 }
 
 function initSettings(settings: GlobalSettings | undefined): SettingsState {
@@ -109,6 +110,7 @@ function initSettings(settings: GlobalSettings | undefined): SettingsState {
     sleepStartTime: settings?.sleep?.schedule?.startTime ?? '23:00',
     sleepEndTime: settings?.sleep?.schedule?.endTime ?? '06:00',
     screensaverMode: settings?.screensaver?.mode ?? 'clock',
+    cursorHideSeconds: settings?.cursorHideSeconds ?? 3,
   };
 }
 
@@ -205,6 +207,7 @@ export default function SettingsPage() {
         screensaver: {
           mode: state.screensaverMode as 'clock' | 'blank' | 'off',
         },
+        cursorHideSeconds: state.cursorHideSeconds,
       });
       await saveConfig();
       setSaveMessage('Saved');
@@ -335,6 +338,7 @@ export default function SettingsPage() {
                   displayHeight: state.displayHeight,
                   displayTransform: state.displayTransform,
                   rotationInterval: state.rotationInterval,
+                  cursorHideSeconds: state.cursorHideSeconds,
                 }}
                 onChange={update}
               />

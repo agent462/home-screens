@@ -133,6 +133,7 @@ export interface GlobalSettings {
   calendar: CalendarSettings;
   sleep?: SleepSettings;
   screensaver?: ScreensaverSettings;
+  cursorHideSeconds?: number;
   activeProfile?: string;
   piVariant?: 'desktop' | 'lite';
 }

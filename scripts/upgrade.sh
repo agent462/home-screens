@@ -410,7 +410,7 @@ case "${action}" in
     changed=""
 
     # 0. Ensure required system packages are installed
-    REQUIRED_PACKAGES="chromium cage xdotool unclutter wlr-randr fonts-noto-color-emoji plymouth"
+    REQUIRED_PACKAGES="chromium cage xdotool wlr-randr fonts-noto-color-emoji plymouth plymouth-themes"
     missing=""
     for pkg in ${REQUIRED_PACKAGES}; do
       if ! dpkg -s "${pkg}" &>/dev/null; then
@@ -636,19 +636,43 @@ exec chromium --kiosk \
         [ -f "${THEME_SRC}/logo.png" ] && sudo cp "${THEME_SRC}/logo.png" "${THEME_DIR}/"
       fi
 
-      current_theme=$(plymouth-set-default-theme 2>/dev/null || true)
+      current_theme=$(/usr/sbin/plymouth-set-default-theme 2>/dev/null || true)
       if [ "${current_theme}" != "home-screens" ] || [ "${theme_changed}" = true ]; then
-        sudo plymouth-set-default-theme home-screens
+        sudo /usr/sbin/plymouth-set-default-theme home-screens
         sudo update-initramfs -u
         changed="${changed}plymouth,"
       fi
     fi
 
-    # 11. Quiet boot (suppress kernel messages, hide cursor/logo)
+    # 11. Plymouth minimum display time (5 seconds)
+    PLYMOUTH_QUIT_DROP="/etc/systemd/system/plymouth-quit.service.d/delay.conf"
+    DESIRED_DELAY="[Service]
+ExecStartPre=/bin/sleep 5"
+    if [ ! -f "${PLYMOUTH_QUIT_DROP}" ] || [ "$(cat "${PLYMOUTH_QUIT_DROP}")" != "${DESIRED_DELAY}" ]; then
+      sudo mkdir -p "$(dirname "${PLYMOUTH_QUIT_DROP}")"
+      echo "${DESIRED_DELAY}" | sudo tee "${PLYMOUTH_QUIT_DROP}" > /dev/null
+      sudo systemctl daemon-reload
+      changed="${changed}plymouth-delay,"
+    fi
+
+    # 12. Quiet boot (suppress kernel messages, hide cursor/logo)
     CMDLINE="/boot/firmware/cmdline.txt"
     if [ -f "${CMDLINE}" ]; then
       cmdline_updated=false
       current_cmdline=$(cat "${CMDLINE}")
+
+      # Remove serial console — forces Plymouth into text-only mode
+      if echo "${current_cmdline}" | grep -qE 'console=(serial|ttyAMA|ttyS)[0-9]'; then
+        current_cmdline=$(echo "${current_cmdline}" | sed -E 's/ ?console=(serial|ttyAMA|ttyS)[0-9][^ ]*//g')
+        cmdline_updated=true
+      fi
+
+      # Remove plymouth.debug if present (leftover from troubleshooting)
+      if echo "${current_cmdline}" | grep -q 'plymouth\.debug'; then
+        current_cmdline=$(echo "${current_cmdline}" | sed -E 's/ ?plymouth\.debug//g')
+        cmdline_updated=true
+      fi
+
       for param in quiet "loglevel=0" "logo.nologo" "vt.global_cursor_default=0" "consoleblank=0" splash; do
         if ! echo " ${current_cmdline} " | grep -q " ${param} "; then
           current_cmdline="${current_cmdline} ${param}"
@@ -661,7 +685,7 @@ exec chromium --kiosk \
       fi
     fi
 
-    # 12. Disable firmware rainbow splash
+    # 13. Disable firmware rainbow splash
     CONFIG_TXT="/boot/firmware/config.txt"
     if [ -f "${CONFIG_TXT}" ]; then
       if grep -q "^disable_splash=" "${CONFIG_TXT}"; then
