@@ -1,4 +1,4 @@
-import { spawn } from 'child_process';
+import { spawn, type ChildProcess } from 'child_process';
 import { createInterface } from 'readline';
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -61,14 +61,20 @@ function runUpgradeScript(
     const child = spawn('bash', [SCRIPT_PATH, action, ...args], {
       cwd: process.cwd(),
     });
+    currentUpgrade.childProcess = child;
 
     let stdout = '';
     let stderr = '';
     let settled = false;
 
+    const settle = () => {
+      settled = true;
+      currentUpgrade.childProcess = null;
+    };
+
     const timer = setTimeout(() => {
       if (!settled) {
-        settled = true;
+        settle();
         rl.close();
         child.kill();
         reject(new Error(`${action} timed out after 10 minutes`));
@@ -93,7 +99,7 @@ function runUpgradeScript(
 
     child.on('error', (err) => {
       if (!settled) {
-        settled = true;
+        settle();
         clearTimeout(timer);
         reject(new Error(`${action} failed: ${err.message}`));
       }
@@ -102,7 +108,7 @@ function runUpgradeScript(
     child.on('close', (code, signal) => {
       rl.close();
       if (!settled) {
-        settled = true;
+        settle();
         clearTimeout(timer);
         if (signal) {
           // Process was killed by a signal (e.g. OOM killer sends SIGKILL)
@@ -137,10 +143,14 @@ function parseResult(output: string): Record<string, unknown> {
 // Global upgrade state — only one upgrade can run at a time
 const currentUpgrade: {
   running: boolean;
+  cancelled: boolean;
+  childProcess: ChildProcess | null;
   progress: UpgradeProgress;
   listeners: Set<EventCallback>;
 } = {
   running: false,
+  cancelled: false,
+  childProcess: null,
   progress: { step: 'complete', progress: 100, message: 'Idle' },
   listeners: new Set(),
 };
@@ -335,12 +345,16 @@ async function runGuardedPipeline({ steps, onError }: GuardedPipelineOptions): P
     throw new Error('An upgrade is already in progress');
   }
   currentUpgrade.running = true;
+  currentUpgrade.cancelled = false;
 
   try {
     await runPipeline(steps);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    emit({ step: 'error', progress: 0, message, error: message });
+    // Skip emitting if cancelUpgrade() already emitted the error
+    if (!currentUpgrade.cancelled) {
+      const message = error instanceof Error ? error.message : String(error);
+      emit({ step: 'error', progress: 0, message, error: message });
+    }
 
     if (onError) {
       await onError();
@@ -349,7 +363,32 @@ async function runGuardedPipeline({ steps, onError }: GuardedPipelineOptions): P
     throw error;
   } finally {
     currentUpgrade.running = false;
+    currentUpgrade.cancelled = false;
   }
+}
+
+/** Cancel a running upgrade — kills the child process and resets state */
+export function cancelUpgrade(): boolean {
+  if (!currentUpgrade.running) return false;
+
+  const child = currentUpgrade.childProcess;
+  if (child && !child.killed) {
+    child.kill('SIGTERM');
+  }
+
+  currentUpgrade.cancelled = true;
+
+  emit({
+    step: 'error',
+    progress: 0,
+    message: 'Upgrade cancelled by user',
+    error: 'Upgrade cancelled by user',
+  });
+
+  currentUpgrade.running = false;
+  currentUpgrade.childProcess = null;
+
+  return true;
 }
 
 // ─── Public Pipeline Functions ───

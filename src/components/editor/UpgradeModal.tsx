@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
+import { editorFetch } from '@/lib/editor-fetch';
 import Button from '@/components/ui/Button';
 import {
   useUpgradeStream,
@@ -72,6 +73,15 @@ export default function UpgradeModal({ targetTag, isRollback, isRebuild, onCompl
   const { expanded, toggleExpand } = useAccordionState(activeStep);
 
   const activeLogRef = useRef<HTMLDivElement>(null);
+
+  const handleCancel = useCallback(async () => {
+    try {
+      await editorFetch('/api/system/upgrade', { method: 'DELETE' });
+      // SSE will receive the error event and transition to failed state
+    } catch {
+      onClose();
+    }
+  }, [onClose]);
 
   // Auto-scroll the active step's output to the bottom
   useEffect(() => {
@@ -186,7 +196,12 @@ export default function UpgradeModal({ targetTag, isRollback, isRebuild, onCompl
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end px-5 py-4 border-t border-neutral-700 flex-shrink-0">
+        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-neutral-700 flex-shrink-0">
+          {!done && !failed && (
+            <Button variant="danger" size="sm" onClick={handleCancel}>
+              Cancel
+            </Button>
+          )}
           {done && (
             <Button variant="primary" onClick={onComplete}>
               Done

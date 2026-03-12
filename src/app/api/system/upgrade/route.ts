@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { runUpgrade, isUpgradeRunning } from '@/lib/upgrade';
+import { runUpgrade, isUpgradeRunning, cancelUpgrade } from '@/lib/upgrade';
 import { requireSession } from '@/lib/auth';
 import { errorResponse } from '@/lib/api-utils';
 
@@ -41,5 +41,24 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     if (error instanceof Response) return error;
     return errorResponse(error, 'Failed to start upgrade');
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    await requireSession(request);
+
+    if (!isUpgradeRunning()) {
+      return NextResponse.json(
+        { error: 'No upgrade is currently running' },
+        { status: 404 },
+      );
+    }
+
+    const cancelled = cancelUpgrade();
+    return NextResponse.json({ ok: cancelled });
+  } catch (error) {
+    if (error instanceof Response) return error;
+    return errorResponse(error, 'Failed to cancel upgrade');
   }
 }

@@ -21,6 +21,7 @@ interface VersionInfo {
   tags: TagInfo[];
   buildPending: boolean;
   buildPendingTag: string | null;
+  upgradeRunning: boolean;
 }
 
 interface Release {
@@ -172,6 +173,22 @@ export default function SystemSection({ onUpgrade, onRollback, onRebuild }: Prop
     }
   }
 
+  async function handleCancelUpgrade() {
+    if (!(await useConfirmStore.getState().confirm({
+      title: 'Cancel Upgrade',
+      message: 'Are you sure? The running upgrade will be killed. You may need to retry or rebuild afterwards.',
+      confirmLabel: 'Cancel Upgrade',
+    }))) return;
+    try {
+      const res = await editorFetch('/api/system/upgrade', { method: 'DELETE' });
+      if (res.ok) {
+        fetchAll();
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   if (loading) {
     return (
       <div className="text-sm text-neutral-500 py-8 text-center">
@@ -216,6 +233,28 @@ export default function SystemSection({ onUpgrade, onRollback, onRebuild }: Prop
             {checking ? 'Checking...' : 'Check for Updates'}
           </Button>
         </div>
+
+        {versionInfo.upgradeRunning && (
+          <div className="mt-3 rounded-lg bg-yellow-950/50 border border-yellow-800/50 p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-yellow-300 font-medium">
+                  Upgrade in progress
+                </p>
+                <p className="text-xs text-yellow-400/70 mt-0.5">
+                  An upgrade is currently running. If it appears stuck, you can cancel it.
+                </p>
+              </div>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={handleCancelUpgrade}
+              >
+                Cancel Upgrade
+              </Button>
+            </div>
+          </div>
+        )}
 
         {versionInfo.buildPending && (
           <div className="mt-3 rounded-lg bg-red-950/50 border border-red-800/50 p-3">
