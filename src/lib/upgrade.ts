@@ -423,6 +423,9 @@ async function runTarballUpgrade(targetTag: string): Promise<void> {
         if (!preflight.ok) {
           throw new Error(preflight.error as string);
         }
+        if (preflight.warning) {
+          emitOutput('preflight', `Warning: ${preflight.warning}`);
+        }
       },
     },
     {
@@ -513,6 +516,9 @@ async function runGitUpgrade(targetTag: string): Promise<void> {
         const preflight = parseResult(preflightOut);
         if (!preflight.ok) {
           throw new Error(preflight.error as string);
+        }
+        if (preflight.warning) {
+          emitOutput('preflight', `Warning: ${preflight.warning}`);
         }
         isDirty = preflight.dirty as boolean;
       },

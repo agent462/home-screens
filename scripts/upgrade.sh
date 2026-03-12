@@ -59,12 +59,13 @@ case "${action}" in
       errors="${errors}Passwordless sudo not available (required for restart/setup-system). "
     fi
 
-    # Check Node.js major version matches .node-version if it exists
+    # Check Node.js major version matches .node-version if it exists (warning only)
+    node_warning=""
     if [ -f "${APP_DIR}/.node-version" ]; then
       expected_major=$(cat "${APP_DIR}/.node-version" | tr -d '[:space:]')
       actual_major=$(node -v 2>/dev/null | sed 's/v//' | cut -d. -f1)
       if [ -n "${expected_major}" ] && [ -n "${actual_major}" ] && [ "${actual_major}" != "${expected_major}" ]; then
-        errors="${errors}Node.js major version mismatch (have v${actual_major}, need v${expected_major}). "
+        node_warning="Node.js v${actual_major} detected (v${expected_major} recommended)"
       fi
     fi
 
@@ -78,7 +79,11 @@ case "${action}" in
           dirty="true"
         fi
       fi
-      echo "{\"ok\":true,\"dirty\":${dirty},\"diskMB\":$(( available_kb / 1024 ))}"
+      warning_field=""
+      if [ -n "${node_warning}" ]; then
+        warning_field=",\"warning\":\"${node_warning}\""
+      fi
+      echo "{\"ok\":true,\"dirty\":${dirty},\"diskMB\":$(( available_kb / 1024 ))${warning_field}}"
     fi
     ;;
 
