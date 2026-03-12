@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import {
   verifyPassword,
   readAuthState,
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
   try {
     const ip = getClientIP(request);
     if (isRateLimited(ip)) {
-      return Response.json(
+      return NextResponse.json(
         { error: 'Too many failed attempts. Try again later.' },
         { status: 429 },
       );
@@ -62,20 +62,20 @@ export async function POST(request: NextRequest) {
     const { password } = body;
 
     if (!password || typeof password !== 'string') {
-      return Response.json({ error: 'Password is required' }, { status: 400 });
+      return NextResponse.json({ error: 'Password is required' }, { status: 400 });
     }
 
     const valid = await verifyPassword(password);
     if (!valid) {
       recordFailure(ip);
-      return Response.json({ error: 'Invalid password' }, { status: 401 });
+      return NextResponse.json({ error: 'Invalid password' }, { status: 401 });
     }
 
     clearFailures(ip);
 
     const state = await readAuthState();
     if (!state.cookieSecret) {
-      return Response.json({ error: 'Auth state invalid' }, { status: 500 });
+      return NextResponse.json({ error: 'Auth state invalid' }, { status: 500 });
     }
 
     const token = createSessionCookie(state.cookieSecret);

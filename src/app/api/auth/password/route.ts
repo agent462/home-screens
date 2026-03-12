@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import {
   isAuthEnabled,
   verifyPassword,
@@ -30,14 +30,14 @@ export async function POST(request: NextRequest) {
     // Disable auth
     if (action === 'disable') {
       if (!authEnabled) {
-        return Response.json({ error: 'Auth is not enabled' }, { status: 400 });
+        return NextResponse.json({ error: 'Auth is not enabled' }, { status: 400 });
       }
       if (!currentPassword || typeof currentPassword !== 'string') {
-        return Response.json({ error: 'Current password is required' }, { status: 400 });
+        return NextResponse.json({ error: 'Current password is required' }, { status: 400 });
       }
       const valid = await verifyPassword(currentPassword);
       if (!valid) {
-        return Response.json({ error: 'Invalid current password' }, { status: 401 });
+        return NextResponse.json({ error: 'Invalid current password' }, { status: 401 });
       }
       await clearPassword();
       clearAuthCache();
@@ -53,10 +53,10 @@ export async function POST(request: NextRequest) {
 
     // Set or change password
     if (!newPassword || typeof newPassword !== 'string') {
-      return Response.json({ error: 'New password is required' }, { status: 400 });
+      return NextResponse.json({ error: 'New password is required' }, { status: 400 });
     }
     if (newPassword.length < MIN_PASSWORD_LENGTH) {
-      return Response.json(
+      return NextResponse.json(
         { error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` },
         { status: 400 },
       );
@@ -65,11 +65,11 @@ export async function POST(request: NextRequest) {
     // If auth is enabled, verify current password before changing
     if (authEnabled) {
       if (!currentPassword || typeof currentPassword !== 'string') {
-        return Response.json({ error: 'Current password is required' }, { status: 400 });
+        return NextResponse.json({ error: 'Current password is required' }, { status: 400 });
       }
       const valid = await verifyPassword(currentPassword);
       if (!valid) {
-        return Response.json({ error: 'Invalid current password' }, { status: 401 });
+        return NextResponse.json({ error: 'Invalid current password' }, { status: 401 });
       }
     }
 

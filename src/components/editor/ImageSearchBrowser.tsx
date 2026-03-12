@@ -1,0 +1,208 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import Button from '@/components/ui/Button';
+
+export interface BrowsePhoto {
+  id: string;
+  thumb: string;
+  alt: string;
+  /** Primary overlay text (author name, title, etc.) */
+  overlayLabel: string;
+  /** Optional secondary overlay line (date, etc.) */
+  overlaySecondary?: string;
+}
+
+export interface CategoryDef {
+  label: string;
+  query: string;
+}
+
+export interface SearchResult {
+  photos: BrowsePhoto[];
+  totalPages: number;
+}
+
+interface ImageSearchBrowserProps {
+  categories: CategoryDef[];
+  onSearch: (query: string, page: number) => Promise<SearchResult>;
+  onUsePhoto: (photo: BrowsePhoto) => Promise<void>;
+  attribution: string;
+  searchPlaceholder?: string;
+  /** Content rendered before the category pills (e.g. mode toggle) */
+  headerSlot?: React.ReactNode;
+  /** When true, categories and search bar are hidden (e.g. NASA APOD mode) */
+  hideSearch?: boolean;
+  /** Extra content rendered between the header/search and the photo grid */
+  beforeGrid?: React.ReactNode;
+  /** External trigger to re-run the current search (increment to trigger) */
+  refreshKey?: number;
+}
+
+export default function ImageSearchBrowser({
+  categories,
+  onSearch,
+  onUsePhoto,
+  attribution,
+  searchPlaceholder = 'Search anything...',
+  headerSlot,
+  hideSearch = false,
+  beforeGrid,
+  refreshKey = 0,
+}: ImageSearchBrowserProps) {
+  const [photos, setPhotos] = useState<BrowsePhoto[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState(categories[0]?.query ?? '');
+  const [customSearch, setCustomSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+
+  const runSearch = useCallback(async (query: string, pageNum: number) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await onSearch(query, pageNum);
+      setPhotos(result.photos);
+      setTotalPages(result.totalPages);
+    } catch {
+      setError('Failed to load images');
+      setPhotos([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [onSearch]);
+
+  useEffect(() => {
+    runSearch(selectedCategory, page);
+  }, [selectedCategory, page, runSearch, refreshKey]);
+
+  const handleCategoryChange = (query: string) => {
+    setSelectedCategory(query);
+    setPage(1);
+    setCustomSearch('');
+  };
+
+  const handleCustomSearch = () => {
+    if (!customSearch.trim()) return;
+    setSelectedCategory(customSearch.trim());
+    setPage(1);
+  };
+
+  const handleUsePhoto = async (photo: BrowsePhoto) => {
+    setIsSaving(photo.id);
+    setError(null);
+    try {
+      await onUsePhoto(photo);
+    } catch {
+      setError('Failed to save image');
+    }
+    setIsSaving(null);
+  };
+
+  return (
+    <>
+      {headerSlot}
+
+      {!hideSearch && (
+        <>
+          <div className="flex flex-wrap gap-1">
+            {categories.map((cat) => (
+              <button
+                key={cat.query}
+                onClick={() => handleCategoryChange(cat.query)}
+                className={`text-[10px] px-2 py-1 rounded-full transition-colors ${
+                  selectedCategory === cat.query
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-neutral-800 text-neutral-400 hover:text-neutral-200'
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex gap-1.5">
+            <input
+              type="text"
+              value={customSearch}
+              onChange={(e) => setCustomSearch(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleCustomSearch()}
+              placeholder={searchPlaceholder}
+              className="flex-1 rounded-md bg-neutral-800 border border-neutral-700 text-xs text-neutral-200 px-2 py-1.5 focus:outline-none focus:border-blue-500"
+            />
+            <Button size="sm" onClick={handleCustomSearch}>
+              Search
+            </Button>
+          </div>
+        </>
+      )}
+
+      {beforeGrid}
+
+      {error && <p className="text-xs text-red-400">{error}</p>}
+
+      {isLoading ? (
+        <div className="text-xs text-neutral-500 py-4 text-center">Loading...</div>
+      ) : (
+        <div className="grid grid-cols-2 gap-1.5 max-h-[300px] overflow-y-auto">
+          {photos.map((photo) => (
+            <button
+              key={photo.id}
+              onClick={() => handleUsePhoto(photo)}
+              disabled={isSaving === photo.id}
+              className="group relative aspect-[9/16] rounded overflow-hidden border border-neutral-700 hover:border-blue-500 transition-colors"
+            >
+              <img
+                src={photo.thumb}
+                alt={photo.alt}
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-end">
+                <span className="text-[9px] text-white/0 group-hover:text-white/80 px-1.5 pb-1 truncate w-full transition-colors">
+                  {photo.overlayLabel}
+                  {photo.overlaySecondary && (
+                    <span className="block text-white/50">{photo.overlaySecondary}</span>
+                  )}
+                </span>
+              </div>
+              {isSaving === photo.id && (
+                <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                  <span className="text-xs text-white">Saving...</span>
+                </div>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {!hideSearch && totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <Button
+            size="sm"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => p - 1)}
+          >
+            Prev
+          </Button>
+          <span className="text-[10px] text-neutral-500">
+            Page {page} of {totalPages}
+          </span>
+          <Button
+            size="sm"
+            disabled={page >= totalPages}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Next
+          </Button>
+        </div>
+      )}
+
+      <p className="text-[9px] text-neutral-600 text-center">
+        {attribution}
+      </p>
+    </>
+  );
+}

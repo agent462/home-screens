@@ -35,7 +35,7 @@ function createColorIcon(
 
 // ─── Sun ────────────────────────────────────────────
 
-export const ColorSun = createColorIcon('ColorSun', (uid) => (
+const ColorSun = createColorIcon('ColorSun', (uid) => (
   <>
     <defs>
       <radialGradient id={`${uid}-sun`}>
@@ -57,7 +57,7 @@ export const ColorSun = createColorIcon('ColorSun', (uid) => (
 
 // ─── Moon ───────────────────────────────────────────
 
-export const ColorMoon = createColorIcon('ColorMoon', (uid) => (
+const ColorMoon = createColorIcon('ColorMoon', (uid) => (
   <>
     <defs>
       <radialGradient id={`${uid}-moon`} cx="40%" cy="40%">
@@ -83,11 +83,11 @@ const CloudShape = ({ y = 0, opacity = 1 }: { y?: number; opacity?: number }) =>
   </g>
 );
 
-export const ColorCloud = createColorIcon('ColorCloud', () => <CloudShape />);
+const ColorCloud = createColorIcon('ColorCloud', () => <CloudShape />);
 
 // ─── Cloud + Sun ────────────────────────────────────
 
-export const ColorCloudSun = createColorIcon('ColorCloudSun', (uid) => (
+const ColorCloudSun = createColorIcon('ColorCloudSun', (uid) => (
   <>
     <defs>
       <radialGradient id={`${uid}-csun`}>
@@ -110,7 +110,7 @@ export const ColorCloudSun = createColorIcon('ColorCloudSun', (uid) => (
 
 // ─── Cloud + Moon ───────────────────────────────────
 
-export const ColorCloudMoon = createColorIcon('ColorCloudMoon', (uid) => (
+const ColorCloudMoon = createColorIcon('ColorCloudMoon', (uid) => (
   <>
     <defs>
       <radialGradient id={`${uid}-cmoon`} cx="40%" cy="40%">
@@ -147,7 +147,7 @@ const RainDrops = ({ heavy = false }: { heavy?: boolean }) => (
 
 // ─── Cloud Rain ─────────────────────────────────────
 
-export const ColorCloudRain = createColorIcon('ColorCloudRain', () => (
+const ColorCloudRain = createColorIcon('ColorCloudRain', () => (
   <>
     <CloudShape y={-2} />
     <RainDrops heavy />
@@ -156,7 +156,7 @@ export const ColorCloudRain = createColorIcon('ColorCloudRain', () => (
 
 // ─── Cloud Drizzle ──────────────────────────────────
 
-export const ColorCloudDrizzle = createColorIcon('ColorCloudDrizzle', () => (
+const ColorCloudDrizzle = createColorIcon('ColorCloudDrizzle', () => (
   <>
     <CloudShape y={-2} />
     <RainDrops />
@@ -165,7 +165,7 @@ export const ColorCloudDrizzle = createColorIcon('ColorCloudDrizzle', () => (
 
 // ─── Cloud Snow ─────────────────────────────────────
 
-export const ColorCloudSnow = createColorIcon('ColorCloudSnow', () => (
+const ColorCloudSnow = createColorIcon('ColorCloudSnow', () => (
   <>
     <CloudShape y={-4} />
     {[{ x: 24, y: 46 }, { x: 34, y: 50 }, { x: 40, y: 44 }, { x: 28, y: 52 }].map(({ x, y }, i) => (
@@ -176,7 +176,7 @@ export const ColorCloudSnow = createColorIcon('ColorCloudSnow', () => (
 
 // ─── Snowflake ──────────────────────────────────────
 
-export const ColorSnowflake = createColorIcon('ColorSnowflake', () => (
+const ColorSnowflake = createColorIcon('ColorSnowflake', () => (
   <g>
     {[0, 60, 120].map((deg) => (
       <g key={deg} transform={`rotate(${deg} 32 32)`}>
@@ -192,7 +192,7 @@ export const ColorSnowflake = createColorIcon('ColorSnowflake', () => (
 
 // ─── Cloud Lightning ────────────────────────────────
 
-export const ColorCloudLightning = createColorIcon('ColorCloudLightning', () => (
+const ColorCloudLightning = createColorIcon('ColorCloudLightning', () => (
   <>
     <CloudShape y={-4} />
     <polygon points="34,40 28,50 32,50 28,58 38,48 34,48 38,40" fill="#FFD54F" />
@@ -201,7 +201,7 @@ export const ColorCloudLightning = createColorIcon('ColorCloudLightning', () => 
 
 // ─── Cloud Fog ──────────────────────────────────────
 
-export const ColorCloudFog = createColorIcon('ColorCloudFog', () => (
+const ColorCloudFog = createColorIcon('ColorCloudFog', () => (
   <>
     <CloudShape y={-6} />
     {[42, 48, 54].map((y, i) => (
@@ -217,7 +217,7 @@ export const ColorCloudFog = createColorIcon('ColorCloudFog', () => (
 
 // ─── Cloud Hail ─────────────────────────────────────
 
-export const ColorCloudHail = createColorIcon('ColorCloudHail', () => (
+const ColorCloudHail = createColorIcon('ColorCloudHail', () => (
   <>
     <CloudShape y={-4} />
     {[{ x: 24, y: 46 }, { x: 34, y: 50 }, { x: 40, y: 44 }, { x: 28, y: 53 }].map(({ x, y }, i) => (
@@ -228,7 +228,7 @@ export const ColorCloudHail = createColorIcon('ColorCloudHail', () => (
 
 // ─── Thermometer (fallback) ─────────────────────────
 
-export const ColorThermometer = createColorIcon('ColorThermometer', () => (
+const ColorThermometer = createColorIcon('ColorThermometer', () => (
   <>
     <rect x="28" y="10" width="8" height="34" rx="4" fill="#ECEFF1" stroke="#B0BEC5" strokeWidth="1.5" />
     <rect x="30" y="24" width="4" height="18" rx="2" fill="#EF5350" />

@@ -2,6 +2,7 @@
 
 import type { DadJokeConfig, ModuleStyle } from '@/types/config';
 import ModuleWrapper from './ModuleWrapper';
+import { ModuleLoadingState } from './ModuleStates';
 import { useFetchData } from '@/hooks/useFetchData';
 import { dadJokeUrl } from '@/lib/fetch-keys';
 
@@ -13,11 +14,15 @@ interface DadJokeModuleProps {
 export default function DadJokeModule({ config, style }: DadJokeModuleProps) {
   const [data] = useFetchData<{ joke: string }>(dadJokeUrl(), config.refreshIntervalMs);
 
+  if (!data) {
+    return <ModuleLoadingState style={style} message="Loading joke\u2026" />;
+  }
+
   return (
     <ModuleWrapper style={style}>
       <div className="flex items-center justify-center h-full">
         <p className="text-center leading-relaxed italic">
-          {data?.joke || 'Loading joke...'}
+          {data.joke}
         </p>
       </div>
     </ModuleWrapper>

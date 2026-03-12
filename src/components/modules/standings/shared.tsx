@@ -1,21 +1,7 @@
 import type { StandingsEntry } from './types';
+import { PaginationDots } from '../shared/PaginationDots';
 
-export function TeamLogo({ src, alt, size = 20 }: { src: string; alt: string; size?: number }) {
-  if (!src) return <div style={{ width: size, height: size }} className="shrink-0" />;
-  return (
-    <img
-      src={`/api/image-proxy?url=${encodeURIComponent(src)}`}
-      alt={alt}
-      width={size}
-      height={size}
-      className="object-contain shrink-0"
-      style={{ width: size, height: size }}
-      onError={(e) => {
-        (e.target as HTMLImageElement).style.opacity = '0';
-      }}
-    />
-  );
-}
+export { TeamLogo } from '../shared/TeamLogo';
 
 export function formatRecord(entry: StandingsEntry, league: string): string {
   const l = league.toLowerCase();
@@ -53,4 +39,33 @@ const SOCCER_LEAGUES = ['mls', 'epl', 'laliga', 'bundesliga', 'seriea', 'ligue1'
 
 export function isSoccer(league: string): boolean {
   return SOCCER_LEAGUES.includes(league.toLowerCase());
+}
+
+export function StandingsHeader({
+  league,
+  groupName,
+  total,
+  current,
+}: {
+  league: string;
+  groupName: string;
+  total: number;
+  current: number;
+}) {
+  return (
+    <div className="flex items-center justify-between px-2 pb-1.5 mb-1 border-b border-white/10">
+      <div className="flex items-center gap-2">
+        <span
+          className="font-semibold tracking-widest uppercase text-white/40"
+          style={{ fontSize: '0.65em' }}
+        >
+          {league}
+        </span>
+        <span className="text-white/60 font-medium" style={{ fontSize: '0.75em' }}>
+          {groupName}
+        </span>
+      </div>
+      <PaginationDots total={total} current={current} />
+    </div>
+  );
 }

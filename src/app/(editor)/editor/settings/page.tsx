@@ -268,7 +268,8 @@ export default function SettingsPage() {
     );
   }
 
-  const showSaveButton = activeTab !== 'system' && activeTab !== 'data' && activeTab !== 'integrations' && activeTab !== 'security' && activeTab !== 'profiles' && activeTab !== 'stats';
+  const SELF_SAVING_TABS = new Set<TabId>(['system', 'data', 'integrations', 'security', 'profiles', 'stats']);
+  const showSaveButton = !SELF_SAVING_TABS.has(activeTab);
 
   return (
     <div className="h-screen flex flex-col">

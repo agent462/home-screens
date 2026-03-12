@@ -17,7 +17,7 @@ export type SecretKey =
   | 'google_client_id'
   | 'google_client_secret';
 
-export type SecretsStore = Partial<Record<SecretKey, string>>;
+type SecretsStore = Partial<Record<SecretKey, string>>;
 
 const ALL_KEYS: SecretKey[] = [
   'openweathermap_key',

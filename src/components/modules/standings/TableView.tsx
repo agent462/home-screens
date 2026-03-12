@@ -2,7 +2,7 @@
 
 import { useRotatingIndex } from '@/hooks/useRotatingIndex';
 import type { StandingsGroup, StandingsEntry } from './types';
-import { TeamLogo, formatRecord, getPlayoffTeamCount, isSoccer } from './shared';
+import { TeamLogo, formatRecord, getPlayoffTeamCount, isSoccer, StandingsHeader } from './shared';
 
 interface TableViewProps {
   groups: StandingsGroup[];
@@ -181,37 +181,7 @@ export function TableView({ groups, teamsToShow, showPlayoffLine, rotationInterv
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-2 pb-1.5 mb-1 border-b border-white/10">
-        <div className="flex items-center gap-2">
-          <span
-            className="font-semibold tracking-widest uppercase text-white/40"
-            style={{ fontSize: '0.65em' }}
-          >
-            {group.league}
-          </span>
-          <span className="text-white/60 font-medium" style={{ fontSize: '0.75em' }}>
-            {group.name}
-          </span>
-        </div>
-        {groups.length > 1 && (
-          groups.length <= 10 ? (
-            <div className="flex gap-1">
-              {groups.map((_, i) => (
-                <div
-                  key={i}
-                  className={`w-1.5 h-1.5 rounded-full transition-colors ${
-                    i === index ? 'bg-white/80' : 'bg-white/20'
-                  }`}
-                />
-              ))}
-            </div>
-          ) : (
-            <span className="text-white/30 tabular-nums" style={{ fontSize: '0.6em' }}>
-              {index + 1} / {groups.length}
-            </span>
-          )
-        )}
-      </div>
+      <StandingsHeader league={group.league} groupName={group.name} total={groups.length} current={index} />
 
       {/* Column headers */}
       <div className="flex items-center gap-1.5 px-2 pb-1" style={{ paddingLeft: 'calc(0.5rem + 3px)' }}>

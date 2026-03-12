@@ -63,6 +63,14 @@ export async function GET() {
       uv = uvData.value ?? 0;
     }
 
+    if (!uvRes?.ok || uv === 0) {
+      console.warn(
+        '[air-quality] UV index returned %s — the /data/2.5/uvi endpoint is deprecated by OpenWeatherMap. ' +
+        'UV data may be unavailable for newer API keys. Consider migrating to One Call API 3.0.',
+        uvRes?.ok ? '0' : `HTTP ${uvRes?.status ?? 'error'}`,
+      );
+    }
+
     const result = {
       aqi,
       pm25: components.pm2_5 ?? 0,

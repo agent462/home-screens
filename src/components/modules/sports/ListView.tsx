@@ -1,5 +1,5 @@
 import type { Game } from './types';
-import { TeamLogo, isWinner, formatScore } from './shared';
+import { TeamLogo, isWinner, formatScore, GameStatus } from './shared';
 
 export function ListView({ games }: { games: Game[] }) {
   return (
@@ -60,22 +60,16 @@ export function ListView({ games }: { games: Game[] }) {
             </div>
 
             {/* Status */}
-            <div className="flex items-center gap-1 shrink-0 ml-auto">
-              {game.state === 'in' && (
-                <span className="w-1 h-1 rounded-full bg-green-400 animate-pulse" />
-              )}
-              <span
-                className={
-                  game.state === 'in'
-                    ? 'text-green-400'
-                    : game.state === 'post'
-                      ? 'text-white/35'
-                      : 'text-white/50'
-                }
-                style={{ fontSize: '0.55em' }}
-              >
-                {game.shortDetail || game.status}
-              </span>
+            <div className="shrink-0 ml-auto">
+              <GameStatus
+                state={game.state}
+                shortDetail={game.shortDetail}
+                status={game.status}
+                dotSize="w-1 h-1"
+                fontSize="0.55em"
+                postColor="text-white/35"
+                preColor="text-white/50"
+              />
             </div>
           </div>
         );

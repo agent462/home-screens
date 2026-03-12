@@ -3,6 +3,7 @@
 import { useRotatingIndex } from '@/hooks/useRotatingIndex';
 import type { StandingsGroup } from './types';
 import { TeamLogo, formatRecord, getPlayoffTeamCount } from './shared';
+import { PaginationDots } from '../shared/PaginationDots';
 
 interface ConferenceViewProps {
   groups: StandingsGroup[];
@@ -96,24 +97,7 @@ export function ConferenceView({ groups, teamsToShow, showPlayoffLine, rotationI
         >
           {pair[0].league}
         </span>
-        {pairs.length > 1 && (
-          pairs.length <= 10 ? (
-            <div className="flex gap-1">
-              {pairs.map((_, i) => (
-                <div
-                  key={i}
-                  className={`w-1.5 h-1.5 rounded-full transition-colors ${
-                    i === index ? 'bg-white/80' : 'bg-white/20'
-                  }`}
-                />
-              ))}
-            </div>
-          ) : (
-            <span className="text-white/30 tabular-nums" style={{ fontSize: '0.6em' }}>
-              {index + 1} / {pairs.length}
-            </span>
-          )
-        )}
+        <PaginationDots total={pairs.length} current={index} />
       </div>
 
       {/* Side-by-side conferences */}

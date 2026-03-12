@@ -44,7 +44,7 @@ export interface WeatherAlert {
   uri?: string;
 }
 
-export interface WeatherProvider {
+interface WeatherProvider {
   getHourly(lat: number, lon: number, units: string): Promise<HourlyWeather[]>;
   getForecast(lat: number, lon: number, units: string): Promise<ForecastDay[]>;
   getMinutely?(lat: number, lon: number, units: string): Promise<MinutelyPrecip[]>;
@@ -400,7 +400,7 @@ interface PWResponse {
 
 // ── Pirate Weather provider ──────────────────────────────────────────
 
-export class PirateWeatherProvider implements WeatherProvider {
+class PirateWeatherProvider implements WeatherProvider {
   private apiKey: string;
   private fetchPromise: Promise<PWResponse> | null = null;
 
@@ -566,7 +566,7 @@ interface NOAAAlertFeature {
 
 // ── NOAA/NWS provider ────────────────────────────────────────────────
 
-export class NOAAProvider implements WeatherProvider {
+class NOAAProvider implements WeatherProvider {
   private static USER_AGENT = '(home-screens, github.com/bryantee/home-screens)';
   private static gridCache = new Map<string, { data: NOAAPointProperties; ts: number }>();
   private static GRID_TTL = 24 * 60 * 60 * 1000; // 24 hours

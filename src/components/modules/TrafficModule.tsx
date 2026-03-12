@@ -2,6 +2,7 @@
 
 import type { TrafficConfig, ModuleStyle } from '@/types/config';
 import ModuleWrapper from './ModuleWrapper';
+import { ModuleLoadingState } from './ModuleStates';
 import { useFetchData } from '@/hooks/useFetchData';
 import { trafficUrl } from '@/lib/fetch-keys';
 
@@ -32,6 +33,10 @@ export default function TrafficModule({ config, style }: TrafficModuleProps) {
   const routes = config.routes ?? [];
   const [data] = useFetchData<TrafficData>(trafficUrl(config) ?? '', config.refreshIntervalMs ?? 300000);
 
+  if (routes.length > 0 && !data) {
+    return <ModuleLoadingState style={style} message="Loading traffic\u2026" />;
+  }
+
   return (
     <ModuleWrapper style={style}>
       <div className="flex flex-col h-full gap-2">
@@ -41,9 +46,7 @@ export default function TrafficModule({ config, style }: TrafficModuleProps) {
 
         {routes.length === 0 ? (
           <p className="text-center opacity-50" style={{ fontSize: '0.875em' }}>No routes configured</p>
-        ) : !data ? (
-          <p className="text-center opacity-50" style={{ fontSize: '0.875em' }}>Loading...</p>
-        ) : (
+        ) : data && (
           <div className="flex flex-col gap-2">
             {data.routes.map((route, i) => (
               <div key={i} className="flex items-center gap-3">

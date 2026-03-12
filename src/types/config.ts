@@ -293,7 +293,7 @@ export type NewsView = 'headline' | 'list' | 'ticker' | 'compact';
 
 export interface NewsConfig {
   feedUrl: string;
-  view?: NewsView;
+  view: NewsView;
   refreshIntervalMs: number;
   rotateIntervalMs: number;
   maxItems: number;
@@ -308,7 +308,7 @@ export type StockTickerView = 'cards' | 'ticker' | 'table' | 'compact';
 export interface StockTickerConfig {
   symbols: string;
   refreshIntervalMs: number;
-  view?: StockTickerView;
+  view: StockTickerView;
   cardScale?: number;
   tickerSpeed?: number;
 }
@@ -319,7 +319,7 @@ export type CryptoView = 'cards' | 'ticker' | 'table' | 'compact';
 export interface CryptoConfig {
   ids: string;
   refreshIntervalMs: number;
-  view?: CryptoView;
+  view: CryptoView;
   cardScale?: number;
   tickerSpeed?: number;
 }
@@ -387,7 +387,7 @@ export interface TrafficConfig {
 export type SportsView = 'scoreboard' | 'cards' | 'list' | 'ticker';
 
 export interface SportsConfig {
-  view?: SportsView;
+  view: SportsView;
   leagues: string[];
   refreshIntervalMs: number;
   tickerSpeed?: number;

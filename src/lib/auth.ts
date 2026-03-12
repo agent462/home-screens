@@ -43,7 +43,7 @@ export async function readAuthState(): Promise<AuthState> {
   }
 }
 
-export async function writeAuthState(state: AuthState): Promise<void> {
+async function writeAuthState(state: AuthState): Promise<void> {
   const filePath = getAuthPath();
   await fs.mkdir(path.dirname(filePath), { recursive: true });
   const tmp = filePath + '.tmp';

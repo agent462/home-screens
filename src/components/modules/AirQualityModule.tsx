@@ -59,7 +59,7 @@ export default function AirQualityModule({ config, style }: AirQualityModuleProp
   );
 
   if (!data) {
-    return <ModuleLoadingState style={style} message="Loading air quality..." />;
+    return <ModuleLoadingState style={style} message="Loading air quality\u2026" />;
   }
 
   const aqiLabel = AQI_LABELS[data.aqi] ?? 'Unknown';

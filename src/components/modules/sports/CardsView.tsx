@@ -1,5 +1,5 @@
 import type { Game } from './types';
-import { TeamLogo, isWinner, formatScore } from './shared';
+import { TeamLogo, isWinner, formatScore, GameStatus } from './shared';
 
 function GameCard({ game }: { game: Game }) {
   const awayWins = isWinner(game, 'away');
@@ -12,22 +12,14 @@ function GameCard({ game }: { game: Game }) {
         <span className="font-semibold tracking-wider uppercase text-white/40">
           {game.league}
         </span>
-        <div className="flex items-center gap-1">
-          {game.state === 'in' && (
-            <span className="w-1 h-1 rounded-full bg-green-400 animate-pulse" />
-          )}
-          <span
-            className={
-              game.state === 'in'
-                ? 'text-green-400'
-                : game.state === 'post'
-                  ? 'text-white/35'
-                  : 'text-white/50'
-            }
-          >
-            {game.shortDetail || game.status}
-          </span>
-        </div>
+        <GameStatus
+          state={game.state}
+          shortDetail={game.shortDetail}
+          status={game.status}
+          dotSize="w-1 h-1"
+          postColor="text-white/35"
+          preColor="text-white/50"
+        />
       </div>
 
       {/* Away team */}

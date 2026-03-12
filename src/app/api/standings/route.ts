@@ -4,8 +4,8 @@ import { LEAGUE_MAP } from '@/lib/espn';
 
 export const dynamic = 'force-dynamic';
 
-const cache = createTTLCache<unknown>(300_000); // 5 minute cache
-const colorCache = createTTLCache<Map<string, string>>(3600_000); // 1 hour for colors
+const cache = createTTLCache<unknown>(5 * 60 * 1000); // 5 minutes
+const colorCache = createTTLCache<Map<string, string>>(60 * 60 * 1000); // 1 hour
 
 // Static division mappings for leagues where ESPN doesn't provide division-level data
 const DIVISION_MAP: Record<string, Record<string, string[]>> = {
@@ -90,6 +90,16 @@ function getStatNum(stats: Record<string, unknown>[], name: string): number | un
   return undefined;
 }
 
+/** Sort parsed entries by points (desc), winPct (desc), wins (desc), then re-assign ranks */
+function sortAndRank(entries: ParsedEntry[]): void {
+  entries.sort((a, b) => {
+    if (a.points !== undefined && b.points !== undefined && a.points !== b.points) return b.points - a.points;
+    if (a.winPct !== b.winPct) return b.winPct - a.winPct;
+    return b.wins - a.wins;
+  });
+  entries.forEach((e, i) => { e.rank = i + 1; });
+}
+
 /** Sort raw standings entries by playoffSeed, then points (desc), then wins (desc) */
 function sortStandingsEntries(entries: Record<string, unknown>[]): Record<string, unknown>[] {
   return [...entries].sort((a, b) => {
@@ -107,6 +117,75 @@ function sortStandingsEntries(entries: Record<string, unknown>[]): Record<string
   });
 }
 
+// Per-league stat field mappings: each entry maps a ParsedEntry field to
+// one or more ESPN stat names to try (first match wins).
+// 'num' fields use getStatNum, 'str' fields use getStat.
+type StatMapping = {
+  num?: Partial<Record<keyof ParsedEntry, string[]>>;
+  str?: Partial<Record<keyof ParsedEntry, string[]>>;
+  postProcess?: (result: ParsedEntry) => void;
+};
+
+const SOCCER_LEAGUES = new Set(['mls', 'epl', 'laliga', 'bundesliga', 'seriea', 'ligue1', 'liga_mx']);
+
+const LEAGUE_STAT_MAP: Record<string, StatMapping> = {
+  nfl: {
+    num: {
+      ties: ['ties'],
+      pointsFor: ['pointsFor'],
+      pointsAgainst: ['pointsAgainst'],
+      differential: ['pointDifferential', 'pointsDiff'],
+    },
+    str: {
+      streak: ['streak'],
+      divRecord: ['divisionRecord'],
+    },
+  },
+  nhl: {
+    num: {
+      otLosses: ['otLosses', 'overtimeLosses'],
+      points: ['points'],
+      gamesPlayed: ['gamesPlayed'],
+      differential: ['pointDifferential', 'pointsDiff'],
+    },
+    str: {
+      streak: ['streak'],
+      homeRecord: ['homeRecord', 'Home'],
+      awayRecord: ['awayRecord', 'Road', 'Away'],
+      last10: ['Last Ten Games', 'last10Record'],
+    },
+  },
+  soccer: {
+    num: {
+      draws: ['ties', 'draws'],
+      points: ['points'],
+      gamesPlayed: ['gamesPlayed'],
+      pointsFor: ['pointsFor'],
+      pointsAgainst: ['pointsAgainst'],
+      goalDiff: ['pointDifferential', 'pointsDiff'],
+    },
+    postProcess: (result) => {
+      if (result.points !== undefined && result.gamesPlayed) {
+        result.winPct = result.points / (result.gamesPlayed * 3);
+      }
+    },
+  },
+  _default: {
+    num: {
+      gamesBack: ['gamesBehind'],
+      differential: ['pointDifferential', 'pointsDiff'],
+      pointsFor: ['pointsFor'],
+      pointsAgainst: ['pointsAgainst'],
+    },
+    str: {
+      streak: ['streak'],
+      last10: ['Last Ten Games', 'last10Record'],
+      homeRecord: ['homeRecord', 'Home'],
+      awayRecord: ['awayRecord', 'Road', 'Away'],
+    },
+  },
+};
+
 function parseEntry(
   entry: Record<string, unknown>,
   rank: number,
@@ -118,9 +197,6 @@ function parseEntry(
   const logo = (logos[0]?.href as string) ?? '';
 
   const leagueKey = league.toLowerCase();
-  const isSoccer = ['mls', 'epl', 'laliga', 'bundesliga', 'seriea', 'ligue1', 'liga_mx'].includes(leagueKey);
-  const isNHL = leagueKey === 'nhl';
-  const isNFL = leagueKey === 'nfl';
 
   const wins = getStatNum(stats, 'wins') ?? 0;
   const losses = getStatNum(stats, 'losses') ?? 0;
@@ -141,45 +217,35 @@ function parseEntry(
     playoffSeed: playoffSeed,
   };
 
-  // Sport-specific stats
-  // Prefer pointDifferential (integer total) over differential (float per-game avg)
-  if (isNFL) {
-    result.ties = getStatNum(stats, 'ties');
-    result.pointsFor = getStatNum(stats, 'pointsFor');
-    result.pointsAgainst = getStatNum(stats, 'pointsAgainst');
-    result.differential = getStatNum(stats, 'pointDifferential') ?? getStatNum(stats, 'pointsDiff');
-    result.streak = getStat(stats, 'streak') as string | undefined;
-    result.divRecord = getStat(stats, 'divisionRecord') as string | undefined;
-  } else if (isNHL) {
-    result.otLosses = getStatNum(stats, 'otLosses') ?? getStatNum(stats, 'overtimeLosses');
-    result.points = getStatNum(stats, 'points');
-    result.gamesPlayed = getStatNum(stats, 'gamesPlayed');
-    result.streak = getStat(stats, 'streak') as string | undefined;
-    result.differential = getStatNum(stats, 'pointDifferential') ?? getStatNum(stats, 'pointsDiff');
-    result.homeRecord = getStat(stats, 'homeRecord') as string | undefined ?? getStat(stats, 'Home') as string | undefined;
-    result.awayRecord = getStat(stats, 'awayRecord') as string | undefined ?? getStat(stats, 'Road') as string | undefined ?? getStat(stats, 'Away') as string | undefined;
-    result.last10 = getStat(stats, 'Last Ten Games') as string | undefined ?? getStat(stats, 'last10Record') as string | undefined;
-  } else if (isSoccer) {
-    result.draws = getStatNum(stats, 'ties') ?? getStatNum(stats, 'draws');
-    result.points = getStatNum(stats, 'points');
-    result.gamesPlayed = getStatNum(stats, 'gamesPlayed');
-    result.pointsFor = getStatNum(stats, 'pointsFor');
-    result.pointsAgainst = getStatNum(stats, 'pointsAgainst');
-    result.goalDiff = getStatNum(stats, 'pointDifferential') ?? getStatNum(stats, 'pointsDiff');
-    result.winPct = result.points !== undefined && result.gamesPlayed
-      ? result.points / (result.gamesPlayed * 3)
-      : result.winPct;
-  } else {
-    // NBA, MLB, WNBA
-    result.gamesBack = getStatNum(stats, 'gamesBehind');
-    result.streak = getStat(stats, 'streak') as string | undefined;
-    result.last10 = getStat(stats, 'Last Ten Games') as string | undefined ?? getStat(stats, 'last10Record') as string | undefined;
-    result.homeRecord = getStat(stats, 'homeRecord') as string | undefined ?? getStat(stats, 'Home') as string | undefined;
-    result.awayRecord = getStat(stats, 'awayRecord') as string | undefined ?? getStat(stats, 'Road') as string | undefined ?? getStat(stats, 'Away') as string | undefined;
-    result.differential = getStatNum(stats, 'pointDifferential') ?? getStatNum(stats, 'pointsDiff');
-    result.pointsFor = getStatNum(stats, 'pointsFor');
-    result.pointsAgainst = getStatNum(stats, 'pointsAgainst');
+  // Apply sport-specific stats via table-driven mapping
+  const mappingKey = SOCCER_LEAGUES.has(leagueKey) ? 'soccer' : leagueKey;
+  const mapping = LEAGUE_STAT_MAP[mappingKey] ?? LEAGUE_STAT_MAP._default;
+
+  if (mapping.num) {
+    for (const [field, statNames] of Object.entries(mapping.num)) {
+      for (const name of statNames!) {
+        const val = getStatNum(stats, name);
+        if (val !== undefined) {
+          (result as unknown as Record<string, unknown>)[field] = val;
+          break;
+        }
+      }
+    }
   }
+
+  if (mapping.str) {
+    for (const [field, statNames] of Object.entries(mapping.str)) {
+      for (const name of statNames!) {
+        const val = getStat(stats, name) as string | undefined;
+        if (val !== undefined) {
+          (result as unknown as Record<string, unknown>)[field] = val;
+          break;
+        }
+      }
+    }
+  }
+
+  mapping.postProcess?.(result);
 
   return result;
 }
@@ -313,12 +379,7 @@ export async function GET(request: NextRequest) {
               allEntries.push(...entries.map((e, i) => parseEntry(e, i + 1, league)));
             }
             // Re-sort and re-rank
-            allEntries.sort((a, b) => {
-              if (a.points !== undefined && b.points !== undefined && a.points !== b.points) return b.points - a.points;
-              if (a.winPct !== b.winPct) return b.winPct - a.winPct;
-              return b.wins - a.wins;
-            });
-            allEntries.forEach((e, i) => { e.rank = i + 1; });
+            sortAndRank(allEntries);
             confMap.set(confName, { name: confName, league: league.toUpperCase(), entries: allEntries });
           } else {
             // Already conference level
@@ -332,12 +393,7 @@ export async function GET(request: NextRequest) {
     } else if (grouping === 'league') {
       // Merge everything into one flat list
       const allEntries = allGroups.flatMap((g) => g.entries);
-      allEntries.sort((a, b) => {
-        if (a.points !== undefined && b.points !== undefined && a.points !== b.points) return b.points - a.points;
-        if (a.winPct !== b.winPct) return b.winPct - a.winPct;
-        return b.wins - a.wins;
-      });
-      allEntries.forEach((e, i) => { e.rank = i + 1; });
+      sortAndRank(allEntries);
       allGroups = [{ name: league.toUpperCase(), league: league.toUpperCase(), entries: allEntries }];
     } else if (grouping === 'division') {
       // Use static division mapping to split conference groups into divisions
@@ -347,13 +403,8 @@ export async function GET(request: NextRequest) {
         const divGroups: ParsedGroup[] = [];
         for (const [divName, teamAbbrs] of Object.entries(divMap)) {
           const divEntries = allEntries
-            .filter((e) => teamAbbrs.includes(e.teamAbbr))
-            .sort((a, b) => {
-              if (a.points !== undefined && b.points !== undefined && a.points !== b.points) return b.points - a.points;
-              if (a.winPct !== b.winPct) return b.winPct - a.winPct;
-              return b.wins - a.wins;
-            });
-          divEntries.forEach((e, i) => { e.rank = i + 1; });
+            .filter((e) => teamAbbrs.includes(e.teamAbbr));
+          sortAndRank(divEntries);
           if (divEntries.length > 0) {
             divGroups.push({ name: divName, league: league.toUpperCase(), entries: divEntries });
           }

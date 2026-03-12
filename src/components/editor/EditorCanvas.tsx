@@ -9,6 +9,7 @@ import { getModuleDefinition } from '@/lib/module-registry';
 import { moduleComponents } from '@/lib/module-components';
 import { isModuleVisible } from '@/lib/schedule';
 import { useTZClock } from '@/hooks/useTZClock';
+import { resolveProvider } from '@/components/display/ScreenRenderer';
 import type { ModuleInstance } from '@/types/config';
 
 function ModulePreview({ mod, previewData, settings }: { mod: ModuleInstance; previewData: PreviewData; settings: PreviewSettings | null }) {
@@ -30,9 +31,7 @@ function ModulePreview({ mod, previewData, settings }: { mod: ModuleInstance; pr
 
   // Resolve provider for weather modules
   const globalProvider = settings?.globalProvider ?? 'weatherapi';
-  const modProvider = mod.type === 'weather'
-    ? ((mod.config.provider as string) && (mod.config.provider as string) !== 'global' ? (mod.config.provider as string) : globalProvider)
-    : globalProvider;
+  const modProvider = resolveProvider(mod, globalProvider);
   const wd = previewData.weatherByProvider[modProvider] ?? previewData.weatherByProvider[globalProvider];
 
   if (mod.type === 'weather' && wd) {

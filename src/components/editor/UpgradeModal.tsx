@@ -1,15 +1,15 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { editorFetch } from '@/lib/editor-fetch';
+import { useEffect, useRef } from 'react';
 import Button from '@/components/ui/Button';
-
-interface ProgressData {
-  step: string;
-  progress: number;
-  message: string;
-  error?: string;
-}
+import {
+  useUpgradeStream,
+  useWaitForServer,
+  useAccordionState,
+  getStepState,
+  STEP_LABELS,
+  type StepState,
+} from './useUpgradeStream';
 
 /** Steps shown in the accordion (stash/cleanup are internal) */
 const VISIBLE_STEPS = [
@@ -34,21 +34,6 @@ const REBUILD_STEPS = [
   'restart',
   'health-check',
 ] as const;
-
-const STEP_LABELS: Record<string, string> = {
-  preflight: 'Pre-flight checks',
-  backup: 'Back up configuration',
-  fetch: 'Download latest code',
-  checkout: 'Switch to new version',
-  install: 'Install dependencies',
-  build: 'Build application',
-  migrate: 'Migrate configuration',
-  'setup-system': 'Apply system configuration',
-  restart: 'Restart service',
-  'health-check': 'Verify server health',
-};
-
-type StepState = 'done' | 'active' | 'pending' | 'error';
 
 const STEP_STYLES: Record<StepState, { icon: React.ReactNode; textClass: string }> = {
   done: {
@@ -79,31 +64,14 @@ interface Props {
 
 export default function UpgradeModal({ targetTag, isRollback, isRebuild, onComplete, onClose }: Props) {
   const steps: readonly string[] = isRebuild ? REBUILD_STEPS : VISIBLE_STEPS;
-  const firstStep = steps[0];
-  const [progress, setProgress] = useState<ProgressData>({
-    step: firstStep,
-    progress: 0,
-    message: 'Starting...',
-  });
-  const [started, setStarted] = useState(false);
-  const [done, setDone] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const [reloadStatus, setReloadStatus] = useState<string | null>(null);
 
-  // Track the last real step (not 'error' or 'complete')
-  const [activeStep, setActiveStep] = useState(firstStep);
-  // Track which steps were actually visited (for rollback correctness)
-  const [visitedSteps, setVisitedSteps] = useState<Set<string>>(new Set([firstStep]));
-  // Per-step accumulated log output
-  const [stepLogs, setStepLogs] = useState<Record<string, string>>({});
-  // Which accordion panels are expanded
-  const [expanded, setExpanded] = useState<Set<string>>(new Set([firstStep]));
+  const { progress, done, failed, activeStep, visitedSteps, stepLogs } =
+    useUpgradeStream(steps, targetTag, isRollback, isRebuild);
+
+  const reloadStatus = useWaitForServer(done);
+  const { expanded, toggleExpand } = useAccordionState(activeStep);
 
   const activeLogRef = useRef<HTMLDivElement>(null);
-  const progressRef = useRef(progress);
-  const activeStepRef = useRef(activeStep);
-  progressRef.current = progress;
-  activeStepRef.current = activeStep;
 
   // Auto-scroll the active step's output to the bottom
   useEffect(() => {
@@ -111,222 +79,6 @@ export default function UpgradeModal({ targetTag, isRollback, isRebuild, onCompl
       activeLogRef.current.scrollTop = activeLogRef.current.scrollHeight;
     }
   }, [stepLogs, activeStep]);
-
-  // Track visited steps + auto-expand active, collapse previous
-  const prevActiveRef = useRef(activeStep);
-  useEffect(() => {
-    setVisitedSteps((prev) => {
-      const next = new Set(prev);
-      next.add(activeStep);
-      return next;
-    });
-
-    if (activeStep !== prevActiveRef.current) {
-      setExpanded((prev) => {
-        const next = new Set(prev);
-        next.delete(prevActiveRef.current);
-        next.add(activeStep);
-        return next;
-      });
-      prevActiveRef.current = activeStep;
-    }
-  }, [activeStep]);
-
-  const toggleExpand = useCallback((step: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(step)) {
-        next.delete(step);
-      } else {
-        next.add(step);
-      }
-      return next;
-    });
-  }, []);
-
-  // Connect SSE and trigger upgrade
-  useEffect(() => {
-    if (started) return;
-    setStarted(true);
-
-    const es = new EventSource('/api/system/status');
-
-    // Progress events — step transitions
-    es.addEventListener(
-      'progress',
-      ((event: MessageEvent) => {
-        try {
-          const data = JSON.parse(event.data) as ProgressData & { type: string };
-          setProgress({
-            step: data.step,
-            progress: data.progress,
-            message: data.message,
-            error: data.error,
-          });
-
-          if (
-            data.step !== 'error' &&
-            data.step !== 'complete' &&
-            steps.includes(data.step)
-          ) {
-            // Only update activeStep for visible steps — hidden steps like
-            // 'stash'/'cleanup' would make indexOf return -1 and break the
-            // accordion state.
-            setActiveStep(data.step);
-          }
-
-          if (data.step === 'complete') {
-            setDone(true);
-            es.close();
-          } else if (data.step === 'error') {
-            setFailed(true);
-            es.close();
-          }
-        } catch {
-          // ignore parse errors
-        }
-      }) as EventListener,
-    );
-
-    // Output events — streaming log lines
-    es.addEventListener(
-      'output',
-      ((event: MessageEvent) => {
-        try {
-          const data = JSON.parse(event.data) as { step: string; line: string };
-          setStepLogs((prev) => ({
-            ...prev,
-            [data.step]: (prev[data.step] || '') + data.line + '\n',
-          }));
-        } catch {
-          // ignore parse errors
-        }
-      }) as EventListener,
-    );
-
-    es.onerror = () => {
-      es.close();
-      const current = progressRef.current;
-      const currentActive = activeStepRef.current;
-
-      if (
-        current.step === 'restart' ||
-        current.step === 'health-check' ||
-        currentActive === 'restart' ||
-        currentActive === 'health-check'
-      ) {
-        // SSE connection lost during restart — expected, the server is restarting
-        setProgress({
-          step: 'complete',
-          progress: 100,
-          message: 'Server restarted. Reconnecting...',
-        });
-        setDone(true);
-      } else if (current.step !== 'complete' && current.step !== 'error') {
-        // Unexpected disconnect — show error so the UI doesn't freeze
-        const stepLabel = STEP_LABELS[currentActive] || currentActive;
-        setFailed(true);
-        setProgress({
-          step: 'error',
-          progress: 0,
-          message: `Connection lost during "${stepLabel}"`,
-          error:
-            'The server connection was lost unexpectedly. The upgrade may still be running — check server logs and try refreshing the page.',
-        });
-      }
-    };
-
-    // Trigger the upgrade/rollback/rebuild
-    const endpoint = isRebuild
-      ? '/api/system/rebuild'
-      : isRollback ? '/api/system/rollback' : '/api/system/upgrade';
-    editorFetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tag: targetTag }),
-    })
-      .then(async (res) => {
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-          es.close();
-          setFailed(true);
-          setProgress({
-            step: 'error',
-            progress: 0,
-            message: 'Failed to start upgrade',
-            error: body.error || `Server returned ${res.status}`,
-          });
-        }
-      })
-      .catch(() => {
-        es.close();
-        setFailed(true);
-        setProgress({
-          step: 'error',
-          progress: 0,
-          message: 'Failed to start upgrade',
-          error: 'Could not connect to server',
-        });
-      });
-
-    return () => {
-      es.close();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // After upgrade completes, poll for the server to be ready before reloading.
-  // The systemctl restart fires ~3s after the upgrade finishes, so we wait past
-  // that window then poll until the (new) server responds.
-  useEffect(() => {
-    if (!done) return;
-    let cancelled = false;
-
-    async function waitForServer() {
-      setReloadStatus('Waiting for server to restart...');
-      // Wait past the nohup restart delay (3s) plus buffer
-      await new Promise((r) => setTimeout(r, 4000));
-
-      setReloadStatus('Waiting for new server...');
-      const deadline = Date.now() + 60000; // 60s max wait
-      while (!cancelled && Date.now() < deadline) {
-        try {
-          const res = await fetch('/api/config', { cache: 'no-store' });
-          if (res.ok) {
-            setReloadStatus('Reloading...');
-            window.location.reload();
-            return;
-          }
-        } catch {
-          // Server not ready yet
-        }
-        await new Promise((r) => setTimeout(r, 2000));
-      }
-
-      // Fallback: reload anyway after timeout
-      if (!cancelled) {
-        window.location.reload();
-      }
-    }
-
-    waitForServer();
-    return () => {
-      cancelled = true;
-    };
-  }, [done]);
-
-  function getStepState(step: string): StepState {
-    const stepIdx = steps.indexOf(step);
-    const activeIdx = steps.indexOf(activeStep);
-
-    // Only mark steps as done if they were actually visited (fixes rollback
-    // showing all steps green even when preflight/fetch/migrate were skipped)
-    if (done) return visitedSteps.has(step) ? 'done' : 'pending';
-    if (failed && stepIdx === activeIdx) return 'error';
-    if (stepIdx < activeIdx) return 'done';
-    if (stepIdx === activeIdx && !failed) return 'active';
-    return 'pending';
-  }
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70">
@@ -360,7 +112,7 @@ export default function UpgradeModal({ targetTag, isRollback, isRebuild, onCompl
           {/* Accordion step list */}
           <div className="space-y-1">
             {steps.map((step) => {
-              const state = getStepState(step);
+              const state = getStepState(step, steps, activeStep, done, failed, visitedSteps);
               const styles = STEP_STYLES[state] ?? STEP_STYLES.pending;
               const isOpen = expanded.has(step);
               const log = stepLogs[step] || '';

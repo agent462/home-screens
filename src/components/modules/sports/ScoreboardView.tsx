@@ -2,7 +2,8 @@
 
 import { useRotatingIndex } from '@/hooks/useRotatingIndex';
 import type { Game } from './types';
-import { TeamLogo, isWinner, formatScore } from './shared';
+import { TeamLogo, isWinner, formatScore, GameStatus } from './shared';
+import { PaginationDots } from '../shared/PaginationDots';
 
 function TeamRow({
   logo,
@@ -94,39 +95,14 @@ export function ScoreboardView({ games }: { games: Game[] }) {
 
       {/* Status + pagination */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5" style={{ fontSize: '0.7em' }}>
-          {game.state === 'in' && (
-            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-          )}
-          <span
-            className={
-              game.state === 'in'
-                ? 'text-green-400'
-                : game.state === 'post'
-                  ? 'text-white/40'
-                  : 'text-white/60'
-            }
-          >
-            {game.shortDetail || game.status}
-          </span>
-        </div>
-        {games.length > 1 &&
-          (games.length <= 12 ? (
-            <div className="flex gap-1">
-              {games.map((_, i) => (
-                <div
-                  key={i}
-                  className={`w-1.5 h-1.5 rounded-full transition-colors ${
-                    i === index ? 'bg-white/80' : 'bg-white/20'
-                  }`}
-                />
-              ))}
-            </div>
-          ) : (
-            <span className="text-white/30 tabular-nums" style={{ fontSize: '0.6em' }}>
-              {index + 1} / {games.length}
-            </span>
-          ))}
+        <GameStatus
+          state={game.state}
+          shortDetail={game.shortDetail}
+          status={game.status}
+          fontSize="0.7em"
+          gap="gap-1.5"
+        />
+        <PaginationDots total={games.length} current={index} threshold={12} />
       </div>
     </div>
   );

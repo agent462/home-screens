@@ -21,7 +21,7 @@ interface RainViewerResponse {
   };
 }
 
-const cache = createTTLCache<RainViewerResponse>(300_000); // 5 min
+const cache = createTTLCache<RainViewerResponse>(5 * 60 * 1000); // 5 minutes
 
 export async function GET() {
   try {

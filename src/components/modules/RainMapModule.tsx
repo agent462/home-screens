@@ -224,7 +224,7 @@ export default function RainMapModule({
   }, [frames, imagesReady, animationSpeedMs, extraDelayLastFrameMs]);
 
   if (!data) {
-    return <ModuleLoadingState style={style} message="Loading rain map..." />;
+    return <ModuleLoadingState style={style} message="Loading rain map\u2026" />;
   }
 
   if (!frames.length) {

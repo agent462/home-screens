@@ -3,6 +3,7 @@
 import type { HistoryConfig, ModuleStyle } from '@/types/config';
 import { useRotatingIndex } from '@/hooks/useRotatingIndex';
 import ModuleWrapper from './ModuleWrapper';
+import { ModuleLoadingState } from './ModuleStates';
 import { useFetchData } from '@/hooks/useFetchData';
 import { historyUrl } from '@/lib/fetch-keys';
 
@@ -23,6 +24,10 @@ export default function HistoryModule({ config, style }: HistoryModuleProps) {
   const rotationMs = config.rotationIntervalMs ?? 10000;
   const index = useRotatingIndex(events.length, rotationMs);
 
+  if (!data) {
+    return <ModuleLoadingState style={style} message="Loading history\u2026" />;
+  }
+
   return (
     <ModuleWrapper style={style}>
       <div className="flex flex-col items-center justify-center h-full gap-2">
@@ -34,7 +39,7 @@ export default function HistoryModule({ config, style }: HistoryModuleProps) {
             {events[index % events.length].text}
           </p>
         ) : (
-          <p className="text-center">Loading history...</p>
+          <p className="text-center opacity-50">No events found</p>
         )}
       </div>
     </ModuleWrapper>

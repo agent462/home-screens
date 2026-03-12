@@ -27,7 +27,7 @@ interface GameResult {
   broadcast: string;
 }
 
-const cache = createTTLCache<unknown>(60_000);
+const cache = createTTLCache<unknown>(60 * 1000); // 1 minute
 
 async function fetchLeague(league: string): Promise<GameResult[]> {
   const path = LEAGUE_MAP[league.toLowerCase()];
