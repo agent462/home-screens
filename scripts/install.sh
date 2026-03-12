@@ -2,15 +2,14 @@
 set -euo pipefail
 
 # Home Screens - Raspberry Pi Install Script
-# Installs everything needed to run the display on a fresh Raspberry Pi OS.
+# Downloads a pre-built release from GitHub and configures the kiosk.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/<owner>/home-screens/main/scripts/install.sh | bash
-#   -- or --
-#   git clone https://github.com/<owner>/home-screens.git && cd home-screens && bash scripts/install.sh
+#   curl -fsSL https://raw.githubusercontent.com/agent462/home-screens/main/scripts/install.sh | bash
 
 APP_DIR="${HOME}/home-screens"
-NODE_MAJOR=20
+REPO="agent462/home-screens"
+NODE_MAJOR=22
 
 # --- Colors ---
 RED='\033[0;31m'
@@ -22,8 +21,17 @@ info()  { echo -e "${GREEN}[*]${NC} $1"; }
 warn()  { echo -e "${YELLOW}[!]${NC} $1"; }
 error() { echo -e "${RED}[x]${NC} $1"; exit 1; }
 
+# When piped via curl | bash, stdin is the download stream.
+# Reattach stdin to the terminal for interactive prompts.
+if [ ! -t 0 ]; then
+  exec < /dev/tty
+fi
+
 # --- Preflight ---
-if [ "$(uname -m)" != "aarch64" ] && [ "$(uname -m)" != "armv7l" ]; then
+if [ "$(uname -m)" != "aarch64" ]; then
+  if [ "$(uname -m)" = "armv7l" ]; then
+    error "32-bit Raspberry Pi OS detected. Home Screens requires 64-bit (aarch64)."
+  fi
   warn "This doesn't look like a Raspberry Pi ($(uname -m)). Continuing anyway..."
 fi
 
@@ -31,10 +39,10 @@ if [ "$(id -u)" -eq 0 ]; then
   error "Don't run this script as root. It will use sudo when needed."
 fi
 
-# --- Step 1: Bootstrap packages (git/curl needed before clone) ---
+# --- Step 1: Bootstrap packages ---
 info "Installing bootstrap packages..."
 sudo apt-get update -qq
-sudo apt-get install -y -qq git curl
+sudo apt-get install -y -qq curl
 
 # --- Step 2: Node.js ---
 if command -v node &>/dev/null; then
@@ -54,74 +62,50 @@ fi
 
 info "Node $(node -v) / npm $(npm -v)"
 
-# --- Step 3: Clone or update repo ---
-if [ -d "${APP_DIR}/.git" ]; then
-  info "Repository already exists at ${APP_DIR}, pulling latest..."
-  git -C "${APP_DIR}" pull --ff-only
-elif [ -f "$(pwd)/package.json" ] && grep -q '"home-screens"' "$(pwd)/package.json" 2>/dev/null; then
-  APP_DIR="$(pwd)"
-  info "Running from existing checkout at ${APP_DIR}"
+# --- Step 3: Download latest release ---
+if [ -d "${APP_DIR}" ]; then
+  warn "Directory ${APP_DIR} already exists — skipping download. Use the editor to upgrade."
 else
-  info "Cloning repository to ${APP_DIR}..."
-  echo ""
-  echo "  Enter the git clone URL for your home-screens repo"
-  echo "  (e.g. https://github.com/youruser/home-screens.git)"
-  echo ""
-  read -rp "  Clone URL: " CLONE_URL
-  [ -z "${CLONE_URL}" ] && error "No clone URL provided."
-  git clone "${CLONE_URL}" "${APP_DIR}"
+  info "Fetching latest release..."
+  LATEST_TAG=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | node -e "
+    let d=''; process.stdin.on('data',c=>d+=c); process.stdin.on('end',()=>{
+      try { console.log(JSON.parse(d).tag_name); }
+      catch { process.exit(1); }
+    });
+  ")
+
+  if [ -z "${LATEST_TAG}" ]; then
+    error "Could not determine latest release tag."
+  fi
+
+  info "Downloading ${LATEST_TAG}..."
+  ASSET_NAME="home-screens-${LATEST_TAG}.tar.gz"
+  DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${LATEST_TAG}/${ASSET_NAME}"
+
+  mkdir -p "${APP_DIR}"
+  if ! curl -fSL --speed-limit 1024 --speed-time 60 -o "/tmp/${ASSET_NAME}" "${DOWNLOAD_URL}"; then
+    rm -rf "${APP_DIR}"
+    error "Failed to download release tarball."
+  fi
+
+  info "Extracting..."
+  tar -xzf "/tmp/${ASSET_NAME}" -C "${APP_DIR}"
+  rm -f "/tmp/${ASSET_NAME}"
+
+  # Validate
+  if [ ! -f "${APP_DIR}/server.js" ] || [ ! -f "${APP_DIR}/package.json" ]; then
+    error "Tarball is missing required files (server.js, package.json)."
+  fi
+
+  info "Installed ${LATEST_TAG} to ${APP_DIR}"
 fi
 
 cd "${APP_DIR}"
 
-# --- Step 4: Environment file ---
-if [ ! -f .env.local ]; then
-  warn "No .env.local found. Creating from example..."
-  cp .env.local.example .env.local
-
-  echo ""
-  echo "  Configure your API keys in .env.local"
-  echo "  Required for weather and calendar features."
-  echo ""
-
-  read -rp "  OpenWeatherMap API key (enter to skip): " OWM_KEY
-  if [ -n "${OWM_KEY}" ]; then
-    sed -i "s|OPENWEATHERMAP_API_KEY=.*|OPENWEATHERMAP_API_KEY=${OWM_KEY}|" .env.local
-  fi
-
-  read -rp "  WeatherAPI key (enter to skip): " WAPI_KEY
-  if [ -n "${WAPI_KEY}" ]; then
-    sed -i "s|WEATHERAPI_KEY=.*|WEATHERAPI_KEY=${WAPI_KEY}|" .env.local
-  fi
-
-  read -rp "  Google Client ID (enter to skip): " GCID
-  if [ -n "${GCID}" ]; then
-    sed -i "s|GOOGLE_CLIENT_ID=.*|GOOGLE_CLIENT_ID=${GCID}|" .env.local
-  fi
-
-  read -rp "  Google Client Secret (enter to skip): " GSEC
-  if [ -n "${GSEC}" ]; then
-    sed -i "s|GOOGLE_CLIENT_SECRET=.*|GOOGLE_CLIENT_SECRET=${GSEC}|" .env.local
-  fi
-
-  # Set NEXTAUTH_URL to localhost (Google OAuth callback)
-  sed -i "s|NEXTAUTH_URL=.*|NEXTAUTH_URL=http://localhost:3000|" .env.local
-  info "Set NEXTAUTH_URL to http://localhost:3000"
-else
-  info ".env.local already exists, skipping configuration."
-fi
-
-# --- Step 5: Install dependencies and build ---
-info "Installing npm dependencies..."
-npm install
-
-info "Building Next.js app (this may take a few minutes on a Pi)..."
-npm run build
-
-# --- Step 6: Create data directory ---
+# --- Step 4: Create data directory ---
 mkdir -p data
 
-# --- Step 7: Display configuration ---
+# --- Step 5: Display configuration ---
 echo ""
 echo "  How is your display oriented?"
 echo "  1) Landscape (default, no rotation)"
@@ -147,7 +131,6 @@ read -rp "  Resolution [auto]: " DISPLAY_RES
 
 DISPLAY_MODE=""
 if [ -n "${DISPLAY_RES}" ]; then
-  # wlr-randr mode format: WxH (it picks the best refresh rate)
   DISPLAY_MODE="${DISPLAY_RES}"
   info "Display resolution set to ${DISPLAY_MODE}."
 fi
@@ -160,7 +143,7 @@ if [ -n "${WLR_TRANSFORM}" ]; then
   info "Display will be rotated ${WLR_TRANSFORM}° on boot."
 fi
 
-# --- Step 8: System setup (services, kiosk, boot target, autologin) ---
+# --- Step 6: System setup (services, kiosk, boot target, autologin) ---
 info "Configuring system..."
 bash "${APP_DIR}/scripts/upgrade.sh" setup-system
 
@@ -175,7 +158,6 @@ echo "  Editor URL:   http://$(hostname -I | awk '{print $1}'):3000/editor"
 echo ""
 echo "  Service:      home-screens (Next.js server)"
 echo "  Kiosk:        cage (launches automatically on TTY1)"
-echo "  Config:       ${APP_DIR}/.env.local"
 echo "  Data:         ${APP_DIR}/data/config.json"
 echo ""
 echo "  Commands:"

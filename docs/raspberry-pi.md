@@ -12,23 +12,17 @@ Home Screens is designed to run as a dedicated kiosk display on a Raspberry Pi. 
 ## One-Command Install
 
 ```bash
-git clone <repo-url> ~/home-screens
-cd ~/home-screens
-bash scripts/install.sh
+curl -fsSL https://raw.githubusercontent.com/agent462/home-screens/main/scripts/install.sh | bash
 ```
 
 The script handles everything:
 
-1. **Node.js 20** — installs via NodeSource
-2. **Chromium** — installs the browser for kiosk mode
-3. **System dependencies** — required packages for building native modules
-4. **npm install** — installs all dependencies
-5. **Production build** — runs `npm run build`
-6. **systemd services** — creates and enables two services:
-   - `home-screens` — the Next.js production server
-   - `home-screens-kiosk` — Chromium in fullscreen kiosk mode
-7. **Screen blanking** — disables DPMS/screen saver to keep the display on
-8. **Autologin** — configures automatic login for the kiosk user
+1. **Node.js 22** — installs via NodeSource
+2. **Latest release** — downloads the pre-built tarball from GitHub Releases
+3. **Chromium** — installs the browser for kiosk mode
+4. **systemd service** — creates and enables the `home-screens` server
+5. **Cage kiosk** — configures Chromium in fullscreen kiosk mode
+6. **Autologin** — configures automatic login for the kiosk user
 
 ## Post-Install
 
@@ -85,25 +79,13 @@ This starts the Next.js server and opens Chromium in kiosk mode.
 
 ## Upgrading
 
-You can upgrade from the editor's System Panel, or manually:
+You can upgrade from the editor's **System Panel > Check for Updates**, or via the API:
 
 ```bash
-cd ~/home-screens
-bash scripts/upgrade.sh
+curl -X POST http://localhost:3000/api/system/upgrade -H 'Content-Type: application/json' -d '{"tag":"v0.14.0"}'
 ```
 
-The upgrade process:
-
-1. Pulls the latest code from git
-2. Installs any new dependencies
-3. Rebuilds the production app
-4. Restarts the services
-
-You can also trigger an upgrade via the API:
-
-```bash
-curl -X POST http://localhost:3000/api/system/upgrade
-```
+The upgrade process downloads the pre-built release tarball from GitHub, atomically swaps the application directory, and restarts the service. No build step is needed on the Pi.
 
 ## Rolling Back
 

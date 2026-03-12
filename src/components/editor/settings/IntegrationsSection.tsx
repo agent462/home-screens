@@ -13,7 +13,8 @@ type SecretKey =
   | 'google_maps_key'
   | 'tomtom_key'
   | 'google_client_id'
-  | 'google_client_secret';
+  | 'google_client_secret'
+  | 'github_token';
 
 type SecretStatus = Partial<Record<SecretKey, boolean>>;
 
@@ -276,6 +277,25 @@ export default function IntegrationsSection() {
             placeholder="Paste your TomTom API key"
             helpText="Alternative to Google Maps for traffic data. Free at developer.tomtom.com — Routing API required."
             status={!!status.tomtom_key}
+            onSaved={fetchStatus}
+          />
+        </div>
+      </div>
+
+      <hr className="my-6 border-neutral-700" />
+
+      {/* GitHub */}
+      <div>
+        <h3 className="text-sm font-medium text-neutral-300 mb-3 uppercase tracking-wider">
+          GitHub
+        </h3>
+        <div className="space-y-3">
+          <SecretField
+            label="Personal Access Token"
+            secretKey="github_token"
+            placeholder="Paste your GitHub token"
+            helpText="Optional — increases the GitHub API rate limit for version checks from 60 to 5,000 requests/hour. Create at github.com/settings/tokens (no scopes needed)."
+            status={!!status.github_token}
             onSaved={fetchStatus}
           />
         </div>

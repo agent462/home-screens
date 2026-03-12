@@ -61,6 +61,7 @@ beforeEach(() => {
     tomtom_key: false,
     google_client_id: false,
     google_client_secret: false,
+    github_token: false,
   });
 
   // Default: fs operations return safe defaults
@@ -220,6 +221,7 @@ describe('GET /api/system/stats - app stats', () => {
       tomtom_key: false,
       google_client_id: false,
       google_client_secret: false,
+      github_token: false,
     });
 
     const res = await GET(makeRequest());

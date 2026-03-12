@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getVersionInfo, getVersionTags, fetchRemoteTags } from '@/lib/version';
-import { getBuildPendingTag, isUpgradeRunning } from '@/lib/upgrade';
+import { getVersionInfo, getVersionTags } from '@/lib/version';
+import { isUpgradeRunning } from '@/lib/upgrade';
 import { requireSession } from '@/lib/auth';
 import { errorResponse } from '@/lib/api-utils';
 
@@ -11,21 +11,14 @@ export async function GET(request: NextRequest) {
     await requireSession(request);
     const forceCheck = request.nextUrl.searchParams.get('check') === 'true';
 
-    if (forceCheck) {
-      await fetchRemoteTags(true);
-    }
-
-    const [info, tags, buildPendingTag] = await Promise.all([
+    const [info, tags] = await Promise.all([
       getVersionInfo(),
-      getVersionTags(),
-      getBuildPendingTag(),
+      getVersionTags(forceCheck),
     ]);
 
     return NextResponse.json({
       ...info,
       tags: tags.slice(0, 20), // Last 20 versions
-      buildPending: buildPendingTag !== null,
-      buildPendingTag,
       upgradeRunning: isUpgradeRunning(),
     });
   } catch (error) {

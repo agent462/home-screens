@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getRemoteUrl } from '@/lib/version';
+import { fetchGitHubReleases, GITHUB_REPO } from '@/lib/version';
 import { requireSession } from '@/lib/auth';
 import { errorResponse, fetchWithTimeout } from '@/lib/api-utils';
 
@@ -9,30 +9,42 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   try {
     await requireSession(request);
-    const remoteUrl = await getRemoteUrl();
-    if (!remoteUrl) {
-      return NextResponse.json({ error: 'No git remote configured' }, { status: 404 });
+
+    // Try cached GitHub releases first
+    try {
+      const releases = await fetchGitHubReleases();
+      if (releases.length > 0) {
+        return NextResponse.json({
+          releases: releases.map((r) => ({
+            tag: r.tag_name,
+            name: r.name || r.tag_name,
+            body: r.body || '',
+            published: r.published_at,
+          })),
+        });
+      }
+    } catch {
+      // Fall through to direct API call
     }
 
-    // Extract owner/repo from git URL
-    const match = remoteUrl.match(/github\.com[/:](.+?)(?:\.git)?$/);
-    if (!match) {
-      return NextResponse.json({ error: 'Not a GitHub repository' }, { status: 400 });
-    }
-
-    const repo = match[1];
-
-    const res = await fetchWithTimeout(`https://api.github.com/repos/${repo}/releases?per_page=10`, {
-      headers: { Accept: 'application/vnd.github.v3+json' },
-      next: { revalidate: 3600 }, // Cache for 1 hour
-    });
+    // Fallback: direct API call (may hit rate limit if releases cache failed)
+    const res = await fetchWithTimeout(
+      `https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=10`,
+      {
+        headers: { Accept: 'application/vnd.github.v3+json' },
+        next: { revalidate: 3600 },
+      },
+    );
 
     if (!res.ok) {
       // Fall back to tags if no releases
-      const tagsRes = await fetchWithTimeout(`https://api.github.com/repos/${repo}/tags?per_page=10`, {
-        headers: { Accept: 'application/vnd.github.v3+json' },
-        next: { revalidate: 3600 },
-      });
+      const tagsRes = await fetchWithTimeout(
+        `https://api.github.com/repos/${GITHUB_REPO}/tags?per_page=10`,
+        {
+          headers: { Accept: 'application/vnd.github.v3+json' },
+          next: { revalidate: 3600 },
+        },
+      );
 
       if (!tagsRes.ok) {
         return NextResponse.json({ error: 'Failed to fetch changelog' }, { status: 502 });

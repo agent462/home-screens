@@ -187,9 +187,8 @@ The **System Panel** provides maintenance and system management features:
 
 - **Version** — current app version
 - **Changelog** — recent release notes
-- **Upgrade** — pull and install the latest version
-- **Rebuild** — rebuild the production app without upgrading
-- **Rollback** — revert to the previous version
+- **Upgrade** — download and install the latest version
+- **Rollback** — revert to a previous version
 - **Backup/Restore** — export and import your configuration
 - **Logs** — view application logs
 - **Power** — restart or shut down the Raspberry Pi from the UI

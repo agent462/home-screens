@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { editorFetch } from '@/lib/editor-fetch';
 import Button from '@/components/ui/Button';
 import {
@@ -12,8 +12,20 @@ import {
   type StepState,
 } from './useUpgradeStream';
 
-/** Steps shown in the accordion (stash/cleanup are internal) */
-const VISIBLE_STEPS = [
+/** Steps shown in the accordion for tarball upgrades */
+const TARBALL_STEPS = [
+  'preflight',
+  'backup',
+  'download',
+  'migrate',
+  'deploy',
+  'setup-system',
+  'restart',
+  'cleanup',
+] as const;
+
+/** Steps shown for legacy git-based upgrades */
+const GIT_STEPS = [
   'preflight',
   'backup',
   'fetch',
@@ -23,18 +35,10 @@ const VISIBLE_STEPS = [
   'migrate',
   'setup-system',
   'restart',
-  'health-check',
 ] as const;
 
-/** Subset of steps shown during a rebuild (no preflight/backup/fetch/checkout) */
-const REBUILD_STEPS = [
-  'install',
-  'build',
-  'migrate',
-  'setup-system',
-  'restart',
-  'health-check',
-] as const;
+/** All possible steps — the modal auto-detects which set is active based on SSE events */
+const ALL_STEPS = [...new Set([...TARBALL_STEPS, ...GIT_STEPS])];
 
 const STEP_STYLES: Record<StepState, { icon: React.ReactNode; textClass: string }> = {
   done: {
@@ -55,24 +59,41 @@ const STEP_STYLES: Record<StepState, { icon: React.ReactNode; textClass: string 
   },
 };
 
+/** Steps during which the cancel button must be disabled */
+const UNCANCELLABLE_STEPS = new Set(['deploy']);
+
 interface Props {
   targetTag: string;
   isRollback: boolean;
-  isRebuild?: boolean;
   onComplete: () => void;
   onClose: () => void;
 }
 
-export default function UpgradeModal({ targetTag, isRollback, isRebuild, onComplete, onClose }: Props) {
-  const steps: readonly string[] = isRebuild ? REBUILD_STEPS : VISIBLE_STEPS;
+export default function UpgradeModal({ targetTag, isRollback, onComplete, onClose }: Props) {
+  // Start with no steps; auto-detect tarball vs git from SSE events
+  const [detectedSteps, setDetectedSteps] = useState<readonly string[]>([]);
 
   const { progress, done, failed, activeStep, visitedSteps, stepLogs } =
-    useUpgradeStream(steps, targetTag, isRollback, isRebuild);
+    useUpgradeStream(ALL_STEPS, targetTag, isRollback);
 
+  // Auto-detect tarball vs git based on which steps appear
+  useEffect(() => {
+    if (visitedSteps.has('download') || visitedSteps.has('deploy')) {
+      setDetectedSteps([...TARBALL_STEPS]);
+    } else if (visitedSteps.has('fetch') || visitedSteps.has('checkout') || visitedSteps.has('install')) {
+      setDetectedSteps([...GIT_STEPS]);
+    } else if (visitedSteps.size > 0 && detectedSteps.length === 0) {
+      // Default to tarball once any step arrives (preflight/backup are shared)
+      setDetectedSteps([...TARBALL_STEPS]);
+    }
+  }, [visitedSteps, detectedSteps.length]);
+
+  const steps = detectedSteps;
   const reloadStatus = useWaitForServer(done);
   const { expanded, toggleExpand } = useAccordionState(activeStep);
 
   const activeLogRef = useRef<HTMLDivElement>(null);
+  const cancelBlocked = UNCANCELLABLE_STEPS.has(activeStep);
 
   const handleCancel = useCallback(async () => {
     try {
@@ -96,7 +117,7 @@ export default function UpgradeModal({ targetTag, isRollback, isRebuild, onCompl
         {/* Header */}
         <div className="px-5 py-4 border-b border-neutral-700 flex-shrink-0">
           <h2 className="text-lg font-semibold text-neutral-100">
-            {isRebuild ? 'Rebuilding application' : `${isRollback ? 'Rolling back' : 'Upgrading'} to ${targetTag}`}
+            {`${isRollback ? 'Rolling back' : 'Upgrading'} to ${targetTag}`}
           </h2>
         </div>
 
@@ -183,7 +204,9 @@ export default function UpgradeModal({ targetTag, isRollback, isRebuild, onCompl
           {/* Warning */}
           {!done && !failed && (
             <p className="text-xs text-yellow-500/70 text-center">
-              Do not close this page or power off the device
+              {cancelBlocked
+                ? 'Installing update — do not close or power off the device'
+                : 'Do not close this page or power off the device'}
             </p>
           )}
 
@@ -198,7 +221,7 @@ export default function UpgradeModal({ targetTag, isRollback, isRebuild, onCompl
         {/* Footer */}
         <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-neutral-700 flex-shrink-0">
           {!done && !failed && (
-            <Button variant="danger" size="sm" onClick={handleCancel}>
+            <Button variant="danger" size="sm" onClick={handleCancel} disabled={cancelBlocked}>
               Cancel
             </Button>
           )}

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { runUpgrade, isUpgradeRunning, cancelUpgrade } from '@/lib/upgrade';
+import { runUpgrade, isUpgradeRunning, isDeploying, cancelUpgrade } from '@/lib/upgrade';
 import { requireSession } from '@/lib/auth';
 import { errorResponse } from '@/lib/api-utils';
 
@@ -52,6 +52,13 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json(
         { error: 'No upgrade is currently running' },
         { status: 404 },
+      );
+    }
+
+    if (isDeploying()) {
+      return NextResponse.json(
+        { error: 'Cannot cancel during deploy — the update is being installed' },
+        { status: 409 },
       );
     }
 

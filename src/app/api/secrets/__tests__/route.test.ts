@@ -67,6 +67,7 @@ describe('GET /api/secrets', () => {
       tomtom_key: false,
       google_client_id: false,
       google_client_secret: false,
+      github_token: false,
     };
     vi.mocked(getSecretStatus).mockResolvedValue(mockStatus);
 

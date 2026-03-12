@@ -585,20 +585,23 @@ Returns a random Unsplash photo with optional query filter.
 
 ### GET /api/system/version
 
-Returns the current application version, available tags, and whether a build is pending. Requires a valid session.
+Returns the current application version, available tags, and upgrade status. Requires a valid session.
 
 | Parameter | Type | Description |
 |---|---|---|
-| `check` | string | Set to `"true"` to force-fetch remote tags |
+| `check` | string | Set to `"true"` to force-check for updates |
 
 **Response:**
 ```json
 {
-  "version": "0.10.0",
-  "commit": "a3b2e17",
-  "tags": ["v0.10.0", "v0.9.0", "..."],
-  "buildPending": false,
-  "buildPendingTag": null
+  "current": "0.10.0",
+  "currentCommit": "a3b2e17",
+  "latest": "0.11.0",
+  "updateAvailable": true,
+  "installedVia": "tarball",
+  "channel": "release",
+  "tags": [{ "tag": "v0.11.0", "version": "0.11.0", "commit": "", "hasTarball": true }],
+  "upgradeRunning": false
 }
 ```
 
@@ -634,7 +637,7 @@ Returns recent release notes from the GitHub repository. Falls back to tags if n
 
 ### POST /api/system/upgrade
 
-Triggers an upgrade to a specific version tag. Pulls from git, installs dependencies, and rebuilds. Progress is streamed via the `/api/system/status` SSE endpoint. Requires a valid session.
+Triggers an upgrade to a specific version tag. Downloads a pre-built release tarball (or falls back to git-based upgrade for older versions). Progress is streamed via the `/api/system/status` SSE endpoint. Requires a valid session.
 
 **Body:** `{ "tag": "v0.10.0" }`
 
@@ -647,12 +650,6 @@ Reverts to a specific previous version tag. Progress is streamed via the `/api/s
 **Body:** `{ "tag": "v0.9.0" }`
 
 **Response:** `{ "ok": true, "message": "Rollback to v0.9.0 started" }`
-
-### POST /api/system/rebuild
-
-Triggers a rebuild for a pending build (e.g. after an interrupted upgrade). Requires a valid session.
-
-**Response:** `{ "ok": true, "message": "Rebuild for v0.10.0 started" }`
 
 ### POST /api/system/power
 

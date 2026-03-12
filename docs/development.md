@@ -94,7 +94,7 @@ API routes live in `src/app/api/*/route.ts` and serve as server-side proxies for
 | Category | Routes | Purpose |
 |---|---|---|
 | **Auth** | `auth/login`, `auth/logout`, `auth/status`, `auth/password`, `auth/google` | Authentication and session management |
-| **System** | `system/status`, `system/version`, `system/build-id`, `system/changelog`, `system/power`, `system/upgrade`, `system/rebuild`, `system/rollback`, `system/backups` | Server management and deployment |
+| **System** | `system/status`, `system/version`, `system/build-id`, `system/changelog`, `system/power`, `system/upgrade`, `system/rollback`, `system/backups` | Server management and deployment |
 | **Config** | `config`, `secrets` | Read/write config and manage API keys |
 | **Weather** | `weather`, `rain-map` | Weather data (4 providers) and rain radar tiles |
 | **Calendar** | `calendar`, `calendars` | Google Calendar events and calendar list |
@@ -238,4 +238,4 @@ npm run lint        # Run ESLint
 | `scripts/rotate-display.sh` | Change screen orientation |
 | `scripts/deploy.sh` | Production deployment |
 | `scripts/release.sh` | Version release process |
-| `scripts/upgrade.sh` | Pull, build, and restart |
+| `scripts/upgrade.sh` | Download, deploy, and restart |

@@ -42,6 +42,13 @@ export function getStepState(
   // Only mark steps as done if they were actually visited (fixes rollback
   // showing all steps green even when preflight/fetch/migrate were skipped)
   if (done) return visitedSteps.has(step) ? 'done' : 'pending';
+
+  // If activeStep is not in the visible steps list (e.g. internal-only steps
+  // like 'stash'), fall back to visitedSteps to determine state
+  if (activeIdx === -1) {
+    return visitedSteps.has(step) ? 'done' : 'pending';
+  }
+
   if (failed && stepIdx === activeIdx) return 'error';
   if (stepIdx < activeIdx) return 'done';
   if (stepIdx === activeIdx && !failed) return 'active';
@@ -55,14 +62,17 @@ export function getStepState(
 export const STEP_LABELS: Record<string, string> = {
   preflight: 'Pre-flight checks',
   backup: 'Back up configuration',
+  download: 'Download update',
+  migrate: 'Migrate configuration',
+  deploy: 'Install update',
+  'setup-system': 'Apply system configuration',
+  restart: 'Restart service',
+  cleanup: 'Finalize',
+  // Legacy git-based steps (shown for fallback upgrades)
   fetch: 'Download latest code',
   checkout: 'Switch to new version',
   install: 'Install dependencies',
   build: 'Build application',
-  migrate: 'Migrate configuration',
-  'setup-system': 'Apply system configuration',
-  restart: 'Restart service',
-  'health-check': 'Verify server health',
 };
 
 // ---------------------------------------------------------------------------
@@ -73,7 +83,6 @@ export function useUpgradeStream(
   steps: readonly string[],
   targetTag: string,
   isRollback: boolean,
-  isRebuild?: boolean,
 ): UpgradeStreamState {
   const firstStep = steps[0];
 
@@ -174,11 +183,11 @@ export function useUpgradeStream(
 
       if (
         current.step === 'restart' ||
-        current.step === 'health-check' ||
+        current.step === 'cleanup' ||
         currentActive === 'restart' ||
-        currentActive === 'health-check'
+        currentActive === 'cleanup'
       ) {
-        // SSE connection lost during restart — expected, the server is restarting
+        // SSE connection lost during restart/cleanup — expected, the server is restarting
         setProgress({
           step: 'complete',
           progress: 100,
@@ -199,10 +208,8 @@ export function useUpgradeStream(
       }
     };
 
-    // Trigger the upgrade/rollback/rebuild
-    const endpoint = isRebuild
-      ? '/api/system/rebuild'
-      : isRollback ? '/api/system/rollback' : '/api/system/upgrade';
+    // Trigger the upgrade/rollback
+    const endpoint = isRollback ? '/api/system/rollback' : '/api/system/upgrade';
     editorFetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

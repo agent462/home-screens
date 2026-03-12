@@ -51,7 +51,7 @@ The editor supports optional password protection. Set a password in **Settings >
 
 ## System Management
 
-The editor includes a system management panel under **Settings > System** for upgrade, rebuild, backups, and power control -- particularly useful when running on a Raspberry Pi.
+The editor includes a system management panel under **Settings > System** for upgrade, rollback, backups, and power control -- particularly useful when running on a Raspberry Pi.
 
 ## Google Calendar Setup
 

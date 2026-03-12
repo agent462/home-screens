@@ -27,7 +27,7 @@ A custom smart display system built with Next.js. Designed to run on a Raspberry
 - **Background images** — upload custom backgrounds or rotate via Unsplash
 - **Per-module styling** — opacity, blur, colors, fonts, border radius, padding
 - **Password-protected editor** — optional password auth for the configuration editor
-- **System management** — upgrade, rebuild, backup/restore, and power control from the UI
+- **System management** — upgrade, rollback, backup/restore, and power control from the UI
 - **Raspberry Pi kiosk scripts** — one-command setup for a dedicated display
 
 ## Tech Stack
@@ -75,16 +75,14 @@ Google Calendar uses the **OAuth 2.0 Device Flow**, which means you can authoriz
 Run the install script on a fresh Raspberry Pi OS:
 
 ```bash
-git clone <repo-url> ~/home-screens
-cd ~/home-screens
-bash scripts/install.sh
+curl -fsSL https://raw.githubusercontent.com/agent462/home-screens/main/scripts/install.sh | bash
 ```
 
 The script handles everything:
-- Installs Node.js 20, Chromium, and system dependencies
-- Installs npm packages and builds the app
-- Creates systemd services (`home-screens`, `home-screens-kiosk`)
-- Disables screen blanking and configures autologin
+- Downloads the latest pre-built release from GitHub
+- Installs Node.js 22, Chromium, and system dependencies
+- Creates the systemd service and configures the kiosk
+- Configures autologin and display orientation
 
 After install, reboot to start the kiosk:
 
@@ -160,7 +158,7 @@ scripts/
 | `/api/secrets` | GET, PUT | Manage API keys and credentials |
 | `/api/display/*` | GET, POST | Remote display control (wake, sleep, brightness, navigation, alerts) |
 | `/api/auth/*` | GET, POST | Authentication (password + Google OAuth) |
-| `/api/system/*` | GET, POST | System management (version, upgrade, rebuild, backups, power) |
+| `/api/system/*` | GET, POST | System management (version, upgrade, rollback, backups, power) |
 
 ## Documentation
 

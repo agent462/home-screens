@@ -2,23 +2,28 @@
 set -euo pipefail
 
 # Home Screens Upgrade Script
-# Called by the API to perform git-based upgrades.
+# Called by the API to perform upgrades (tarball-based or git-based fallback).
 #
 # Usage: upgrade.sh <action> [args...]
 #   upgrade.sh preflight              - Check if upgrade is possible
 #   upgrade.sh backup                 - Backup config to data/backups/
+#   upgrade.sh download <tag>         - Download release tarball from GitHub
+#   upgrade.sh deploy                 - Atomic swap of staged files into place
+#   upgrade.sh cleanup-rollback       - Remove rollback directory after success
+#   upgrade.sh restart                - Restart the systemd service
+#   upgrade.sh health-check           - Verify server is responding
+#   upgrade.sh setup-system           - Apply system config (services, kiosk, boot target)
+#   upgrade.sh list-backups           - List config backups
+#   upgrade.sh restore-backup <file>  - Restore a config backup
+#
+# Legacy git-based actions (fallback for pre-tarball releases):
 #   upgrade.sh fetch                  - Fetch latest tags from remote
 #   upgrade.sh checkout <tag>         - Checkout a specific version tag
 #   upgrade.sh install                - Run npm install
 #   upgrade.sh build                  - Run npm run build
-#   upgrade.sh restart                - Restart the systemd service
 #   upgrade.sh rollback <tag>         - Checkout previous tag (same as checkout)
 #   upgrade.sh stash                  - Stash local changes
 #   upgrade.sh stash-pop              - Pop stashed changes
-#   upgrade.sh health-check           - Verify server is responding
-#   upgrade.sh list-backups           - List config backups
-#   upgrade.sh restore-backup <file>  - Restore a config backup
-#   upgrade.sh setup-system            - Apply system config (services, kiosk, boot target)
 
 APP_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BACKUP_DIR="${APP_DIR}/data/backups"
@@ -26,7 +31,9 @@ CONFIG_FILE="${APP_DIR}/data/config.json"
 SERVICE_NAME="home-screens"
 MAX_BACKUPS=6
 
-cd "${APP_DIR}"
+# cd may fail if APP_DIR was removed by an interrupted deploy — the preflight
+# action's recovery check handles this, so we must not abort here.
+cd "${APP_DIR}" 2>/dev/null || true
 
 action="${1:-}"
 shift || true
@@ -36,20 +43,15 @@ case "${action}" in
   preflight)
     errors=""
 
-    # Check git
-    if ! git rev-parse --is-inside-work-tree &>/dev/null; then
-      errors="${errors}Not a git repository. "
-    fi
-
-    # Check disk space (need ~500MB for build)
+    # Check disk space (~400MB for tarball + staging + rollback)
     available_kb=$(df -k "${APP_DIR}" | tail -1 | awk '{print $4}')
-    if [ "${available_kb}" -lt 512000 ]; then
-      errors="${errors}Low disk space ($(( available_kb / 1024 ))MB available, need 500MB). "
+    if [ "${available_kb}" -lt 409600 ]; then
+      errors="${errors}Low disk space ($(( available_kb / 1024 ))MB available, need 400MB). "
     fi
 
-    # Check for merge conflicts
-    if git diff --name-only --diff-filter=U 2>/dev/null | grep -q .; then
-      errors="${errors}Unresolved merge conflicts. "
+    # Check network connectivity to GitHub
+    if ! curl -fsSL --head --max-time 10 "https://github.com" >/dev/null 2>&1; then
+      errors="${errors}Cannot reach GitHub (check network connectivity). "
     fi
 
     # Check passwordless sudo (needed for restart and setup-system)
@@ -57,12 +59,24 @@ case "${action}" in
       errors="${errors}Passwordless sudo not available (required for restart/setup-system). "
     fi
 
+    # Check Node.js major version matches .node-version if it exists
+    if [ -f "${APP_DIR}/.node-version" ]; then
+      expected_major=$(cat "${APP_DIR}/.node-version" | tr -d '[:space:]')
+      actual_major=$(node -v 2>/dev/null | sed 's/v//' | cut -d. -f1)
+      if [ -n "${expected_major}" ] && [ -n "${actual_major}" ] && [ "${actual_major}" != "${expected_major}" ]; then
+        errors="${errors}Node.js major version mismatch (have v${actual_major}, need v${expected_major}). "
+      fi
+    fi
+
     if [ -n "${errors}" ]; then
       echo "{\"ok\":false,\"error\":\"${errors}\"}"
     else
+      # Check git status for legacy fallback
       dirty="false"
-      if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
-        dirty="true"
+      if git rev-parse --is-inside-work-tree &>/dev/null; then
+        if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+          dirty="true"
+        fi
       fi
       echo "{\"ok\":true,\"dirty\":${dirty},\"diskMB\":$(( available_kb / 1024 ))}"
     fi
@@ -84,6 +98,115 @@ case "${action}" in
     else
       echo "{\"ok\":true,\"file\":null}"
     fi
+    ;;
+
+  download)
+    tag="${1:-}"
+    if [ -z "${tag}" ]; then
+      echo '{"ok":false,"error":"No tag specified"}'
+      exit 1
+    fi
+
+    repo="${2:-agent462/home-screens}"
+    asset_name="home-screens-${tag}.tar.gz"
+    download_url="https://github.com/${repo}/releases/download/${tag}/${asset_name}"
+
+    staging_dir="${APP_DIR}.staging"
+    rm -rf "${staging_dir}"
+    mkdir -p "${staging_dir}"
+
+    # Clean up staging on any failure, signal, or cancellation
+    trap 'rm -rf "${staging_dir}" 2>/dev/null; true' ERR INT TERM
+
+    # Check that the release asset exists before committing to download
+    if ! curl -fsSL --head --max-time 10 "${download_url}" >/dev/null 2>&1; then
+      rm -rf "${staging_dir}"
+      echo "{\"ok\":false,\"error\":\"Release asset not found: ${asset_name}\"}"
+      exit 1
+    fi
+
+    # Download (with stall detection: fail if <1KB/s for 60 seconds)
+    if ! curl -fSL --speed-limit 1024 --speed-time 60 -o "${staging_dir}/${asset_name}" "${download_url}" 2>&1; then
+      rm -rf "${staging_dir}"
+      echo "{\"ok\":false,\"error\":\"Failed to download ${asset_name}\"}"
+      exit 1
+    fi
+
+    # Extract
+    tar -xzf "${staging_dir}/${asset_name}" -C "${staging_dir}"
+    rm "${staging_dir}/${asset_name}"
+
+    # Validate tarball contents — catch CI misconfigurations before deploy
+    for required in server.js package.json; do
+      if [ ! -f "${staging_dir}/${required}" ]; then
+        rm -rf "${staging_dir}"
+        echo "{\"ok\":false,\"error\":\"Tarball missing required file: ${required}\"}"
+        exit 1
+      fi
+    done
+
+    trap - ERR INT TERM
+    echo "{\"ok\":true,\"staging\":\"${staging_dir}\"}"
+    ;;
+
+  deploy)
+    staging_dir="${APP_DIR}.staging"
+    if [ ! -d "${staging_dir}" ]; then
+      echo '{"ok":false,"error":"No staged upgrade found"}'
+      exit 1
+    fi
+
+    rollback_dir="${APP_DIR}.rollback"
+
+    # Safety trap: covers both the data-move phase and the atomic swap.
+    # Order matters: restore APP_DIR from rollback FIRST (phase 2), then
+    # move data back (phase 1). If APP_DIR is gone, the data-restore
+    # conditions would skip because they check [ -d "${APP_DIR}" ].
+    trap '
+      # Phase 2: restore APP_DIR from rollback if the swap failed
+      [ ! -d "${APP_DIR}" ] && [ -d "${rollback_dir}" ] && mv "${rollback_dir}" "${APP_DIR}" 2>/dev/null
+      # Phase 1: restore data moved to staging
+      [ -d "${staging_dir}/data" ] && [ ! -d "${APP_DIR}/data" ] && [ -d "${APP_DIR}" ] && mv "${staging_dir}/data" "${APP_DIR}/data" 2>/dev/null
+      [ -d "${staging_dir}/public/backgrounds" ] && [ ! -d "${APP_DIR}/public/backgrounds" ] && [ -d "${APP_DIR}" ] && mv "${staging_dir}/public/backgrounds" "${APP_DIR}/public/backgrounds" 2>/dev/null
+      true
+    ' ERR INT TERM
+
+    # 1. Move user data INTO the staged release so it survives the swap
+    if [ -d "${APP_DIR}/data" ]; then
+      rm -rf "${staging_dir}/data"
+      mv "${APP_DIR}/data" "${staging_dir}/data"
+    fi
+    if [ -d "${APP_DIR}/public/backgrounds" ]; then
+      mkdir -p "${staging_dir}/public"
+      rm -rf "${staging_dir}/public/backgrounds"
+      mv "${APP_DIR}/public/backgrounds" "${staging_dir}/public/backgrounds"
+    fi
+    # Preserve .env files
+    shopt -s nullglob
+    for f in "${APP_DIR}"/.env*; do
+      cp -a "${f}" "${staging_dir}/"
+    done
+    shopt -u nullglob
+
+    # 2. Remove any previous rollback
+    rm -rf "${rollback_dir}"
+
+    # 3. Atomic swap: rename current → rollback, staging → current
+    #    rename(2) is atomic on the same filesystem
+    mv "${APP_DIR}" "${rollback_dir}"
+    mv "${staging_dir}" "${APP_DIR}"
+
+    # Clear the trap now that the swap succeeded
+    trap - ERR INT TERM
+
+    # NOTE: rollback_dir is intentionally kept — cleaned up after health-check
+    echo '{"ok":true}'
+    ;;
+
+  cleanup-rollback)
+    rollback_dir="${APP_DIR}.rollback"
+    rm -rf "${rollback_dir}" 2>/dev/null || true
+    echo '{"ok":true}'
     ;;
 
   fetch)
@@ -300,8 +423,21 @@ case "${action}" in
     fi
 
     # 2. Ensure systemd services are current
-    NPM_PATH=$(which npm 2>/dev/null || echo "/usr/bin/npm")
+    #    For tarball installs: use node server.js directly (no npm wrapper)
+    #    For git installs: use npm start
+    NODE_PATH=$(which node 2>/dev/null || echo "/usr/bin/node")
+    if [ -f "${APP_DIR}/server.js" ]; then
+      EXEC_START="${NODE_PATH} ${APP_DIR}/server.js"
+      WORKING_DIR="${APP_DIR}"
+    else
+      NPM_PATH=$(which npm 2>/dev/null || echo "/usr/bin/npm")
+      EXEC_START="${NPM_PATH} start"
+      WORKING_DIR="${APP_DIR}"
+    fi
+
     SERVICE_FILE="/etc/systemd/system/home-screens.service"
+    # ExecStartPre recovers from an interrupted atomic deploy — if APP_DIR was
+    # removed (mid-swap power loss) but the rollback still exists, restore it.
     DESIRED_SERVICE="[Unit]
 Description=Home Screens Next.js Server
 After=network-online.target
@@ -310,8 +446,9 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=${USER}
-WorkingDirectory=${APP_DIR}
-ExecStart=${NPM_PATH} start
+WorkingDirectory=${WORKING_DIR}
+ExecStartPre=/bin/bash -c '[ -d ${APP_DIR} ] || [ ! -d ${APP_DIR}.rollback ] || mv ${APP_DIR}.rollback ${APP_DIR}'
+ExecStart=${EXEC_START}
 Restart=on-failure
 RestartSec=5
 Environment=NODE_ENV=production

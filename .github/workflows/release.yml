@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build & Release
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build
+
+      # Assemble standalone tarball
+      - name: Assemble tarball
+        run: |
+          cp -r public .next/standalone/public
+          cp -r .next/static .next/standalone/.next/static
+          cp -r scripts .next/standalone/scripts
+          cp .node-version .next/standalone/.node-version
+
+          # Seed config (not user data)
+          mkdir -p .next/standalone/data
+          cp data/config.json .next/standalone/data/config.json
+
+          # package.json with corrected start script for tarball root
+          node -e "
+            const pkg = require('./package.json');
+            pkg.scripts.start = 'node server.js';
+            require('fs').writeFileSync(
+              '.next/standalone/package.json',
+              JSON.stringify(pkg, null, 2)
+            );
+          "
+
+          TAG="${GITHUB_REF_NAME}"
+          tar -czf "home-screens-${TAG}.tar.gz" -C .next/standalone .
+
+      # Fail if tarball exceeds 60MB
+      - name: Size gate
+        run: |
+          size=$(stat -c%s home-screens-*.tar.gz)
+          echo "Tarball size: $(( size / 1024 / 1024 ))MB ($size bytes)"
+          if [ "$size" -gt 62914560 ]; then
+            echo "::error::Tarball exceeds 60MB budget"
+            exit 1
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2.5.0
+        with:
+          files: home-screens-*.tar.gz
+          generate_release_notes: true
+          draft: false

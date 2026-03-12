@@ -9,6 +9,7 @@ interface TagInfo {
   tag: string;
   version: string;
   commit: string;
+  hasTarball?: boolean;
 }
 
 interface VersionInfo {
@@ -16,11 +17,9 @@ interface VersionInfo {
   currentCommit: string;
   latest: string | null;
   updateAvailable: boolean;
-  installedVia: 'git' | 'unknown';
+  installedVia: 'git' | 'tarball' | 'unknown';
   channel: string;
   tags: TagInfo[];
-  buildPending: boolean;
-  buildPendingTag: string | null;
   upgradeRunning: boolean;
 }
 
@@ -46,10 +45,9 @@ type PowerState =
 interface Props {
   onUpgrade: (tag: string) => void;
   onRollback: (tag: string) => void;
-  onRebuild: () => void;
 }
 
-export default function SystemSection({ onUpgrade, onRollback, onRebuild }: Props) {
+export default function SystemSection({ onUpgrade, onRollback }: Props) {
   const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
   const [releases, setReleases] = useState<Release[]>([]);
   const [backups, setBackups] = useState<BackupFile[]>([]);
@@ -176,7 +174,7 @@ export default function SystemSection({ onUpgrade, onRollback, onRebuild }: Prop
   async function handleCancelUpgrade() {
     if (!(await useConfirmStore.getState().confirm({
       title: 'Cancel Upgrade',
-      message: 'Are you sure? The running upgrade will be killed. You may need to retry or rebuild afterwards.',
+      message: 'Are you sure? The running upgrade will be killed. You may need to retry afterwards.',
       confirmLabel: 'Cancel Upgrade',
     }))) return;
     try {
@@ -205,6 +203,9 @@ export default function SystemSection({ onUpgrade, onRollback, onRebuild }: Prop
     );
   }
 
+  // Updates are available for git and tarball installs (not just git)
+  const canUpdate = versionInfo.installedVia !== 'unknown';
+
   return (
     <div className="space-y-0 divide-y divide-neutral-600 [&>section]:py-5 [&>section:first-child]:pt-0 [&>section:last-child]:pb-0">
       {/* Current Version */}
@@ -216,19 +217,23 @@ export default function SystemSection({ onUpgrade, onRollback, onRebuild }: Prop
           <div>
             <p className="text-neutral-100 font-mono text-sm">
               v{versionInfo.current}
-              <span className="text-neutral-500 ml-2">({versionInfo.currentCommit})</span>
+              {versionInfo.currentCommit !== 'unknown' && (
+                <span className="text-neutral-500 ml-2">({versionInfo.currentCommit})</span>
+              )}
             </p>
             <p className="text-xs text-neutral-500 mt-0.5">
               {versionInfo.installedVia === 'git'
                 ? `Branch: ${versionInfo.channel}`
-                : 'Not installed via git'}
+                : versionInfo.installedVia === 'tarball'
+                  ? 'Installed from release'
+                  : 'Installation method unknown'}
             </p>
           </div>
           <Button
             variant="secondary"
             size="sm"
             onClick={handleCheckUpdates}
-            disabled={checking || versionInfo.installedVia !== 'git'}
+            disabled={checking || !canUpdate}
           >
             {checking ? 'Checking...' : 'Check for Updates'}
           </Button>
@@ -256,28 +261,6 @@ export default function SystemSection({ onUpgrade, onRollback, onRebuild }: Prop
           </div>
         )}
 
-        {versionInfo.buildPending && (
-          <div className="mt-3 rounded-lg bg-red-950/50 border border-red-800/50 p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-red-300 font-medium">
-                  Build failed for {versionInfo.buildPendingTag}
-                </p>
-                <p className="text-xs text-red-400/70 mt-0.5">
-                  Code was checked out but the build did not complete successfully.
-                </p>
-              </div>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={onRebuild}
-              >
-                Retry Build
-              </Button>
-            </div>
-          </div>
-        )}
-
         {versionInfo.updateAvailable && versionInfo.latest && (
           <div className="mt-3 rounded-lg bg-blue-950/50 border border-blue-800/50 p-3">
             <div className="flex items-center justify-between">
@@ -300,22 +283,22 @@ export default function SystemSection({ onUpgrade, onRollback, onRebuild }: Prop
           </div>
         )}
 
-        {!versionInfo.buildPending && !versionInfo.updateAvailable && versionInfo.installedVia === 'git' && (
+        {!versionInfo.updateAvailable && canUpdate && (
           <p className="text-xs text-green-400/80 mt-2 flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" />
             You&apos;re on the latest version
           </p>
         )}
 
-        {versionInfo.installedVia !== 'git' && (
+        {!canUpdate && (
           <p className="text-xs text-yellow-400/80 mt-2">
-            Auto-upgrade requires a git-based installation.
+            Unable to check for updates. Re-install from a release to enable auto-upgrade.
           </p>
         )}
       </section>
 
       {/* Changelog */}
-      {versionInfo.installedVia === 'git' && (
+      {canUpdate && (
         <section>
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-medium text-neutral-300 uppercase tracking-wider">
