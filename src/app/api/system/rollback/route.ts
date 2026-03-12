@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing "tag" in request body' }, { status: 400 });
     }
 
-    if (!/^v?\d+\.\d+\.\d+$/.test(tag)) {
+    if (!/^v?\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$/.test(tag)) {
       return NextResponse.json({ error: 'Invalid tag format' }, { status: 400 });
     }
 

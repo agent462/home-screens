@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { editorFetch } from '@/lib/editor-fetch';
 import Button from '@/components/ui/Button';
 import { useConfirmStore } from '@/stores/confirm-store';
+import { useEditorStore } from '@/stores/editor-store';
 
 interface TagInfo {
   tag: string;
@@ -48,6 +49,7 @@ interface Props {
 }
 
 export default function SystemSection({ onUpgrade, onRollback }: Props) {
+  const { updateSettings, saveConfig } = useEditorStore();
   const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
   const [releases, setReleases] = useState<Release[]>([]);
   const [backups, setBackups] = useState<BackupFile[]>([]);
@@ -56,12 +58,19 @@ export default function SystemSection({ onUpgrade, onRollback }: Props) {
   const [restoreStatus, setRestoreStatus] = useState<string | null>(null);
   const [showChangelog, setShowChangelog] = useState(false);
   const [powerState, setPowerState] = useState<PowerState>({ status: 'idle' });
+  const [channel, setChannel] = useState<'stable' | 'dev'>(() => {
+    const cfg = useEditorStore.getState().config;
+    return cfg?.settings?.updateChannel === 'dev' ? 'dev' : 'stable';
+  });
 
   const fetchAll = useCallback(async (forceCheck = false) => {
     try {
-      const params = forceCheck ? '?check=true' : '';
+      const params = new URLSearchParams();
+      if (forceCheck) params.set('check', 'true');
+      if (channel === 'dev') params.set('channel', 'dev');
+      const query = params.toString();
       const [vRes, bRes] = await Promise.all([
-        editorFetch(`/api/system/version${params}`),
+        editorFetch(`/api/system/version${query ? `?${query}` : ''}`),
         editorFetch('/api/system/backups'),
       ]);
 
@@ -79,11 +88,12 @@ export default function SystemSection({ onUpgrade, onRollback }: Props) {
       setLoading(false);
       setChecking(false);
     }
-  }, []);
+  }, [channel]);
 
   const fetchChangelog = useCallback(async () => {
     try {
-      const res = await editorFetch('/api/system/changelog');
+      const params = channel === 'dev' ? '?channel=dev' : '';
+      const res = await editorFetch(`/api/system/changelog${params}`);
       if (res.ok) {
         const data = await res.json();
         setReleases(data.releases ?? []);
@@ -91,15 +101,31 @@ export default function SystemSection({ onUpgrade, onRollback }: Props) {
     } catch {
       // ignore
     }
-  }, []);
+  }, [channel]);
 
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
 
+  // Re-fetch changelog when channel changes while the panel is open
+  useEffect(() => {
+    if (showChangelog) fetchChangelog();
+  }, [fetchChangelog, showChangelog]);
+
   function handleCheckUpdates() {
     setChecking(true);
     fetchAll(true);
+  }
+
+  async function handleToggleChannel() {
+    const next = channel === 'stable' ? 'dev' : 'stable';
+    setChannel(next);
+    updateSettings({ updateChannel: next });
+    try {
+      await saveConfig();
+    } catch {
+      // Store is updated in-memory; config will be saved on next successful write
+    }
   }
 
   async function handleRestoreBackup(name: string) {
@@ -205,6 +231,7 @@ export default function SystemSection({ onUpgrade, onRollback }: Props) {
 
   // Updates are available for git and tarball installs (not just git)
   const canUpdate = versionInfo.installedVia !== 'unknown';
+  const latestIsPrerelease = versionInfo.latest?.includes('-') ?? false;
 
   return (
     <div className="space-y-0 divide-y divide-neutral-600 [&>section]:py-5 [&>section:first-child]:pt-0 [&>section:last-child]:pb-0">
@@ -227,6 +254,17 @@ export default function SystemSection({ onUpgrade, onRollback }: Props) {
                 : versionInfo.installedVia === 'tarball'
                   ? 'Installed from release'
                   : 'Installation method unknown'}
+              {canUpdate && (
+                <>
+                  {' · '}
+                  <button
+                    onClick={handleToggleChannel}
+                    className="text-neutral-400 hover:text-blue-400 transition-colors"
+                  >
+                    {channel === 'stable' ? 'Stable' : 'Pre-release'} channel
+                  </button>
+                </>
+              )}
             </p>
           </div>
           <Button
@@ -262,13 +300,21 @@ export default function SystemSection({ onUpgrade, onRollback }: Props) {
         )}
 
         {versionInfo.updateAvailable && versionInfo.latest && (
-          <div className="mt-3 rounded-lg bg-blue-950/50 border border-blue-800/50 p-3">
+          <div className={`mt-3 rounded-lg border p-3 ${
+            latestIsPrerelease
+              ? 'bg-orange-950/50 border-orange-800/50'
+              : 'bg-blue-950/50 border-blue-800/50'
+          }`}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-blue-300 font-medium">
-                  Update available: v{versionInfo.latest}
+                <p className={`text-sm font-medium ${
+                  latestIsPrerelease ? 'text-orange-300' : 'text-blue-300'
+                }`}>
+                  {latestIsPrerelease ? 'Pre-release' : 'Update'} available: v{versionInfo.latest}
                 </p>
-                <p className="text-xs text-blue-400/70 mt-0.5">
+                <p className={`text-xs mt-0.5 ${
+                  latestIsPrerelease ? 'text-orange-400/70' : 'text-blue-400/70'
+                }`}>
                   You are on v{versionInfo.current}
                 </p>
               </div>
@@ -277,7 +323,7 @@ export default function SystemSection({ onUpgrade, onRollback }: Props) {
                 size="sm"
                 onClick={() => handleUpgrade(`v${versionInfo.latest}`)}
               >
-                Update Now
+                {latestIsPrerelease ? 'Install' : 'Update Now'}
               </Button>
             </div>
           </div>

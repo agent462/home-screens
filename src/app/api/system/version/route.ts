@@ -10,10 +10,11 @@ export async function GET(request: NextRequest) {
   try {
     await requireSession(request);
     const forceCheck = request.nextUrl.searchParams.get('check') === 'true';
+    const includePrerelease = request.nextUrl.searchParams.get('channel') === 'dev';
 
     const [info, tags] = await Promise.all([
-      getVersionInfo(),
-      getVersionTags(forceCheck),
+      getVersionInfo({ includePrerelease }),
+      getVersionTags({ force: forceCheck, includePrerelease }),
     ]);
 
     return NextResponse.json({

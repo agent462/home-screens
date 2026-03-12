@@ -1,7 +1,6 @@
 import { spawn, type ChildProcess } from 'child_process';
 import { createInterface } from 'readline';
 import path from 'path';
-import os from 'os';
 import { readConfig, writeConfig } from './config';
 import { migrateUp, getLatestSchemaVersion } from './migrations';
 import { hasReleaseTarball, GITHUB_REPO } from './version';

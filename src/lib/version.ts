@@ -102,14 +102,22 @@ async function getGitHubHeaders(): Promise<Record<string, string>> {
   return headers;
 }
 
-/** Fetch releases from GitHub API with ETag caching */
-export async function fetchGitHubReleases(force = false): Promise<GitHubRelease[]> {
+/** Fetch releases from GitHub API with ETag caching.
+ *  By default only stable releases are returned. Pass includePrerelease
+ *  to also return releases marked as pre-release on GitHub. */
+export async function fetchGitHubReleases(options?: {
+  force?: boolean;
+  includePrerelease?: boolean;
+}): Promise<GitHubRelease[]> {
+  const { force = false, includePrerelease = false } = options ?? {};
+
   if (
     !force &&
     cachedGitHubReleases &&
     Date.now() - cachedGitHubReleases.fetchedAt < GITHUB_CACHE_TTL_MS
   ) {
-    return cachedGitHubReleases.releases;
+    const cached = cachedGitHubReleases.releases;
+    return includePrerelease ? cached : cached.filter((r) => !r.prerelease);
   }
 
   const headers = await getGitHubHeaders();
@@ -128,7 +136,8 @@ export async function fetchGitHubReleases(force = false): Promise<GitHubRelease[
 
     if (res.status === 304 && cachedGitHubReleases) {
       cachedGitHubReleases.fetchedAt = Date.now();
-      return cachedGitHubReleases.releases;
+      const cached = cachedGitHubReleases.releases;
+      return includePrerelease ? cached : cached.filter((r) => !r.prerelease);
     }
 
     if (!res.ok) {
@@ -137,10 +146,10 @@ export async function fetchGitHubReleases(force = false): Promise<GitHubRelease[
 
     const releases: GitHubRelease[] = await res.json();
     const etag = res.headers.get('etag');
-    const filtered = releases.filter((r) => !r.draft && !r.prerelease);
+    const nonDraft = releases.filter((r) => !r.draft);
 
-    cachedGitHubReleases = { releases: filtered, etag, fetchedAt: Date.now() };
-    return filtered;
+    cachedGitHubReleases = { releases: nonDraft, etag, fetchedAt: Date.now() };
+    return includePrerelease ? nonDraft : nonDraft.filter((r) => !r.prerelease);
   } finally {
     clearTimeout(timeout);
   }
@@ -162,7 +171,7 @@ function releasesToTags(releases: GitHubRelease[]): TagInfo[] {
 /** Check if a specific tag has a pre-built tarball on GitHub Releases */
 export async function hasReleaseTarball(tag: string): Promise<boolean> {
   try {
-    const releases = await fetchGitHubReleases();
+    const releases = await fetchGitHubReleases({ includePrerelease: true });
     const release = releases.find((r) => r.tag_name === tag);
     if (!release) return false;
     return release.assets.some(
@@ -183,6 +192,8 @@ export function parseVersionTags(tagLines: string): TagInfo[] {
   for (const line of tagLines.split('\n')) {
     const trimmed = line.trim();
     if (!trimmed) continue;
+    // Skip dereferenced annotated tag entries (e.g., refs/tags/v1.0.0^{})
+    if (trimmed.endsWith('^{}')) continue;
     // Format: <commit> refs/tags/v1.2.3
     const match = trimmed.match(/^([a-f0-9]+)\s+refs\/tags\/(v?\d+\.\d+\.\d+.*)$/);
     if (match) {
@@ -225,9 +236,14 @@ async function getGitVersionTags(): Promise<TagInfo[]> {
 // ---------------------------------------------------------------------------
 
 /** Get version tags — prefers GitHub API, falls back to git */
-export async function getVersionTags(force = false): Promise<TagInfo[]> {
+export async function getVersionTags(options?: {
+  force?: boolean;
+  includePrerelease?: boolean;
+}): Promise<TagInfo[]> {
+  const { force = false, includePrerelease = false } = options ?? {};
+
   try {
-    const releases = await fetchGitHubReleases(force);
+    const releases = await fetchGitHubReleases({ force, includePrerelease });
     if (releases.length > 0) {
       return releasesToTags(releases);
     }
@@ -237,7 +253,8 @@ export async function getVersionTags(force = false): Promise<TagInfo[]> {
 
   if (await isGitRepo()) {
     if (force) await fetchRemoteTags(true);
-    return getGitVersionTags();
+    const tags = await getGitVersionTags();
+    return includePrerelease ? tags : tags.filter((t) => !isPrerelease(t.version));
   }
 
   return [];
@@ -256,7 +273,10 @@ async function detectInstallMethod(): Promise<'git' | 'tarball' | 'unknown'> {
 }
 
 /** Get full version info */
-export async function getVersionInfo(): Promise<VersionInfo> {
+export async function getVersionInfo(options?: {
+  includePrerelease?: boolean;
+}): Promise<VersionInfo> {
+  const { includePrerelease = false } = options ?? {};
   const [current, commit, installedVia] = await Promise.all([
     getPackageVersion(),
     getCurrentCommit(),
@@ -265,7 +285,7 @@ export async function getVersionInfo(): Promise<VersionInfo> {
 
   // Try GitHub API first
   try {
-    const releases = await fetchGitHubReleases();
+    const releases = await fetchGitHubReleases({ includePrerelease });
     if (releases.length > 0) {
       const tags = releasesToTags(releases);
       const latest = tags.length > 0 ? tags[0] : null;
@@ -289,7 +309,10 @@ export async function getVersionInfo(): Promise<VersionInfo> {
   // Fallback to git
   if (installedVia === 'git') {
     await fetchRemoteTags();
-    const tags = await getGitVersionTags();
+    let tags = await getGitVersionTags();
+    if (!includePrerelease) {
+      tags = tags.filter((t) => !isPrerelease(t.version));
+    }
     const branch = await getCurrentBranch();
     const latest = tags.length > 0 ? tags[0] : null;
     const updateAvailable = latest !== null && compareSemver(latest.version, current) > 0;
@@ -316,13 +339,54 @@ export async function getVersionInfo(): Promise<VersionInfo> {
   };
 }
 
-/** Compare two semver strings. Returns >0 if a > b, <0 if a < b, 0 if equal */
+/** Split "1.2.3-rc.1" into ["1.2.3", "rc.1"] */
+function splitVersion(v: string): [string, string | null] {
+  const idx = v.indexOf('-');
+  if (idx === -1) return [v, null];
+  return [v.substring(0, idx), v.substring(idx + 1)];
+}
+
+/** Check if a version string has a pre-release suffix (e.g., "0.15.0-rc.1") */
+export function isPrerelease(version: string): boolean {
+  return version.includes('-');
+}
+
+/** Compare two semver strings (with pre-release support).
+ *  Returns >0 if a > b, <0 if a < b, 0 if equal.
+ *  Per semver: 1.0.0-rc.1 < 1.0.0 (pre-release < release) */
 export function compareSemver(a: string, b: string): number {
-  const pa = a.split('.').map(Number);
-  const pb = b.split('.').map(Number);
+  const [aVer, aPre] = splitVersion(a);
+  const [bVer, bPre] = splitVersion(b);
+  const pa = aVer.split('.').map(Number);
+  const pb = bVer.split('.').map(Number);
   for (let i = 0; i < 3; i++) {
     const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
     if (diff !== 0) return diff;
+  }
+  // Same major.minor.patch: release > pre-release
+  if (!aPre && !bPre) return 0;
+  if (!aPre) return 1;
+  if (!bPre) return -1;
+  // Both have pre-release identifiers — compare left to right
+  const aIds = aPre.split('.');
+  const bIds = bPre.split('.');
+  for (let i = 0; i < Math.max(aIds.length, bIds.length); i++) {
+    if (i >= aIds.length) return -1;
+    if (i >= bIds.length) return 1;
+    const aNum = parseInt(aIds[i], 10);
+    const bNum = parseInt(bIds[i], 10);
+    const aIsNum = !isNaN(aNum);
+    const bIsNum = !isNaN(bNum);
+    if (aIsNum && bIsNum) {
+      if (aNum !== bNum) return aNum - bNum;
+    } else if (aIsNum) {
+      return -1;
+    } else if (bIsNum) {
+      return 1;
+    } else {
+      const cmp = aIds[i].localeCompare(bIds[i]);
+      if (cmp !== 0) return cmp;
+    }
   }
   return 0;
 }

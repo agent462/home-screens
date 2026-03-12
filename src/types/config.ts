@@ -142,6 +142,7 @@ export interface GlobalSettings {
   piVariant?: 'desktop' | 'lite';
   transitionEffect?: TransitionEffect;
   transitionDuration?: number;
+  updateChannel?: 'stable' | 'dev';
 }
 
 export interface Profile {
