@@ -11,7 +11,9 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
+import { Check, AlertCircle } from 'lucide-react';
 import { useEditorStore } from '@/stores/editor-store';
+import { useAutoSave } from '@/hooks/useAutoSave';
 import { DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT, DEFAULT_MODULE_SIZES, snapToGrid } from '@/lib/constants';
 import { getModuleDefinition } from '@/lib/module-registry';
 import type { ModuleType } from '@/types/config';
@@ -26,14 +28,13 @@ import Button from '@/components/ui/Button';
 export default function EditorPage() {
   const {
     config,
-    isDirty,
-    isSaving,
     selectedScreenId,
     loadConfig,
-    saveConfig,
     addModule,
     moveModule,
   } = useEditorStore();
+
+  const { isDirty, isSaving, saveError, saveConfig } = useAutoSave();
 
   const [activePaletteType, setActivePaletteType] = useState<string | null>(null);
   const router = useRouter();
@@ -118,7 +119,10 @@ export default function EditorPage() {
           <div className="flex shrink-0 items-center gap-2">
             <Button
               variant="secondary"
-              onClick={() => router.push('/editor/settings')}
+              onClick={async () => {
+                if (isDirty) await saveConfig();
+                router.push('/editor/settings');
+              }}
             >
               Settings
             </Button>
@@ -128,13 +132,24 @@ export default function EditorPage() {
             >
               Preview
             </Button>
-            <Button
-              variant="primary"
-              onClick={saveConfig}
-              disabled={!isDirty || isSaving}
-            >
-              {isSaving ? 'Saving...' : 'Save'}
-            </Button>
+            <div className="min-w-24 flex items-center justify-end gap-1.5">
+              {saveError ? (
+                <>
+                  <AlertCircle className="w-3.5 h-3.5 text-red-400" />
+                  <span className="text-xs text-red-400">Save failed</span>
+                  <Button variant="secondary" size="sm" onClick={saveConfig}>
+                    Retry
+                  </Button>
+                </>
+              ) : isSaving ? (
+                <span className="text-xs text-neutral-500">Saving...</span>
+              ) : !isDirty ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-green-500" />
+                  <span className="text-xs text-green-500">Saved</span>
+                </>
+              ) : null}
+            </div>
           </div>
         </div>
 

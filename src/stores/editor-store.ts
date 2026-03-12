@@ -21,6 +21,7 @@ interface EditorState {
   selectedModuleId: string | null;
   isDirty: boolean;
   isSaving: boolean;
+  saveError: string | null;
 
   loadConfig: () => Promise<void>;
   saveConfig: () => Promise<void>;
@@ -67,6 +68,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedModuleId: null,
   isDirty: false,
   isSaving: false,
+  saveError: null,
 
   loadConfig: async () => {
     try {
@@ -90,20 +92,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   saveConfig: async () => {
-    const { config } = get();
-    if (!config) return;
-    set({ isSaving: true });
+    const { config, isSaving } = get();
+    if (!config || isSaving) return;
+    const configSnapshot = config;
+    set({ isSaving: true, saveError: null });
     try {
       const res = await editorFetch('/api/config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config),
+        body: JSON.stringify(configSnapshot),
       });
       if (!res.ok) throw new Error(`Save failed: ${res.status}`);
-      set({ isSaving: false, isDirty: false });
+      // Only clear dirty if no new changes occurred during save
+      const { config: current } = get();
+      set({ isSaving: false, isDirty: current !== configSnapshot, saveError: null });
     } catch (err) {
-      set({ isSaving: false });
+      set({ isSaving: false, saveError: 'Failed to save' });
       console.error('Failed to save config:', err);
+      throw err;
     }
   },
 
@@ -136,7 +142,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         s.id === screenId ? { ...s, modules: [...s.modules, newModule] } : s,
       ),
     };
-    set({ config: updated, isDirty: true, selectedModuleId: newModule.id });
+    set({ config: updated, isDirty: true, saveError: null, selectedModuleId: newModule.id });
   },
 
   removeModule: (screenId, moduleId) => {
@@ -150,7 +156,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     };
     set({
       config: updated,
-      isDirty: true,
+      isDirty: true, saveError: null,
       selectedModuleId: selectedModuleId === moduleId ? null : selectedModuleId,
     });
   },
@@ -160,7 +166,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (!config) return;
     set({
       config: updateModuleInConfig(config, screenId, moduleId, (m) => ({ ...m, ...updates })),
-      isDirty: true,
+      isDirty: true, saveError: null,
     });
   },
 
@@ -172,7 +178,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         ...m,
         style: { ...m.style, ...style },
       })),
-      isDirty: true,
+      isDirty: true, saveError: null,
     });
   },
 
@@ -181,7 +187,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (!config) return;
     set({
       config: updateModuleInConfig(config, screenId, moduleId, (m) => ({ ...m, position })),
-      isDirty: true,
+      isDirty: true, saveError: null,
     });
   },
 
@@ -190,7 +196,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (!config) return;
     set({
       config: updateModuleInConfig(config, screenId, moduleId, (m) => ({ ...m, size })),
-      isDirty: true,
+      isDirty: true, saveError: null,
     });
   },
 
@@ -207,7 +213,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       config: { ...config, screens: [...config.screens, newScreen] },
       selectedScreenId: newScreen.id,
       selectedModuleId: null,
-      isDirty: true,
+      isDirty: true, saveError: null,
     });
     const url = new URL(window.location.href);
     url.searchParams.set('screen', newScreen.id);
@@ -228,7 +234,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       config: { ...config, screens, profiles },
       selectedScreenId: newSelectedId,
       selectedModuleId: null,
-      isDirty: true,
+      isDirty: true, saveError: null,
     });
     if (newSelectedId) {
       const url = new URL(window.location.href);
@@ -245,7 +251,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         ...config,
         screens: config.screens.map((s) => (s.id === id ? { ...s, ...updates } : s)),
       },
-      isDirty: true,
+      isDirty: true, saveError: null,
     });
   },
 
@@ -254,7 +260,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (!config) return;
     set({
       config: { ...config, settings: { ...config.settings, ...settings } },
-      isDirty: true,
+      isDirty: true, saveError: null,
     });
   },
 
@@ -268,7 +274,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     };
     set({
       config: { ...config, profiles: [...(config.profiles ?? []), newProfile] },
-      isDirty: true,
+      isDirty: true, saveError: null,
     });
   },
 
@@ -281,7 +287,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       : config.settings;
     set({
       config: { ...config, profiles, settings },
-      isDirty: true,
+      isDirty: true, saveError: null,
     });
   },
 
@@ -295,7 +301,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           p.id === id ? { ...p, ...updates } : p,
         ),
       },
-      isDirty: true,
+      isDirty: true, saveError: null,
     });
   },
 
@@ -305,7 +311,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const profiles = [...config.profiles];
     const [moved] = profiles.splice(fromIndex, 1);
     profiles.splice(toIndex, 0, moved);
-    set({ config: { ...config, profiles }, isDirty: true });
+    set({ config: { ...config, profiles }, isDirty: true, saveError: null });
   },
 
   setActiveProfile: (id: string | undefined) => {
@@ -313,7 +319,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (!config) return;
     set({
       config: { ...config, settings: { ...config.settings, activeProfile: id } },
-      isDirty: true,
+      isDirty: true, saveError: null,
     });
   },
 
@@ -339,7 +345,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       config,
       selectedScreenId: firstId,
       selectedModuleId: null,
-      isDirty: true,
+      isDirty: true, saveError: null,
     });
     if (firstId) {
       const url = new URL(window.location.href);
