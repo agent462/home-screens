@@ -9,16 +9,19 @@ Home Screens is designed to run as a dedicated kiosk display on a Raspberry Pi. 
 - A display connected via HDMI
 - Network connection (Ethernet or Wi-Fi)
 
-## One-Command Install
+## Install
+
+Clone the repo and run the install script:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/agent462/home-screens/main/scripts/install.sh | bash
+git clone https://github.com/agent462/home-screens.git
+~/home-screens/scripts/install.sh
 ```
 
 The script handles everything:
 
 1. **Node.js 22** — installs via NodeSource
-2. **Latest release** — downloads the pre-built tarball from GitHub Releases
+2. **Latest release** — downloads the pre-built tarball from GitHub Releases to `/opt/home-screens/`
 3. **Chromium** — installs the browser for kiosk mode
 4. **systemd service** — creates and enables the `home-screens` server
 5. **Cage kiosk** — configures Chromium in fullscreen kiosk mode

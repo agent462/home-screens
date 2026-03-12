@@ -233,7 +233,6 @@ npm run lint        # Run ESLint
 | Script | Description |
 |---|---|
 | `scripts/install.sh` | Full Raspberry Pi setup |
-| `scripts/setup-kiosk.sh` | Kiosk mode configuration only |
 | `scripts/start-display.sh` | Manual server + kiosk start |
 | `scripts/rotate-display.sh` | Change screen orientation |
 | `scripts/deploy.sh` | Production deployment |

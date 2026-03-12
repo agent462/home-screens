@@ -5,9 +5,11 @@ set -euo pipefail
 # Downloads a pre-built release from GitHub and configures the kiosk.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/agent462/home-screens/main/scripts/install.sh | bash
+#   git clone https://github.com/agent462/home-screens.git
+#   ~/home-screens/scripts/install.sh
 
-APP_DIR="${HOME}/home-screens"
+INSTALL_BASE="/opt/home-screens"
+APP_DIR="${INSTALL_BASE}/current"
 REPO="agent462/home-screens"
 NODE_MAJOR=22
 
@@ -21,8 +23,8 @@ info()  { echo -e "${GREEN}[*]${NC} $1"; }
 warn()  { echo -e "${YELLOW}[!]${NC} $1"; }
 error() { echo -e "${RED}[x]${NC} $1"; exit 1; }
 
-# When piped via curl | bash, stdin is the download stream.
-# Reattach stdin to the terminal for interactive prompts.
+# Reattach stdin to the terminal for interactive prompts
+# (needed when piped or redirected).
 if [ ! -t 0 ]; then
   exec < /dev/tty
 fi
@@ -63,42 +65,57 @@ fi
 info "Node $(node -v) / npm $(npm -v)"
 
 # --- Step 3: Download latest release ---
-if [ -d "${APP_DIR}" ]; then
-  warn "Directory ${APP_DIR} already exists — skipping download. Use the editor to upgrade."
-else
-  info "Fetching latest release..."
-  LATEST_TAG=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | node -e "
-    let d=''; process.stdin.on('data',c=>d+=c); process.stdin.on('end',()=>{
-      try { console.log(JSON.parse(d).tag_name); }
-      catch { process.exit(1); }
-    });
-  ")
+info "Fetching latest release..."
+LATEST_TAG=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | node -e "
+  let d=''; process.stdin.on('data',c=>d+=c); process.stdin.on('end',()=>{
+    try { console.log(JSON.parse(d).tag_name); }
+    catch { process.exit(1); }
+  });
+")
 
-  if [ -z "${LATEST_TAG}" ]; then
-    error "Could not determine latest release tag."
-  fi
-
-  info "Downloading ${LATEST_TAG}..."
-  ASSET_NAME="home-screens-${LATEST_TAG}.tar.gz"
-  DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${LATEST_TAG}/${ASSET_NAME}"
-
-  mkdir -p "${APP_DIR}"
-  if ! curl -fSL --speed-limit 1024 --speed-time 60 -o "/tmp/${ASSET_NAME}" "${DOWNLOAD_URL}"; then
-    rm -rf "${APP_DIR}"
-    error "Failed to download release tarball."
-  fi
-
-  info "Extracting..."
-  tar -xzf "/tmp/${ASSET_NAME}" -C "${APP_DIR}"
-  rm -f "/tmp/${ASSET_NAME}"
-
-  # Validate
-  if [ ! -f "${APP_DIR}/server.js" ] || [ ! -f "${APP_DIR}/package.json" ]; then
-    error "Tarball is missing required files (server.js, package.json)."
-  fi
-
-  info "Installed ${LATEST_TAG} to ${APP_DIR}"
+if [ -z "${LATEST_TAG}" ]; then
+  error "Could not determine latest release tag."
 fi
+
+info "Downloading ${LATEST_TAG}..."
+ASSET_NAME="home-screens-${LATEST_TAG}.tar.gz"
+DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${LATEST_TAG}/${ASSET_NAME}"
+
+if ! curl -fSL --speed-limit 1024 --speed-time 60 -o "/tmp/${ASSET_NAME}" "${DOWNLOAD_URL}"; then
+  error "Failed to download release tarball."
+fi
+
+# Create the install base owned by the current user.
+# The app lives in current/, with staging/rollback siblings for atomic upgrades.
+if [ ! -d "${INSTALL_BASE}" ]; then
+  sudo mkdir -p "${INSTALL_BASE}"
+  sudo chown "${USER}:${USER}" "${INSTALL_BASE}"
+fi
+
+# Preserve any existing data/ directory from a prior install.
+if [ -d "${APP_DIR}/data" ]; then
+  mv "${APP_DIR}/data" "/tmp/home-screens-data-$$"
+fi
+
+rm -rf "${APP_DIR}"
+mkdir -p "${APP_DIR}"
+
+info "Extracting..."
+tar -xzf "/tmp/${ASSET_NAME}" -C "${APP_DIR}"
+rm -f "/tmp/${ASSET_NAME}"
+
+# Restore user data if we saved it
+if [ -d "/tmp/home-screens-data-$$" ]; then
+  rm -rf "${APP_DIR}/data"
+  mv "/tmp/home-screens-data-$$" "${APP_DIR}/data"
+fi
+
+# Validate
+if [ ! -f "${APP_DIR}/server.js" ] || [ ! -f "${APP_DIR}/package.json" ]; then
+  error "Tarball is missing required files (server.js, package.json)."
+fi
+
+info "Installed ${LATEST_TAG} to ${APP_DIR}"
 
 cd "${APP_DIR}"
 
@@ -158,6 +175,7 @@ echo "  Editor URL:   http://$(hostname -I | awk '{print $1}'):3000/editor"
 echo ""
 echo "  Service:      home-screens (Next.js server)"
 echo "  Kiosk:        cage (launches automatically on TTY1)"
+echo "  App:          ${APP_DIR}"
 echo "  Data:         ${APP_DIR}/data/config.json"
 echo ""
 echo "  Commands:"

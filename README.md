@@ -72,14 +72,15 @@ Google Calendar uses the **OAuth 2.0 Device Flow**, which means you can authoriz
 
 ## Raspberry Pi Install
 
-Run the install script on a fresh Raspberry Pi OS:
+Clone the repo and run the install script on a fresh Raspberry Pi OS:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/agent462/home-screens/main/scripts/install.sh | bash
+git clone https://github.com/agent462/home-screens.git
+~/home-screens/scripts/install.sh
 ```
 
 The script handles everything:
-- Downloads the latest pre-built release from GitHub
+- Downloads the latest pre-built release to `/opt/home-screens/`
 - Installs Node.js 22, Chromium, and system dependencies
 - Creates the systemd service and configures the kiosk
 - Configures autologin and display orientation
@@ -126,7 +127,6 @@ data/
   config.json            # Screen configuration (file-based, no database)
 scripts/
   install.sh             # Full Raspberry Pi install script
-  setup-kiosk.sh         # Kiosk-only setup (used by install.sh)
   start-display.sh       # Manual start script
 ```
 

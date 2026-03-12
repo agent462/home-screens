@@ -8,7 +8,7 @@ import { hasReleaseTarball, GITHUB_REPO } from './version';
 
 /** Explicit APP_DIR — safe to use after the atomic swap when process.cwd() is stale.
  *  Reads HOME_SCREENS_DIR env var to support non-default install paths. */
-const APP_DIR = process.env.HOME_SCREENS_DIR || path.resolve(os.homedir(), 'home-screens');
+const APP_DIR = process.env.HOME_SCREENS_DIR || '/opt/home-screens/current';
 
 type UpgradeStep =
   | 'preflight'

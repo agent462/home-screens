@@ -11,7 +11,7 @@ set -euo pipefail
 #   ./scripts/deploy.sh --restart-only            # just restart the service
 
 DEFAULT_HOST="signal@192.168.86.143"
-REMOTE_DIR="home-screens"
+REMOTE_DIR="/opt/home-screens/current"
 SKIP_INSTALL=false
 RESTART_ONLY=false
 HOST=""
@@ -53,7 +53,7 @@ done
 HOST="${HOST:-$DEFAULT_HOST}"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
-info "Deploying to ${HOST}:~/${REMOTE_DIR}"
+info "Deploying to ${HOST}:${REMOTE_DIR}"
 
 # --- Restart only ---
 if [ "$RESTART_ONLY" = true ]; then
@@ -83,7 +83,7 @@ rsync -azP --delete \
   --exclude 'public/backgrounds/*.jpeg' \
   --exclude 'public/backgrounds/*.png' \
   --exclude 'public/backgrounds/*.webp' \
-  "$PROJECT_DIR/" "$HOST:~/$REMOTE_DIR/"
+  "$PROJECT_DIR/" "$HOST:$REMOTE_DIR/"
 
 # --- Build locally ---
 step "Building locally..."
@@ -93,17 +93,17 @@ cd "$PROJECT_DIR" && npm run build
 step "Syncing build output..."
 rsync -azP --delete \
   --exclude 'cache' \
-  "$PROJECT_DIR/.next/" "$HOST:~/$REMOTE_DIR/.next/"
+  "$PROJECT_DIR/.next/" "$HOST:$REMOTE_DIR/.next/"
 
 # --- Install dependencies ---
 if [ "$SKIP_INSTALL" = false ]; then
   step "Installing dependencies..."
-  ssh "$HOST" "cd ~/$REMOTE_DIR && npm install --omit=dev"
+  ssh "$HOST" "cd $REMOTE_DIR && npm install --omit=dev"
 fi
 
 # --- Apply system config ---
 step "Applying system configuration..."
-ssh "$HOST" "cd ~/$REMOTE_DIR && bash scripts/upgrade.sh setup-system"
+ssh "$HOST" "cd $REMOTE_DIR && bash scripts/upgrade.sh setup-system"
 
 # --- Restart service ---
 step "Restarting service..."
