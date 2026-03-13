@@ -19,7 +19,7 @@ export default function StandingsModule({ config, style }: StandingsModuleProps)
   const grouping = config.grouping ?? 'division';
   const view = config.view ?? 'table';
 
-  const [data] = useFetchData<{ groups: StandingsGroup[] }>(
+  const [data, error] = useFetchData<{ groups: StandingsGroup[] }>(
     standingsUrl(config),
     config.refreshIntervalMs ?? 300000,
   );
@@ -27,7 +27,7 @@ export default function StandingsModule({ config, style }: StandingsModuleProps)
   const groups = data?.groups ?? [];
 
   if (data === null) {
-    return <ModuleLoadingState style={style} message="Loading standings\u2026" />;
+    return <ModuleLoadingState style={style} message="Loading standings…" error={error} />;
   }
 
   if (groups.length === 0) {

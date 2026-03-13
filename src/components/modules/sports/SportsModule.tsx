@@ -17,7 +17,7 @@ interface SportsModuleProps {
 }
 
 export default function SportsModule({ config, style }: SportsModuleProps) {
-  const [data] = useFetchData<{ games: Game[] }>(
+  const [data, error] = useFetchData<{ games: Game[] }>(
     sportsUrl(config),
     config.refreshIntervalMs ?? 60000,
   );
@@ -25,7 +25,7 @@ export default function SportsModule({ config, style }: SportsModuleProps) {
   const view = config.view ?? 'scoreboard';
 
   if (data === null) {
-    return <ModuleLoadingState style={style} message="Loading scores\u2026" />;
+    return <ModuleLoadingState style={style} message="Loading scores…" error={error} />;
   }
 
   if (games.length === 0) {

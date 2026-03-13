@@ -18,14 +18,14 @@ interface HistoryEvent {
 }
 
 export default function HistoryModule({ config, style }: HistoryModuleProps) {
-  const [data] = useFetchData<{ events: HistoryEvent[] }>(historyUrl(), config.refreshIntervalMs ?? 86400000);
+  const [data, error] = useFetchData<{ events: HistoryEvent[] }>(historyUrl(), config.refreshIntervalMs ?? 86400000);
   const events = data?.events ?? [];
 
   const rotationMs = config.rotationIntervalMs ?? 10000;
   const index = useRotatingIndex(events.length, rotationMs);
 
   if (!data) {
-    return <ModuleLoadingState style={style} message="Loading history\u2026" />;
+    return <ModuleLoadingState style={style} message="Loading history…" error={error} />;
   }
 
   return (

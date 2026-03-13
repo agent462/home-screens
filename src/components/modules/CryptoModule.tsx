@@ -61,7 +61,7 @@ const cryptoTableColumns: TableColumn<CryptoData>[] = [
 ];
 
 export default function CryptoModule({ config, style }: CryptoModuleProps) {
-  const [data] = useFetchData<{ prices: CryptoData[] }>(
+  const [data, error] = useFetchData<{ prices: CryptoData[] }>(
     cryptoUrl(config) ?? '',
     config.refreshIntervalMs ?? 60000,
   );
@@ -71,7 +71,7 @@ export default function CryptoModule({ config, style }: CryptoModuleProps) {
   const tickerSpeed = config.tickerSpeed ?? 5;
 
   if (data === null) {
-    return <ModuleLoadingState style={style} message="Loading\u2026" />;
+    return <ModuleLoadingState style={style} message="Loading…" error={error} />;
   }
 
   if (coins.length === 0) {

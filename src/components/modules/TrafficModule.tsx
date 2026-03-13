@@ -31,10 +31,10 @@ function delayColor(delayMinutes: number): string {
 
 export default function TrafficModule({ config, style }: TrafficModuleProps) {
   const routes = config.routes ?? [];
-  const [data] = useFetchData<TrafficData>(trafficUrl(config) ?? '', config.refreshIntervalMs ?? 300000);
+  const [data, error] = useFetchData<TrafficData>(trafficUrl(config) ?? '', config.refreshIntervalMs ?? 300000);
 
   if (routes.length > 0 && !data) {
-    return <ModuleLoadingState style={style} message="Loading traffic\u2026" />;
+    return <ModuleLoadingState style={style} message="Loading traffic…" error={error} />;
   }
 
   return (

@@ -121,7 +121,7 @@ function CompactView({ items, showTimestamp }: { items: NewsItem[]; showTimestam
 }
 
 export default function NewsModule({ config, style }: NewsModuleProps) {
-  const [data] = useFetchData<{ items: NewsItem[] }>(
+  const [data, error] = useFetchData<{ items: NewsItem[] }>(
     newsUrl(config),
     config.refreshIntervalMs ?? 300000,
   );
@@ -131,7 +131,7 @@ export default function NewsModule({ config, style }: NewsModuleProps) {
   const items = view === 'headline' ? allItems : allItems.slice(0, maxItems);
 
   if (data === null) {
-    return <ModuleLoadingState style={style} message="Loading news\u2026" />;
+    return <ModuleLoadingState style={style} message="Loading news…" error={error} />;
   }
 
   if (allItems.length === 0) {

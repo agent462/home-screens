@@ -53,13 +53,13 @@ function getUVColor(uv: number): string {
 }
 
 export default function AirQualityModule({ config, style }: AirQualityModuleProps) {
-  const [data] = useFetchData<AirQualityData>(
+  const [data, error] = useFetchData<AirQualityData>(
     airQualityUrl(),
     config.refreshIntervalMs ?? 600000,
   );
 
   if (!data) {
-    return <ModuleLoadingState style={style} message="Loading air quality\u2026" />;
+    return <ModuleLoadingState style={style} message="Loading air quality…" error={error} />;
   }
 
   const aqiLabel = AQI_LABELS[data.aqi] ?? 'Unknown';

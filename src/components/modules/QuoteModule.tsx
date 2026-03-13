@@ -12,10 +12,10 @@ interface QuoteModuleProps {
 }
 
 export default function QuoteModule({ config, style }: QuoteModuleProps) {
-  const [data] = useFetchData<{ quote: string; author: string }>(quoteUrl(), config.refreshIntervalMs ?? 300000);
+  const [data, error] = useFetchData<{ quote: string; author: string }>(quoteUrl(), config.refreshIntervalMs ?? 300000);
 
   if (!data) {
-    return <ModuleLoadingState style={style} message="Loading quote\u2026" />;
+    return <ModuleLoadingState style={style} message="Loading quote…" error={error} />;
   }
 
   return (

@@ -77,7 +77,7 @@ export default function RainMapModule({
   const colorScheme = config.colorScheme ?? 2;
   const refreshMs = config.refreshIntervalMs ?? 600000;
 
-  const [data] = useFetchData<RainViewerData>(rainMapUrl(), refreshMs);
+  const [data, error] = useFetchData<RainViewerData>(rainMapUrl(), refreshMs);
 
   const [displayIndex, setDisplayIndex] = useState(0);
   const [imagesReady, setImagesReady] = useState(false);
@@ -224,7 +224,7 @@ export default function RainMapModule({
   }, [frames, imagesReady, animationSpeedMs, extraDelayLastFrameMs]);
 
   if (!data) {
-    return <ModuleLoadingState style={style} message="Loading rain map\u2026" />;
+    return <ModuleLoadingState style={style} message="Loading rain map…" error={error} />;
   }
 
   if (!frames.length) {
