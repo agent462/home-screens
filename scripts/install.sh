@@ -6,8 +6,9 @@ set -euo pipefail
 #
 # Usage:
 #   git clone https://github.com/agent462/home-screens.git
-#   ~/home-screens/scripts/install.sh          # Pi OS with Desktop
-#   ~/home-screens/scripts/install.sh --lite   # Pi OS Lite (no desktop)
+#   ~/home-screens/scripts/install.sh                        # Pi OS with Desktop (latest release)
+#   ~/home-screens/scripts/install.sh --lite                 # Pi OS Lite (no desktop)
+#   ~/home-screens/scripts/install.sh --version v1.2.0       # Install a specific release
 
 INSTALL_BASE="/opt/home-screens"
 APP_DIR="${INSTALL_BASE}/current"
@@ -19,9 +20,13 @@ source "$(dirname "$0")/lib/common.sh"
 
 # --- Parse flags ---
 PI_VARIANT="desktop"
+REQUESTED_VERSION=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --lite) PI_VARIANT="lite"; shift ;;
+    --version)
+      if [ -z "${2:-}" ]; then error "--version requires a tag (e.g. --version v1.2.0)"; fi
+      REQUESTED_VERSION="$2"; shift 2 ;;
     *)      error "Unknown option: $1" ;;
   esac
 done
@@ -39,17 +44,22 @@ sudo apt-get install -y -qq curl
 # --- Step 2: Node.js ---
 install_node "${NODE_MAJOR}"
 
-# --- Step 3: Download latest release ---
-info "Fetching latest release..."
-LATEST_TAG=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | node -e "
-  let d=''; process.stdin.on('data',c=>d+=c); process.stdin.on('end',()=>{
-    try { console.log(JSON.parse(d).tag_name); }
-    catch { process.exit(1); }
-  });
-")
+# --- Step 3: Download release ---
+if [ -n "${REQUESTED_VERSION}" ]; then
+  LATEST_TAG="${REQUESTED_VERSION}"
+  info "Using requested version ${LATEST_TAG}..."
+else
+  info "Fetching latest release..."
+  LATEST_TAG=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | node -e "
+    let d=''; process.stdin.on('data',c=>d+=c); process.stdin.on('end',()=>{
+      try { console.log(JSON.parse(d).tag_name); }
+      catch { process.exit(1); }
+    });
+  ")
 
-if [ -z "${LATEST_TAG}" ]; then
-  error "Could not determine latest release tag."
+  if [ -z "${LATEST_TAG}" ]; then
+    error "Could not determine latest release tag."
+  fi
 fi
 
 info "Downloading ${LATEST_TAG}..."
