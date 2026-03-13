@@ -262,7 +262,7 @@ function DragGhost({
   );
 }
 
-export default function EditorCanvas({ onScaleChange }: { onScaleChange?: (scale: number) => void }) {
+export default function EditorCanvas({ onScaleChange, canvasRef }: { onScaleChange?: (scale: number) => void; canvasRef?: React.RefObject<HTMLDivElement | null> }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.4);
   const { config, selectedScreenId, selectedModuleId, selectModule, resizeModule } = useEditorStore();
@@ -414,7 +414,7 @@ export default function EditorCanvas({ onScaleChange }: { onScaleChange?: (scale
   return (
     <div ref={containerRef} className="flex-1 flex items-center justify-center bg-neutral-950 overflow-hidden p-4">
       <div
-        ref={setNodeRef}
+        ref={(node) => { setNodeRef(node); if (canvasRef) (canvasRef as React.MutableRefObject<HTMLDivElement | null>).current = node; }}
         className="relative bg-neutral-900 border border-neutral-700 overflow-hidden"
         style={{
           width: displayWidth * scale,

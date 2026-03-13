@@ -39,6 +39,7 @@ export default function EditorPage() {
   const [activePaletteType, setActivePaletteType] = useState<string | null>(null);
   const router = useRouter();
   const canvasScaleRef = useRef(0.4);
+  const canvasElRef = useRef<HTMLDivElement | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -70,11 +71,12 @@ export default function EditorPage() {
         const scale = canvasScaleRef.current;
         const moduleType = data.moduleType as string;
         const defaultSize = DEFAULT_MODULE_SIZES[moduleType] || { w: 200, h: 200 };
-        // Compute pointer position relative to the canvas droppable
+        // Use a live DOM rect instead of over.rect, which can be stale after
+        // window resize (dnd-kit caches droppable rects with optimized frequency)
         const pointerEvent = activatorEvent as PointerEvent;
         const pointerX = pointerEvent.clientX + delta.x;
         const pointerY = pointerEvent.clientY + delta.y;
-        const canvasRect = over.rect;
+        const canvasRect = canvasElRef.current?.getBoundingClientRect() ?? over.rect;
         const rawX = (pointerX - canvasRect.left) / scale - defaultSize.w / 2;
         const rawY = (pointerY - canvasRect.top) / scale - defaultSize.h / 2;
         const dropX = snapToGrid(Math.max(0, Math.min(displayW - defaultSize.w, rawX)));
@@ -156,7 +158,7 @@ export default function EditorPage() {
         {/* Main area */}
         <div className="flex flex-1 overflow-hidden">
           <ModulePalette />
-          <EditorCanvas onScaleChange={(s) => { canvasScaleRef.current = s; }} />
+          <EditorCanvas onScaleChange={(s) => { canvasScaleRef.current = s; }} canvasRef={canvasElRef} />
           <PropertyPanel />
         </div>
       </div>
