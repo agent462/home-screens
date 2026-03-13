@@ -55,6 +55,17 @@ The module system follows a registry pattern. Each module is a self-contained un
 4. **Registration** — an entry in `src/lib/module-registry.ts` (label, icon, category, defaults)
 5. **Dynamic import** — lazy loading in `src/lib/module-components.ts`
 
+```mermaid
+flowchart TD
+    A["1. React Component\nsrc/components/modules/MyModule.tsx"] --> B["2. ModuleType union\nsrc/types/config.ts"]
+    B --> C["3. Config interface\nsrc/types/config.ts"]
+    C --> D["4. Default size\nsrc/lib/constants.ts"]
+    D --> E["5. Registry entry\nsrc/lib/module-registry.ts"]
+    E --> F["6. Dynamic import\nsrc/lib/module-components.ts"]
+    F --> G["7. Editor controls\nsrc/components/editor/PropertyPanel.tsx"]
+    G -.->|optional| H["8. API route\nsrc/app/api/*/route.ts"]
+```
+
 ### State Management
 
 - **Editor** — Zustand store (`src/stores/editor-store.ts`) manages config, selection, and dirty state
@@ -62,12 +73,32 @@ The module system follows a registry pattern. Each module is a self-contained un
 
 ### Data Flow
 
-```
-Editor:
-  Zustand store → fetch/save → /api/config → data/config.json
+#### Editor Flow
 
-Display:
-  ScreenRotator (polls config) → ScreenRenderer (fetches weather/calendar) → Modules
+```mermaid
+flowchart LR
+    User -->|interact| EditorCanvas
+    EditorCanvas -->|dispatch actions| ZustandStore["Zustand Store"]
+    ZustandStore -->|PUT /api/config| ConfigAPI["/api/config"]
+    ConfigAPI -->|write| ConfigJSON["data/config.json"]
+```
+
+#### Display Flow
+
+```mermaid
+flowchart LR
+    ConfigJSON["data/config.json"] -->|GET /api/config\nevery 3s| ScreenRotator
+    ScreenRotator -->|active screen| ScreenRenderer
+    ScreenRenderer -->|wraps each| ModuleWrapper
+    ModuleWrapper -->|renders| Modules["Individual Modules"]
+```
+
+#### API Data Flow
+
+```mermaid
+flowchart LR
+    Modules["Module Components"] -->|useFetchData hook| APIRoutes["API Routes\n/api/weather, /api/calendar, etc."]
+    APIRoutes -->|fetch| External["External Services\nOpenWeatherMap, Google, ESPN, etc."]
 ```
 
 The display polls `config.json` every 3 seconds, so changes made in the editor appear on the display within a few seconds.
@@ -76,13 +107,53 @@ The display polls `config.json` every 3 seconds, so changes made in the editor a
 
 Weather data comes from a pluggable provider system in `src/lib/weather.ts`:
 
-```typescript
-interface WeatherProvider {
-  getHourly(lat, lon, units): Promise<HourlyWeather[]>
-  getForecast(lat, lon, units): Promise<ForecastDay[]>
-  getMinutely?(lat, lon, units): Promise<MinutelyPrecip[]>
-  getAlerts?(lat, lon, units): Promise<WeatherAlert[]>
-}
+```mermaid
+classDiagram
+    class WeatherProvider {
+        <<interface>>
+        +getHourly(lat, lon, units) Promise~HourlyWeather[]~
+        +getForecast(lat, lon, units) Promise~ForecastDay[]~
+        +getMinutely(lat, lon, units)? Promise~MinutelyPrecip[]~
+        +getAlerts(lat, lon, units)? Promise~WeatherAlert[]~
+    }
+
+    class OpenWeatherMapProvider {
+        -apiKey: string
+        +getHourly()
+        +getForecast()
+    }
+
+    class WeatherAPIProvider {
+        -apiKey: string
+        +getHourly()
+        +getForecast()
+    }
+
+    class PirateWeatherProvider {
+        -apiKey: string
+        +getHourly()
+        +getForecast()
+        +getMinutely()
+        +getAlerts()
+    }
+
+    class NOAAProvider {
+        +getHourly()
+        +getForecast()
+        +getAlerts()
+    }
+
+    WeatherProvider <|.. OpenWeatherMapProvider
+    WeatherProvider <|.. WeatherAPIProvider
+    WeatherProvider <|.. PirateWeatherProvider
+    WeatherProvider <|.. NOAAProvider
+
+    class createWeatherProvider {
+        <<function>>
+        +createWeatherProvider(provider, apiKey) WeatherProvider
+    }
+
+    createWeatherProvider ..> WeatherProvider : creates
 ```
 
 Four implementations exist: `OpenWeatherMapProvider`, `WeatherAPIProvider`, `PirateWeatherProvider`, and `NOAAProvider`. The factory function `createWeatherProvider(provider, apiKey)` instantiates the correct one. Pirate Weather (a Dark Sky replacement) additionally supports minutely precipitation data and weather alerts. NOAA uses the National Weather Service API — it's free and requires no API key, but is limited to US locations.
@@ -102,9 +173,85 @@ API routes live in `src/app/api/*/route.ts` and serve as server-side proxies for
 | **Display** | `display/[action]` | Remote control: wake, sleep, brightness, navigation, profiles, alerts |
 | **Utility** | `backgrounds`, `geocode`, `image-proxy`, `time`, `unsplash` | Background images, geocoding, image proxying, server time, Unsplash photos |
 
+### Display Control
+
+Remote control uses a command queue pattern where the editor (or any HTTP client) pushes commands and the display polls to execute them.
+
+```mermaid
+sequenceDiagram
+    participant Client as Editor / HTTP Client
+    participant API as /api/display/[action]
+    participant Queue as Command Queue (in-memory)
+    participant Display as Display (ScreenRotator)
+
+    Note over Client,Display: Command Flow
+    Client->>API: POST /api/display/wake
+    API->>Queue: enqueueCommand("wake")
+    Display->>API: GET /api/display/commands (polls)
+    API->>Queue: drainCommands()
+    Queue-->>API: [{type: "wake"}]
+    API-->>Display: {commands: [{type: "wake"}]}
+    Display->>Display: Execute command
+
+    Note over Client,Display: Status Reporting
+    Display->>API: POST /api/display/status
+    API->>API: setDisplayStatus(status)
+    Client->>API: GET /api/display/status
+    API-->>Client: {screenIndex, screenName, displayState, ...}
+```
+
 ### Auth System
 
 An authentication layer (`src/lib/auth.ts`) protects the editor and API routes. Google OAuth device flow is used for Google Calendar integration via `auth/google`.
+
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant API as API Routes
+    participant Google as google.com/device
+
+    Note over Browser,Google: Password Auth
+    Browser->>API: POST /api/auth/login {password}
+    API-->>Browser: Set session cookie
+
+    Note over Browser,Google: Google OAuth Device Flow
+    Browser->>API: POST /api/auth/google/device
+    API-->>Browser: {user_code, verification_url}
+    Browser->>Browser: Display code to user
+    Browser->>Google: User enters code at google.com/device
+    loop Poll until authorized
+        Browser->>API: PUT /api/auth/google/device {device_code}
+        API-->>Browser: {status: "pending"} or {status: "ok"}
+    end
+    API->>API: Store tokens on disk
+```
+
+### Profile & Schedule System
+
+Profiles group screens together and can activate on a schedule. Individual modules also support per-module scheduling to show/hide by day and time.
+
+```mermaid
+flowchart TD
+    subgraph Profile
+        PID["id, name"]
+        SIDs["screenIds[]"]
+        PSched["schedule?\n(daysOfWeek, startTime, endTime, invert)"]
+    end
+
+    subgraph ModuleSchedule
+        Days["daysOfWeek: number[]\n0=Sun ... 6=Sat"]
+        Start["startTime: string\ne.g. '06:00'"]
+        End["endTime: string\ne.g. '09:00'"]
+        Invert["invert: boolean\nhide during window if true"]
+    end
+
+    subgraph ScreenRotator Resolution
+        A{"activeProfile\noverride set?"} -->|yes| B["Use override profile screens"]
+        A -->|no| C{"Scheduled profile\nmatches now?"}
+        C -->|yes| D["Use first matching\nprofile's screens"]
+        C -->|no| E["Use all screens"]
+    end
+```
 
 ## Adding a New Module
 
@@ -220,6 +367,8 @@ const [data] = useFetchData('/api/my-data?param=value', 60000)
 | `useSleepManager(sleep, screensaver)` | Manages display sleep/dim state |
 | `useDisplayCommands()` | Polls for remote commands and reports display status |
 | `useTZClock(timezone)` | Provides a live-updating `Date` for a given timezone |
+| `useIdleCursor(seconds)` | Hides cursor after idle period, restores on mousemove |
+| `useLiveConfig(screens, settings, profiles)` | Polls for config changes on the display |
 
 ## Testing
 

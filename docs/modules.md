@@ -378,12 +378,41 @@ Displays rotating positive affirmations with multiple visual styles. Time-aware 
 
 ### Text
 
-Static text block with alignment control.
+Rich text block with multiple display modes, effects, and styling options.
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `content` | string | `""` | Text content |
+| `content` | string | `""` | Text content (supports markdown when enabled) |
 | `alignment` | string | `"center"` | Text alignment: `left`, `center`, or `right` |
+| `orientation` | string | `"horizontal"` | Text direction: `horizontal`, `vertical`, or `sideways` |
+| `verticalAlign` | string | `"top"` | Vertical alignment: `top`, `center`, or `bottom` |
+| `markdown` | boolean | `false` | Enable markdown rendering |
+| `autoFit` | boolean | `false` | Auto-fit text size to fill the container |
+| `effect` | string | `"none"` | Text effect: `none`, `typewriter`, `fade-in`, `gradient-sweep`, or `glow` |
+| `rotationEnabled` | boolean | `false` | Rotate through content split by separator |
+| `rotationIntervalMs` | number | `5000` | Rotation interval in milliseconds |
+| `rotationSeparator` | string | `"---"` | Separator string for splitting content into rotation items |
+| `gradientEnabled` | boolean | `false` | Enable gradient text coloring |
+| `gradientFrom` | string | `"#ff6b6b"` | Gradient start color |
+| `gradientTo` | string | `"#4ecdc4"` | Gradient end color |
+| `gradientAngle` | number | `90` | Gradient angle in degrees |
+| `textTransform` | string | `"none"` | Text transform: `none`, `uppercase`, `lowercase`, or `capitalize` |
+| `letterSpacing` | number | `0` | Letter spacing in pixels |
+| `icon` | string | `""` | Icon prefix (emoji or short text shown before content) |
+| `templateVariables` | boolean | `false` | Enable dynamic variables like `{{time}}`, `{{date}}`, `{{greeting}}` |
+| `marquee` | boolean | `false` | Enable marquee (scrolling) text |
+| `marqueeSpeed` | number | `5` | Marquee scroll speed |
+| `marqueeDirection` | string | `"left"` | Marquee direction: `left`, `right`, `up`, or `down` |
+
+**Text effects:**
+- **typewriter** — Types out the text character by character
+- **fade-in** — Fades the text in smoothly
+- **gradient-sweep** — Animated gradient sweep across the text
+- **glow** — Pulsing glow effect
+
+**Template variables:** When enabled, special placeholders are replaced with live data: `{{time}}`, `{{date}}`, `{{greeting}}`, `{{dayOfWeek}}`, and more.
+
+**Content rotation:** Split content by a separator (default `---`) and rotate through the chunks at a set interval — useful for rotating quotes, tips, or announcements.
 
 ### Image
 

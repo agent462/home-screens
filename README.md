@@ -29,6 +29,47 @@ A custom smart display system built with Next.js. Designed to run on a Raspberry
 - **Password-protected editor** — optional password auth for the configuration editor
 - **System management** — upgrade, rollback, backup/restore, and power control from the UI
 - **Raspberry Pi kiosk scripts** — one-command setup for a dedicated display
+- **Configurable screen transitions** — 8 effects (fade, slide, slide-up, zoom, flip, blur, crossfade, none) with adjustable duration
+- **Auto-hide cursor** — cursor hides after a configurable idle period on the display
+- **Pre-release update channel** — opt into the dev channel for early updates
+
+## Architecture Overview
+
+```mermaid
+graph TB
+    subgraph Clients
+        Editor["Editor<br/>(browser)"]
+        Display["Display<br/>(kiosk / browser)"]
+    end
+
+    subgraph "Next.js Server"
+        API["API Routes"]
+        ConfigAPI["/api/config"]
+        SecretsAPI["/api/secrets"]
+    end
+
+    subgraph "Local Storage"
+        Config["data/config.json"]
+        Secrets["data/secrets.json"]
+    end
+
+    subgraph "External Services"
+        Weather["Weather Providers<br/>(OWM, WeatherAPI,<br/>Pirate Weather, NOAA)"]
+        ESPN["ESPN<br/>(scores, standings)"]
+        Google["Google<br/>(Calendar, Routes)"]
+        Other["RSS, CoinGecko,<br/>Yahoo Finance, etc."]
+    end
+
+    Editor -- "Zustand store<br/>PUT /api/config" --> ConfigAPI
+    ConfigAPI -- "read / write" --> Config
+    Display -- "GET /api/config" --> ConfigAPI
+    API -- "read keys" --> Secrets
+    SecretsAPI -- "read / write" --> Secrets
+    API --> Weather
+    API --> ESPN
+    API --> Google
+    API --> Other
+```
 
 ## Tech Stack
 
@@ -132,6 +173,17 @@ scripts/
 
 ## API Routes
 
+All API routes are server-side proxies that keep credentials off the client. The request flow:
+
+```mermaid
+graph LR
+    Browser["Browser<br/>(Editor or Display)"] -- "fetch" --> Route["Next.js<br/>API Route"]
+    Secrets["data/secrets.json"] -- "API keys" --> Route
+    Route -- "authenticated request" --> Service["External Service<br/>(weather, ESPN, etc.)"]
+    Service -- "response" --> Route
+    Route -- "JSON" --> Browser
+```
+
 | Route | Methods | Description |
 |---|---|---|
 | `/api/config` | GET, PUT | Read/write screen configuration |
@@ -180,5 +232,17 @@ scripts/
 6. Add a dynamic import in `src/lib/module-components.ts`
 7. Add an editor config section in `src/components/editor/PropertyPanel.tsx`
 8. (Optional) Create an API route in `src/app/api/` if external data is needed
+
+### Module Registration Flow
+
+```mermaid
+flowchart LR
+    Component["React Component<br/>src/components/modules/"] --> Types["Type + Config<br/>src/types/config.ts"]
+    Types --> Defaults["Default Size<br/>src/lib/constants.ts"]
+    Defaults --> Registry["Module Registry<br/>src/lib/module-registry.ts"]
+    Registry --> DynImport["Dynamic Import<br/>src/lib/module-components.ts"]
+    DynImport --> PropPanel["Editor Config Section<br/>PropertyPanel.tsx"]
+    PropPanel --> Render["Module rendered<br/>on canvas / display"]
+```
 
 See the [Development Guide](docs/development.md) for a detailed walkthrough.

@@ -30,6 +30,56 @@ Supported secret keys:
 
 ## Schema
 
+```mermaid
+erDiagram
+    ScreenConfiguration {
+        number version
+    }
+    GlobalSettings {
+        number rotationIntervalMs
+        number displayWidth
+        number displayHeight
+        string timezone
+    }
+    Screen {
+        string id
+        string name
+        string backgroundImage
+    }
+    Profile {
+        string id
+        string name
+        string[] screenIds
+    }
+    ModuleInstance {
+        string id
+        ModuleType type
+        object position
+        object size
+        number zIndex
+    }
+    ModuleStyle {
+        number opacity
+        number borderRadius
+        string backgroundColor
+        string textColor
+    }
+    ModuleSchedule {
+        number[] daysOfWeek
+        string startTime
+        string endTime
+        boolean invert
+    }
+    ScreenConfiguration ||--|| GlobalSettings : "settings"
+    ScreenConfiguration ||--o{ Screen : "screens"
+    ScreenConfiguration ||--o{ Profile : "profiles"
+    Screen ||--o{ ModuleInstance : "modules"
+    ModuleInstance ||--|| ModuleStyle : "style"
+    ModuleInstance ||--o| ModuleSchedule : "schedule"
+    ModuleInstance ||--|| object : "config"
+    Profile ||--o| ModuleSchedule : "schedule"
+```
+
 ### Top Level
 
 ```typescript
@@ -89,7 +139,21 @@ Supported secret keys:
   }
 
   activeProfile: string         // Currently active profile ID (optional)
+
+  cursorHideSeconds?: number      // Seconds of idle before cursor hides (default: 3)
+  transitionEffect?: TransitionEffect  // Screen transition effect
+  transitionDuration?: number     // Transition duration in seconds (default: 0.6)
+  updateChannel?: 'stable' | 'dev'    // Update channel for system upgrades
+  piVariant?: 'desktop' | 'lite'      // Detected Raspberry Pi OS variant
 }
+```
+
+### TransitionEffect
+
+```typescript
+type TransitionEffect =
+  | 'fade' | 'slide' | 'slide-up' | 'zoom'
+  | 'flip' | 'blur' | 'crossfade' | 'none';
 ```
 
 ### Screen
@@ -276,6 +340,25 @@ Four providers are supported: **OpenWeatherMap**, **WeatherAPI**, **Pirate Weath
 {
   content: string
   alignment: 'left' | 'center' | 'right'
+  orientation?: 'horizontal' | 'vertical' | 'sideways'
+  verticalAlign?: 'top' | 'center' | 'bottom'
+  markdown?: boolean                    // Enable markdown rendering
+  autoFit?: boolean                     // Auto-fit text to container
+  effect?: 'none' | 'typewriter' | 'fade-in' | 'gradient-sweep' | 'glow'
+  rotationEnabled?: boolean             // Rotate through content chunks
+  rotationIntervalMs?: number           // Rotation interval
+  rotationSeparator?: string            // Separator for splitting content
+  gradientEnabled?: boolean             // Enable gradient text
+  gradientFrom?: string                 // Gradient start color
+  gradientTo?: string                   // Gradient end color
+  gradientAngle?: number                // Gradient angle
+  textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize'
+  letterSpacing?: number                // Letter spacing in px
+  icon?: string                         // Icon prefix (emoji)
+  templateVariables?: boolean           // Enable {{time}}, {{date}}, etc.
+  marquee?: boolean                     // Enable marquee scrolling
+  marqueeSpeed?: number                 // Marquee scroll speed
+  marqueeDirection?: 'left' | 'right' | 'up' | 'down'
 }
 ```
 

@@ -11,6 +11,26 @@ The editor has four main areas:
 - **Property Panel** (right sidebar) — configure the selected module's settings and appearance
 - **Screen Tabs** (top) — manage multiple screens
 
+```mermaid
+block-beta
+  columns 1
+  block:tabs["Screen Tabs"]
+    columns 3
+    block:palette["Module Palette"]
+      columns 1
+      p1[" "]
+    end
+    block:canvas["Canvas"]
+      columns 1
+      c1[" "]
+    end
+    block:props["Property Panel"]
+      columns 1
+      pp1[" "]
+    end
+  end
+```
+
 ## Adding Modules
 
 1. Open the **Module Palette** on the left
@@ -76,6 +96,21 @@ Click the **x** button on a screen tab. You must have at least one screen.
 
 Set the rotation interval in **Settings > Display**. Screens cycle in order at this interval. The display view shows small indicator dots at the bottom.
 
+### Screen Transitions
+
+Screen transitions control the visual effect when cycling between screens. There are 8 transition effects available:
+
+- **fade** — smooth opacity crossfade (default)
+- **slide** — horizontal slide left/right
+- **slide-up** — vertical slide upward
+- **zoom** — scale in/out
+- **flip** — 3D card flip
+- **blur** — blur out and in
+- **crossfade** — overlapping crossfade
+- **none** — instant switch with no animation
+
+The transition effect and duration are configurable in **Settings > Display**. The default duration is 0.6 seconds.
+
 ## Backgrounds
 
 Open the **Background Picker** to manage screen backgrounds.
@@ -131,6 +166,7 @@ The **Integrations** tab is where you configure all API keys and external servic
 
 - **Resolution Preset** — choose from standard resolutions (1080p portrait, 4K, landscape, etc.)
 - **Display Transform** — rotate the output (for physically rotated screens)
+- **Cursor Auto-Hide** — cursor hides after a configurable idle period (default 3 seconds); move the mouse to restore it
 
 ### Sleep & Screensaver
 
@@ -187,6 +223,7 @@ The **System Panel** provides maintenance and system management features:
 
 - **Version** — current app version
 - **Changelog** — recent release notes
+- **Update Channel** — switch between Stable and Dev (pre-release) channels for updates
 - **Upgrade** — download and install the latest version
 - **Rollback** — revert to a previous version
 - **Backup/Restore** — export and import your configuration

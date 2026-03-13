@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Node.js 20+
+- Node.js 22+
 - npm
 
 ## Installation
@@ -65,6 +65,12 @@ Google Calendar uses **OAuth 2.0 Device Flow**, which means you can authorize fr
 6. Enable the **Google Calendar API** at APIs & Services > Library
 7. In the editor, go to **Settings > Google Calendar > Sign in with Google**
 8. You'll see a code and a link to `google.com/device` -- enter the code on your phone or computer and grant access
+
+## Update Channel
+
+By default, Home Screens uses the **Stable** channel for updates, which only includes tested releases.
+
+You can switch to the **Dev** channel in **Settings > System** to get pre-release builds for testing new features before they are officially released. Dev builds may contain breaking changes or incomplete functionality. If you encounter issues, switch back to the Stable channel to return to the latest stable release.
 
 ## Next Steps
 

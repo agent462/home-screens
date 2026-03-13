@@ -41,6 +41,10 @@ This installs additional packages that Pi OS Lite lacks (fonts, D-Bus session bu
 6. **Autologin** — configures automatic login for the kiosk user
 7. **Boot splash** — Plymouth theme with quiet boot (no kernel text, no rainbow screen)
 
+### Boot Splash
+
+The installer configures a clean boot experience with a Plymouth splash screen. Kernel text output and the rainbow screen are suppressed for a polished, appliance-like startup. This applies to both Desktop and Lite installs.
+
 On Lite installs, additional packages are installed: `fonts-noto-core` (base fonts), `libpam-systemd` (session management), and `dbus-user-session` (D-Bus session bus).
 
 ## Post-Install
@@ -58,6 +62,8 @@ After reboot, the display should automatically show the fullscreen view. To conf
 API keys are configured through the editor UI, not environment files. Open the editor and go to **Settings > Integrations** to enter your API keys for weather providers, Unsplash, Todoist, TomTom, and other services.
 
 ## Display Orientation
+
+The install script auto-detects the connected display resolution and configures it in the settings, so the display should match your screen's native resolution out of the box.
 
 If your screen is mounted in portrait mode, you may need to rotate the display output. Use the display transform setting in the editor (Settings > Display), or run:
 

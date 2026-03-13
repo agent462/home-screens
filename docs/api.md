@@ -2,6 +2,22 @@
 
 All API routes are served under `/api/`. They act as server-side proxies to protect API keys and avoid CORS issues. API keys and credentials are managed through the editor UI (Settings > Integrations) and stored server-side; no `.env.local` file is needed.
 
+```mermaid
+sequenceDiagram
+    participant Client as Client (Browser)
+    participant API as Next.js API Route
+    participant Secrets as data/secrets.json
+    participant External as External Service
+
+    Client->>API: GET /api/weather?lat=44&lon=-93
+    API->>Secrets: Read API key
+    Secrets-->>API: API key
+    API->>External: Request with API key
+    External-->>API: Response data
+    Note over API: Cache result server-side
+    API-->>Client: JSON response
+```
+
 ## Configuration
 
 ### GET /api/config
@@ -784,3 +800,16 @@ Geocodes a location name to coordinates. Used by the weather location picker in 
 | Parameter | Type | Description |
 |---|---|---|
 | `q` | string | Location query (e.g. "Minneapolis, MN") |
+
+**Response:**
+```json
+[
+  {
+    "name": "Minneapolis",
+    "state": "Minnesota",
+    "country": "US",
+    "lat": 44.9778,
+    "lon": -93.2650
+  }
+]
+```
