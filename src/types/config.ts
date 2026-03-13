@@ -421,9 +421,22 @@ export interface PhotoSlideshowConfig {
 }
 
 // QR code module config
+export type QRCodeMode = 'custom' | 'wifi';
+export type WifiAuthType = 'WPA' | 'WEP' | 'nopass';
+
 export interface QRCodeConfig {
+  mode: QRCodeMode;
+  // Custom mode
   data: string;
   label: string;
+  // WiFi mode
+  ssid: string;
+  password: string;
+  authType: WifiAuthType;
+  hiddenNetwork: boolean;
+  showPassword: boolean;
+  showNetworkName: boolean;
+  // Shared
   fgColor: string;
   bgColor: string;
 }

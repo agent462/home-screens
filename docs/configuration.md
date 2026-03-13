@@ -496,8 +496,18 @@ Five providers are supported: **OpenWeatherMap**, **WeatherAPI**, **Pirate Weath
 
 ```typescript
 {
+  mode: 'custom' | 'wifi'
+  // Custom mode
   data: string
   label: string
+  // WiFi mode
+  ssid: string
+  password: string
+  authType: 'WPA' | 'WEP' | 'nopass'
+  hiddenNetwork: boolean
+  showPassword: boolean
+  showNetworkName: boolean
+  // Shared
   fgColor: string
   bgColor: string
 }

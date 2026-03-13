@@ -312,8 +312,15 @@ describe('Data correctness spot checks', () => {
 
   it('qr-code defaultConfig: fgColor white, bgColor transparent', () => {
     const config = getModuleDefinition('qr-code')!.defaultConfig;
+    expect(config.mode).toBe('custom');
     expect(config.data).toBe('');
     expect(config.label).toBe('');
+    expect(config.ssid).toBe('');
+    expect(config.password).toBe('');
+    expect(config.authType).toBe('WPA');
+    expect(config.hiddenNetwork).toBe(false);
+    expect(config.showPassword).toBe(true);
+    expect(config.showNetworkName).toBe(true);
     expect(config.fgColor).toBe('#ffffff');
     expect(config.bgColor).toBe('transparent');
   });
