@@ -14,9 +14,16 @@ const PROVIDER_CAPS: Record<string, { minutely?: boolean; alerts?: boolean; pres
   weatherapi: {},
   pirateweather: { minutely: true, alerts: true },
   noaa: { alerts: true, pressure: true, visibility: true, dewPoint: true },
+  'open-meteo': { pressure: true, dewPoint: true },
 };
 
-const WEATHER_VIEWS: { value: WeatherView; label: string }[] = [
+// Which provider capability a view requires (omit = available for all providers)
+const VIEW_REQUIRES: Partial<Record<WeatherView, 'minutely' | 'alerts'>> = {
+  precipitation: 'minutely',
+  alerts: 'alerts',
+};
+
+const ALL_WEATHER_VIEWS: { value: WeatherView; label: string }[] = [
   { value: 'current', label: 'Current Only' },
   { value: 'hourly', label: 'Hourly' },
   { value: 'daily', label: 'Daily Forecast' },
@@ -60,6 +67,7 @@ export function WeatherConfigSection({ mod, screenId }: { mod: ModuleInstance; s
           if (data.weatherapi_key) providers.push('weatherapi');
           if (data.pirateweather_key) providers.push('pirateweather');
           providers.push('noaa'); // NOAA always available (no key needed)
+          providers.push('open-meteo'); // Open-Meteo always available (no key needed)
           setConfiguredProviders(providers);
         }
       } catch { /* ignore */ }
@@ -71,7 +79,27 @@ export function WeatherConfigSection({ mod, screenId }: { mod: ModuleInstance; s
   const effectiveProvider = (c.provider && c.provider !== 'global') ? c.provider : (globalProvider ?? 'openweathermap');
   const caps = PROVIDER_CAPS[effectiveProvider] ?? {};
 
+  // Filter views to only those supported by the current provider
+  const availableViews = ALL_WEATHER_VIEWS.filter((v) => {
+    const req = VIEW_REQUIRES[v.value];
+    return !req || caps[req];
+  });
+
   const view = c.view ?? 'hourly';
+
+  // Auto-reset view if the current provider doesn't support it
+  const viewReq = VIEW_REQUIRES[view];
+  if (viewReq && !caps[viewReq]) {
+    // Defer state update to avoid React warning
+    setTimeout(() => set({ view: 'hourly' }), 0);
+  }
+
+  // Filter providers: when a capability-specific view is selected, only show compatible providers
+  const viewRequirement = VIEW_REQUIRES[view];
+  const filteredProviders = viewRequirement
+    ? configuredProviders.filter((p) => PROVIDER_CAPS[p]?.[viewRequirement])
+    : configuredProviders;
+
   const showsHours = view === 'hourly' || view === 'combined';
   const showsDays = view === 'daily' || view === 'combined' || view === 'table';
   const showsCurrent = ['current', 'hourly', 'combined', 'compact'].includes(view);
@@ -87,7 +115,7 @@ export function WeatherConfigSection({ mod, screenId }: { mod: ModuleInstance; s
           onChange={(e) => set({ view: e.target.value as WeatherView })}
           className={INPUT_CLASS}
         >
-          {WEATHER_VIEWS.map((v) => (
+          {availableViews.map((v) => (
             <option key={v.value} value={v.value}>{v.label}</option>
           ))}
         </select>
@@ -108,7 +136,7 @@ export function WeatherConfigSection({ mod, screenId }: { mod: ModuleInstance; s
           </select>
         </label>
       )}
-      {configuredProviders.length > 0 && (
+      {filteredProviders.length > 0 && (
         <label className="flex flex-col gap-0.5">
           <span className="text-xs text-neutral-400">Data Provider</span>
           <select
@@ -116,18 +144,21 @@ export function WeatherConfigSection({ mod, screenId }: { mod: ModuleInstance; s
             onChange={(e) => set({ provider: e.target.value as WeatherProviderOption })}
             className={INPUT_CLASS}
           >
-            <option value="global">Global Default</option>
-            {configuredProviders.includes('openweathermap') && (
+            {!viewRequirement && <option value="global">Global Default</option>}
+            {filteredProviders.includes('openweathermap') && (
               <option value="openweathermap">OpenWeatherMap</option>
             )}
-            {configuredProviders.includes('weatherapi') && (
+            {filteredProviders.includes('weatherapi') && (
               <option value="weatherapi">WeatherAPI</option>
             )}
-            {configuredProviders.includes('pirateweather') && (
+            {filteredProviders.includes('pirateweather') && (
               <option value="pirateweather">Pirate Weather</option>
             )}
-            {configuredProviders.includes('noaa') && (
+            {filteredProviders.includes('noaa') && (
               <option value="noaa">NOAA / NWS (US only)</option>
+            )}
+            {filteredProviders.includes('open-meteo') && (
+              <option value="open-meteo">Open-Meteo (free, global)</option>
             )}
           </select>
         </label>

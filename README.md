@@ -19,7 +19,7 @@ A custom smart display system built with Next.js. Designed to run on a Raspberry
 - **Drag-and-drop editor** — visually arrange modules on a 1080x1920 portrait canvas
 - **Multi-screen rotation** — configure multiple screens that cycle automatically
 - **30 built-in modules** — clock, calendar, weather (8 views), countdown, dad jokes, text, image, quote, todo, sticky note, greeting, news, stock ticker, crypto, word of the day, this day in history, moon phase, sunrise/sunset, photo slideshow, QR code, year progress, traffic/commute, sports scores, air quality, todoist, rain map, multi-month calendar, garbage day, sports standings, and affirmations
-- **4 weather providers** — OpenWeatherMap, WeatherAPI, Pirate Weather, and NOAA (free, no API key) with a shared interface
+- **5 weather providers** — OpenWeatherMap, WeatherAPI, Pirate Weather, NOAA (free, no API key), and Open-Meteo (free, no API key) with a shared interface
 - **Profile system** — define screen groups with schedule-based auto-activation (day of week, time windows)
 - **Remote display control** — wake, sleep, brightness, screen navigation, and alerts via simple HTTP endpoints
 - **Per-module scheduling** — show or hide individual modules by day of week and time window
@@ -54,7 +54,7 @@ graph TB
     end
 
     subgraph "External Services"
-        Weather["Weather Providers<br/>(OWM, WeatherAPI,<br/>Pirate Weather, NOAA)"]
+        Weather["Weather Providers<br/>(OWM, WeatherAPI,<br/>Pirate Weather, NOAA, Open-Meteo)"]
         ESPN["ESPN<br/>(scores, standings)"]
         Google["Google<br/>(Calendar, Routes)"]
         Other["RSS, CoinGecko,<br/>Yahoo Finance, etc."]
@@ -189,7 +189,7 @@ graph LR
 | `/api/config` | GET, PUT | Read/write screen configuration |
 | `/api/calendar` | GET | Google Calendar event proxy |
 | `/api/calendars` | GET | List available Google Calendars |
-| `/api/weather` | GET | Weather data (4 providers) |
+| `/api/weather` | GET | Weather data (5 providers) |
 | `/api/geocode` | GET | Location geocoding for weather |
 | `/api/jokes` | GET | Dad jokes proxy |
 | `/api/quote` | GET | ZenQuotes daily quote proxy |

@@ -22,10 +22,11 @@ The following integrations can be configured through the editor:
 | Integration | Description | Required |
 |---|---|---|
 | Google Calendar | OAuth client ID and secret for calendar sync | For calendar module |
-| OpenWeatherMap | Weather data provider | Optional (one of four weather providers) |
-| WeatherAPI | Weather data provider | Optional (one of four weather providers) |
-| Pirate Weather | Weather data provider (Dark Sky replacement) | Optional (one of four weather providers) |
-| NOAA | Free weather data (US only, no API key needed) | Optional (one of four weather providers) |
+| OpenWeatherMap | Weather data provider | Optional (one of five weather providers) |
+| WeatherAPI | Weather data provider | Optional (one of five weather providers) |
+| Pirate Weather | Weather data provider (Dark Sky replacement) | Optional (one of five weather providers) |
+| NOAA | Free weather data (US only, no API key needed) | Optional (one of five weather providers) |
+| Open-Meteo | Free weather data (global coverage, no API key needed) | Optional (one of five weather providers) |
 | Google Maps | Google Routes API key for traffic module | For traffic module |
 | TomTom | TomTom Routing API key (traffic fallback) | For traffic module |
 

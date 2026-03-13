@@ -106,7 +106,7 @@ erDiagram
   timezone: string              // IANA timezone (e.g. "America/Chicago")
 
   weather: {
-    provider: string            // "openweathermap", "weatherapi", "pirateweather", or "noaa"
+    provider: string            // "openweathermap", "weatherapi", "pirateweather", "noaa", or "open-meteo"
     latitude: number            // Weather-specific latitude (overrides global)
     longitude: number           // Weather-specific longitude (overrides global)
     units: string               // "metric" or "imperial"
@@ -298,13 +298,13 @@ type ModuleType =
 
 ### WeatherConfig
 
-Four providers are supported: **OpenWeatherMap**, **WeatherAPI**, **Pirate Weather** (a Dark Sky replacement with minutely precipitation and alerts), and **NOAA** (free, no API key, US only). Eight views are available.
+Five providers are supported: **OpenWeatherMap**, **WeatherAPI**, **Pirate Weather** (a Dark Sky replacement with minutely precipitation and alerts), **NOAA** (free, no API key, US only), and **Open-Meteo** (free, no API key, global coverage). Eight views are available.
 
 ```typescript
 {
   view: 'current' | 'hourly' | 'daily' | 'combined' | 'compact' | 'table' | 'precipitation' | 'alerts'
   iconSet: 'outline' | 'color'
-  provider: 'global' | 'openweathermap' | 'weatherapi' | 'pirateweather' | 'noaa'
+  provider: 'global' | 'openweathermap' | 'weatherapi' | 'pirateweather' | 'noaa' | 'open-meteo'
   hoursToShow: number
   showFeelsLike: boolean
   daysToShow: number

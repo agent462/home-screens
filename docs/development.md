@@ -143,10 +143,16 @@ classDiagram
         +getAlerts()
     }
 
+    class OpenMeteoProvider {
+        +getHourly()
+        +getForecast()
+    }
+
     WeatherProvider <|.. OpenWeatherMapProvider
     WeatherProvider <|.. WeatherAPIProvider
     WeatherProvider <|.. PirateWeatherProvider
     WeatherProvider <|.. NOAAProvider
+    WeatherProvider <|.. OpenMeteoProvider
 
     class createWeatherProvider {
         <<function>>
@@ -156,7 +162,7 @@ classDiagram
     createWeatherProvider ..> WeatherProvider : creates
 ```
 
-Four implementations exist: `OpenWeatherMapProvider`, `WeatherAPIProvider`, `PirateWeatherProvider`, and `NOAAProvider`. The factory function `createWeatherProvider(provider, apiKey)` instantiates the correct one. Pirate Weather (a Dark Sky replacement) additionally supports minutely precipitation data and weather alerts. NOAA uses the National Weather Service API — it's free and requires no API key, but is limited to US locations.
+Five implementations exist: `OpenWeatherMapProvider`, `WeatherAPIProvider`, `PirateWeatherProvider`, `NOAAProvider`, and `OpenMeteoProvider`. The factory function `createWeatherProvider(provider, apiKey)` instantiates the correct one. Pirate Weather (a Dark Sky replacement) additionally supports minutely precipitation data and weather alerts. NOAA uses the National Weather Service API — it's free and requires no API key, but is limited to US locations. Open-Meteo is free, requires no API key, and provides global coverage.
 
 ### API Routes
 
@@ -167,7 +173,7 @@ API routes live in `src/app/api/*/route.ts` and serve as server-side proxies for
 | **Auth** | `auth/login`, `auth/logout`, `auth/status`, `auth/password`, `auth/google` | Authentication and session management |
 | **System** | `system/status`, `system/version`, `system/build-id`, `system/changelog`, `system/power`, `system/upgrade`, `system/rollback`, `system/backups` | Server management and deployment |
 | **Config** | `config`, `secrets` | Read/write config and manage API keys |
-| **Weather** | `weather`, `rain-map` | Weather data (4 providers) and rain radar tiles |
+| **Weather** | `weather`, `rain-map` | Weather data (5 providers) and rain radar tiles |
 | **Calendar** | `calendar`, `calendars` | Google Calendar events and calendar list |
 | **Data** | `jokes`, `quote`, `news`, `history`, `stocks`, `crypto`, `sports`, `standings`, `todoist`, `air-quality`, `traffic` | External data proxies |
 | **Display** | `display/[action]` | Remote control: wake, sleep, brightness, navigation, profiles, alerts |

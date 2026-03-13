@@ -87,7 +87,7 @@ export interface Screen {
 }
 
 export interface WeatherSettings {
-  provider: 'openweathermap' | 'weatherapi' | 'pirateweather' | 'noaa';
+  provider: 'openweathermap' | 'weatherapi' | 'pirateweather' | 'noaa' | 'open-meteo';
   latitude: number;
   longitude: number;
   units: 'metric' | 'imperial';
@@ -218,7 +218,7 @@ export interface CalendarConfig {
 export type WeatherView = 'current' | 'hourly' | 'daily' | 'combined' | 'compact' | 'table' | 'precipitation' | 'alerts';
 
 export type WeatherIconSet = 'outline' | 'color';
-export type WeatherProviderOption = 'global' | 'openweathermap' | 'weatherapi' | 'pirateweather' | 'noaa';
+export type WeatherProviderOption = 'global' | 'openweathermap' | 'weatherapi' | 'pirateweather' | 'noaa' | 'open-meteo';
 
 export interface WeatherConfig {
   view: WeatherView;

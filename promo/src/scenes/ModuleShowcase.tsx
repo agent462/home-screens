@@ -16,7 +16,7 @@ const clamp = {
 
 const FEATURED = [
   { name: "Clock", description: "Time, date & week number", glow: "rgba(103,232,249,0.12)" },
-  { name: "Weather", description: "8 views \u2022 4 providers", glow: "rgba(96,165,250,0.12)" },
+  { name: "Weather", description: "8 views \u2022 5 providers", glow: "rgba(96,165,250,0.12)" },
   { name: "Calendar", description: "Google Calendar sync", glow: "rgba(167,139,250,0.12)" },
   { name: "Stocks", description: "Live market data", glow: "rgba(74,222,128,0.12)" },
   { name: "News", description: "RSS feeds \u2022 4 layouts", glow: "rgba(251,191,36,0.10)" },

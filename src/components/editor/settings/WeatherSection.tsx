@@ -22,11 +22,11 @@ interface Props {
 function providerSecretKey(provider: string): SecretKey {
   if (provider === 'openweathermap') return 'openweathermap_key';
   if (provider === 'pirateweather') return 'pirateweather_key';
-  if (provider === 'noaa') return null; // NOAA requires no API key
+  if (provider === 'noaa' || provider === 'open-meteo') return null;
   return 'weatherapi_key';
 }
 
-const needsApiKey = (provider: string) => provider !== 'noaa';
+const needsApiKey = (provider: string) => provider !== 'noaa' && provider !== 'open-meteo';
 
 export default function WeatherSection({ values, onChange }: Props) {
   const { provider, units, lat, lon } = values;
@@ -121,7 +121,7 @@ export default function WeatherSection({ values, onChange }: Props) {
         latitude: testLat,
         longitude: testLon,
         weather: {
-          provider: provider as 'openweathermap' | 'weatherapi' | 'pirateweather' | 'noaa',
+          provider: provider as 'openweathermap' | 'weatherapi' | 'pirateweather' | 'noaa' | 'open-meteo',
           latitude: testLat,
           longitude: testLon,
           units: units as 'metric' | 'imperial',
@@ -171,6 +171,7 @@ export default function WeatherSection({ values, onChange }: Props) {
             onChange={(e) => onChange({ provider: e.target.value })}
             className="mt-1 block w-full rounded-md bg-neutral-800 border border-neutral-600 text-sm text-neutral-200 px-3 py-2 focus:outline-none focus:border-blue-500"
           >
+            <option value="open-meteo">Open-Meteo (free, no key, global)</option>
             <option value="weatherapi">WeatherAPI.com (free, no credit card)</option>
             <option value="openweathermap">OpenWeatherMap (One Call 3.0)</option>
             <option value="pirateweather">Pirate Weather (Dark Sky replacement)</option>
@@ -250,7 +251,9 @@ export default function WeatherSection({ values, onChange }: Props) {
           </div>
         ) : (
           <p className="text-xs text-green-400/80">
-            No API key required — NOAA data is free and public (US only).
+            {provider === 'noaa'
+              ? 'No API key required — NOAA data is free and public (US only).'
+              : 'No API key required — Open-Meteo is free and open-source with global coverage.'}
           </p>
         )}
 

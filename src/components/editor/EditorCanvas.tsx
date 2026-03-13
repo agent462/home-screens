@@ -349,7 +349,7 @@ export default function EditorCanvas({ onScaleChange }: { onScaleChange?: (scale
     async function fetchPreviewData() {
       // Fetch both providers in parallel; the server-side cache + secrets
       // check means unconfigured providers will simply fail gracefully
-      const providers = ['openweathermap', 'weatherapi', 'pirateweather', 'noaa'] as const;
+      const providers = ['openweathermap', 'weatherapi', 'pirateweather', 'noaa', 'open-meteo'] as const;
       const results = await Promise.allSettled(
         providers.map(async (p) => {
           const res = await fetch(`/api/weather?provider=${p}`);

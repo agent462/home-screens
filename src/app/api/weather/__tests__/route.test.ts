@@ -285,6 +285,19 @@ describe('GET /api/weather', () => {
     expect(mockGetSecret).toHaveBeenCalledWith('pirateweather_key');
   });
 
+  it('skips secret lookup for open-meteo provider', async () => {
+    setupDefaults();
+    mockGetSecret.mockClear();
+    const provider = makeMockProvider();
+    mockCreateWeatherProvider.mockReturnValue(provider as never);
+
+    const req = makeRequest({ provider: 'open-meteo' });
+    await GET(req);
+
+    expect(mockGetSecret).not.toHaveBeenCalled();
+    expect(mockCreateWeatherProvider).toHaveBeenCalledWith('open-meteo', undefined);
+  });
+
   it('returns 500 via errorResponse when provider throws', async () => {
     setupDefaults();
     mockCreateWeatherProvider.mockImplementation(() => {

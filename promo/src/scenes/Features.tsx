@@ -12,7 +12,7 @@ const FEATURES = [
   { title: "30 Modules", subtitle: "Weather, news, stocks, sports & more", color: theme.colors.cyan },
   { title: "Drag & Drop", subtitle: "Visual editor \u2014 no code needed", color: "#a78bfa" },
   { title: "Raspberry Pi", subtitle: "Runs on a cheap computer", color: "#f59e0b" },
-  { title: "4 Weather Providers", subtitle: "OWM, WeatherAPI, Pirate, NOAA", color: "#60a5fa" },
+  { title: "5 Weather Providers", subtitle: "OWM, WeatherAPI, Pirate, NOAA, Open-Meteo", color: "#60a5fa" },
   { title: "Remote Control", subtitle: "Phone, Home Assistant, scripts", color: "#f472b6" },
 ];
 
