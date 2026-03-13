@@ -9,18 +9,18 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // Minimal mock element with classList and addEventListener
 function makeMockElement() {
   const classes = new Set<string>();
-  const listeners = new Map<string, Function[]>();
+  const listeners = new Map<string, ((...args: unknown[]) => void)[]>();
   return {
     classList: {
       add: (c: string) => classes.add(c),
       remove: (c: string) => classes.delete(c),
       contains: (c: string) => classes.has(c),
     },
-    addEventListener: (event: string, fn: Function) => {
+    addEventListener: (event: string, fn: (...args: unknown[]) => void) => {
       if (!listeners.has(event)) listeners.set(event, []);
       listeners.get(event)!.push(fn);
     },
-    removeEventListener: (event: string, fn: Function) => {
+    removeEventListener: (event: string, fn: (...args: unknown[]) => void) => {
       const fns = listeners.get(event);
       if (fns) listeners.set(event, fns.filter((f) => f !== fn));
     },

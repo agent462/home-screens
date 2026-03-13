@@ -34,11 +34,18 @@ function ModulePreview({ mod, previewData, settings }: { mod: ModuleInstance; pr
   const modProvider = resolveProvider(mod, globalProvider);
   const wd = previewData.weatherByProvider[modProvider] ?? previewData.weatherByProvider[globalProvider];
 
-  if (mod.type === 'weather' && wd) {
-    extraProps.hourly = wd.hourly ?? [];
-    extraProps.forecast = wd.forecast ?? [];
-    extraProps.minutely = wd.minutely ?? undefined;
-    extraProps.alerts = wd.alerts ?? undefined;
+  if (mod.type === 'weather') {
+    const lat = settings?.latitude;
+    const lon = settings?.longitude;
+    if (lat == null || lon == null || (lat === 0 && lon === 0)) {
+      extraProps.locationMissing = true;
+    }
+    if (wd) {
+      extraProps.hourly = wd.hourly ?? [];
+      extraProps.forecast = wd.forecast ?? [];
+      extraProps.minutely = wd.minutely ?? undefined;
+      extraProps.alerts = wd.alerts ?? undefined;
+    }
     extraProps.units = settings?.units;
   } else if (mod.type === 'calendar') {
     extraProps.events = previewData.calendarEvents;

@@ -22,6 +22,7 @@ interface WeatherModuleProps {
   alerts?: WeatherAlert[];
   units?: 'metric' | 'imperial';
   timezone?: string;
+  locationMissing?: boolean;
 }
 
 const SCALE_FACTORS: Record<WeatherView, number> = {
@@ -46,10 +47,21 @@ const VIEW_COMPONENTS = {
   alerts: WeatherAlertsView,
 };
 
-export default function WeatherModule({ config, style, hourly, forecast, minutely, alerts, units = 'imperial', timezone }: WeatherModuleProps) {
+export default function WeatherModule({ config, style, hourly, forecast, minutely, alerts, units = 'imperial', timezone, locationMissing }: WeatherModuleProps) {
   const view = config.view ?? 'hourly';
   const scaleFactor = SCALE_FACTORS[view] ?? 0.09;
   const { containerRef, scaledFontSize } = useScaledFontSize(style.fontSize, scaleFactor);
+
+  if (locationMissing) {
+    return (
+      <ModuleWrapper style={style}>
+        <div ref={containerRef} className="w-full h-full flex flex-col items-center justify-center gap-1">
+          <p className="opacity-60" style={{ fontSize: `${scaledFontSize}px` }}>Location not set</p>
+          <p className="opacity-40" style={{ fontSize: `${scaledFontSize * 0.7}px` }}>Set your location in Settings</p>
+        </div>
+      </ModuleWrapper>
+    );
+  }
 
   // Hide the entire module when alerts view has no active alerts
   // Only hide when alerts is defined (data loaded from a supported provider)

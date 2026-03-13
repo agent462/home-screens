@@ -149,12 +149,21 @@ export default function WeatherSection({ values, onChange }: Props) {
     }
   }
 
+  const hasLocation = parseFloat(lat) !== 0 || parseFloat(lon) !== 0;
+
   return (
     <section>
       <h3 className="text-sm font-medium text-neutral-300 mb-3 uppercase tracking-wider">
         Weather
       </h3>
       <div className="space-y-3">
+        {!hasLocation && (
+          <div className="rounded-md bg-amber-900/30 border border-amber-700/50 px-3 py-2">
+            <p className="text-xs text-amber-400">
+              Set your location for weather to work. Enter a zip code or city name, or use Detect.
+            </p>
+          </div>
+        )}
         <label className="block">
           <span className="text-xs text-neutral-400">Provider</span>
           <select

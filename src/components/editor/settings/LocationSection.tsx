@@ -61,13 +61,28 @@ export default function LocationSection({ values, onChange }: Props) {
     }
   }
 
+  async function detectViaIP() {
+    const res = await fetch('/api/geocode?detect=ip');
+    if (!res.ok) throw new Error('IP geolocation failed');
+    const data = await res.json();
+    const newLat = data.latitude.toFixed(4);
+    const newLon = data.longitude.toFixed(4);
+    onChange({ lat: newLat, lon: newLon, locationName: data.displayName });
+    setLocationStatus(`Detected: ${data.displayName} (via IP)`);
+  }
+
   function detectLocation() {
-    if (!navigator.geolocation) {
-      setLocationStatus('Error: Geolocation not supported in this browser');
-      return;
-    }
     setLocationStatus('Detecting...');
     onChange({ locationName: null });
+
+    // Browser geolocation requires HTTPS — fall back to IP geolocation on non-secure origins
+    if (!navigator.geolocation || window.location.protocol === 'http:') {
+      detectViaIP().catch(() => {
+        setLocationStatus('Error: Could not detect location');
+      });
+      return;
+    }
+
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const newLat = pos.coords.latitude.toFixed(4);
@@ -86,8 +101,11 @@ export default function LocationSection({ values, onChange }: Props) {
           setLocationStatus(`Detected: ${newLat}, ${newLon}`);
         }
       },
-      (err) => {
-        setLocationStatus(`Error: ${err.message}`);
+      () => {
+        // Geolocation denied or failed — try IP fallback
+        detectViaIP().catch(() => {
+          setLocationStatus('Error: Could not detect location');
+        });
       },
       { enableHighAccuracy: false, timeout: 10000 },
     );

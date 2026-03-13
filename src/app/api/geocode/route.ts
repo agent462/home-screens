@@ -4,6 +4,25 @@ import { errorResponse, fetchWithTimeout } from '@/lib/api-utils';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
+  // IP-based geolocation fallback (for non-HTTPS origins where browser geolocation is blocked)
+  if (request.nextUrl.searchParams.get('detect') === 'ip') {
+    try {
+      const res = await fetchWithTimeout('http://ip-api.com/json/?fields=lat,lon,city,regionName,countryCode');
+      if (res.ok) {
+        const data = await res.json();
+        const displayName = [data.city, data.regionName, data.countryCode].filter(Boolean).join(', ');
+        return NextResponse.json({
+          latitude: data.lat,
+          longitude: data.lon,
+          displayName,
+        });
+      }
+    } catch {
+      // fall through
+    }
+    return NextResponse.json({ error: 'IP geolocation failed' }, { status: 502 });
+  }
+
   const query = request.nextUrl.searchParams.get('q');
   if (!query) {
     return NextResponse.json({ error: 'Missing query param: q' }, { status: 400 });

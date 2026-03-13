@@ -46,6 +46,10 @@ export default function ScreenRenderer({ screen, settings, rotatingBackground, s
   const rotation = screen.backgroundRotation;
   const backgroundImage = rotation?.enabled ? (rotatingBackground || screen.backgroundImage) : screen.backgroundImage;
 
+  const lat = settings.latitude ?? settings.weather.latitude;
+  const lon = settings.longitude ?? settings.weather.longitude;
+  const locationMissing = lat == null || lon == null || (lat === 0 && lon === 0);
+
   function getWeatherData(mod: { type: string; config: Record<string, unknown> }): Record<string, unknown> | null {
     const p = resolveProvider(mod, globalProvider);
     if (p === 'openweathermap') return sharedData.owmData as Record<string, unknown> | null;
@@ -97,11 +101,16 @@ export default function ScreenRenderer({ screen, settings, rotatingBackground, s
 
         if (mod.type === 'calendar' && sharedData.calendarData) {
           extraProps.events = Array.isArray(sharedData.calendarData) ? sharedData.calendarData : (sharedData.calendarData as Record<string, unknown>).events ?? [];
-        } else if (mod.type === 'weather' && weatherData) {
-          extraProps.hourly = weatherData.hourly ?? [];
-          extraProps.forecast = weatherData.forecast ?? [];
-          extraProps.minutely = weatherData.minutely;
-          extraProps.alerts = weatherData.alerts;
+        } else if (mod.type === 'weather') {
+          if (locationMissing) {
+            extraProps.locationMissing = true;
+          }
+          if (weatherData) {
+            extraProps.hourly = weatherData.hourly ?? [];
+            extraProps.forecast = weatherData.forecast ?? [];
+            extraProps.minutely = weatherData.minutely;
+            extraProps.alerts = weatherData.alerts;
+          }
           extraProps.units = settings.weather.units;
         }
 
