@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { editorFetch } from '@/lib/editor-fetch';
+import type { ICalSource } from '@/types/config';
 import Slider from '@/components/ui/Slider';
 import Button from '@/components/ui/Button';
 
@@ -14,6 +15,7 @@ interface GoogleCalendar {
 
 interface CalendarSettings {
   selectedCalendarIds: string[];
+  icalSources: ICalSource[];
   maxEvents: number;
   daysAhead: number;
 }
@@ -23,8 +25,13 @@ interface Props {
   onChange: (updates: Partial<CalendarSettings>) => void;
 }
 
+const ICAL_COLOR_PALETTE = [
+  '#f97316', '#a855f7', '#3b82f6', '#ef4444',
+  '#10b981', '#f59e0b', '#ec4899', '#06b6d4',
+];
+
 export default function CalendarSection({ values, onChange }: Props) {
-  const { selectedCalendarIds, maxEvents, daysAhead } = values;
+  const { selectedCalendarIds, icalSources, maxEvents, daysAhead } = values;
 
   const [credentialsConfigured, setCredentialsConfigured] = useState(false);
   const [googleConnected, setGoogleConnected] = useState(false);
@@ -38,6 +45,16 @@ export default function CalendarSection({ values, onChange }: Props) {
   const [deviceFlowPolling, setDeviceFlowPolling] = useState(false);
   const pollingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancelledRef = useRef(false);
+
+  // ICS feed form state
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newFeedName, setNewFeedName] = useState('');
+  const [newFeedUrl, setNewFeedUrl] = useState('');
+  const [newFeedColor, setNewFeedColor] = useState(() => {
+    const usedColors = new Set(icalSources.map(s => s.color));
+    return ICAL_COLOR_PALETTE.find(c => !usedColors.has(c)) ?? ICAL_COLOR_PALETTE[0];
+  });
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   // Clean up polling on unmount
   useEffect(() => {
@@ -53,7 +70,9 @@ export default function CalendarSection({ values, onChange }: Props) {
       if (res.ok) {
         const cals: GoogleCalendar[] = await res.json();
         setGoogleCalendars(cals);
-        if (selectedCalendarIds.length === 0 && cals.length > 0) {
+        // Only auto-select primary Google calendar on first connection,
+        // not when an ICS-only user has no Google calendars selected
+        if (selectedCalendarIds.length === 0 && icalSources.length === 0 && cals.length > 0) {
           const primary = cals.find((c) => c.primary);
           if (primary) onChange({ selectedCalendarIds: [primary.id] });
         }
@@ -61,7 +80,7 @@ export default function CalendarSection({ values, onChange }: Props) {
     } catch {
       // ignore
     }
-  }, [selectedCalendarIds.length, onChange]);
+  }, [selectedCalendarIds.length, icalSources.length, onChange]);
 
   useEffect(() => {
     async function checkAuth() {
@@ -159,126 +178,299 @@ export default function CalendarSection({ values, onChange }: Props) {
     scheduleNext(poll);
   }
 
-  return (
-    <section>
-      <h3 className="text-sm font-medium text-neutral-300 mb-3 uppercase tracking-wider">
-        Google Calendar
-      </h3>
-      <div className="space-y-3">
-        {googleLoading ? (
-          <p className="text-xs text-neutral-500">Checking connection...</p>
-        ) : googleConnected ? (
-          <>
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-green-400 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" />
-                Connected to Google
-              </span>
-              <button
-                onClick={disconnectGoogle}
-                className="text-xs text-neutral-500 hover:text-red-400 transition-colors"
-              >
-                Disconnect
-              </button>
-            </div>
+  // ICS source handlers
+  function addICalSource() {
+    if (!newFeedName.trim() || !newFeedUrl.trim()) return;
+    const newSource: ICalSource = {
+      id: crypto.randomUUID(),
+      type: 'ical',
+      name: newFeedName.trim(),
+      url: newFeedUrl.trim(),
+      color: newFeedColor,
+      enabled: true,
+    };
+    onChange({ icalSources: [...icalSources, newSource] });
+    setNewFeedName('');
+    setNewFeedUrl('');
+    setShowAddForm(false);
+    // Auto-pick next unused color
+    const usedColors = new Set([...icalSources.map(s => s.color), newFeedColor]);
+    setNewFeedColor(ICAL_COLOR_PALETTE.find(c => !usedColors.has(c)) ?? ICAL_COLOR_PALETTE[0]);
+  }
 
-            {googleCalendars.length > 0 ? (
-              <div className="space-y-1">
-                <span className="text-xs text-neutral-400">Select calendars to display</span>
-                <div className="max-h-40 overflow-y-auto rounded-md bg-neutral-800 border border-neutral-600 divide-y divide-neutral-700">
-                  {googleCalendars.map((cal) => (
-                    <label
-                      key={cal.id}
-                      className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-neutral-750"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedCalendarIds.includes(cal.id)}
-                        onChange={() => toggleCalendar(cal.id)}
-                        className="rounded border-neutral-600 bg-neutral-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
-                      />
-                      <span
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: cal.backgroundColor }}
-                      />
-                      <span className="text-sm text-neutral-200 truncate">
-                        {cal.summary}
-                        {cal.primary && (
-                          <span className="text-neutral-500 ml-1 text-xs">(primary)</span>
-                        )}
-                      </span>
-                    </label>
-                  ))}
-                </div>
+  function removeICalSource(id: string) {
+    onChange({ icalSources: icalSources.filter(s => s.id !== id) });
+    if (editingId === id) setEditingId(null);
+  }
+
+  function toggleICalSource(id: string) {
+    onChange({
+      icalSources: icalSources.map(s =>
+        s.id === id ? { ...s, enabled: !s.enabled } : s
+      ),
+    });
+  }
+
+  function updateICalSource(id: string, updates: Partial<ICalSource>) {
+    onChange({
+      icalSources: icalSources.map(s =>
+        s.id === id ? { ...s, ...updates } : s
+      ),
+    });
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Google Calendar section */}
+      <section>
+        <h3 className="text-sm font-medium text-neutral-300 mb-3 uppercase tracking-wider">
+          Google Calendar
+        </h3>
+        <div className="space-y-3">
+          {googleLoading ? (
+            <p className="text-xs text-neutral-500">Checking connection...</p>
+          ) : googleConnected ? (
+            <>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-green-400 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" />
+                  Connected to Google
+                </span>
+                <button
+                  onClick={disconnectGoogle}
+                  className="text-xs text-neutral-500 hover:text-red-400 transition-colors"
+                >
+                  Disconnect
+                </button>
               </div>
-            ) : (
-              <p className="text-xs text-neutral-500">No calendars found.</p>
-            )}
-          </>
-        ) : !credentialsConfigured ? (
-          <div className="space-y-2">
-            <p className="text-xs text-neutral-400">
-              Google OAuth credentials are required to connect your calendar.
-            </p>
-            <p className="text-xs text-neutral-500">
-              Set up your Client ID and Client Secret in{' '}
-              <a
-                href="/editor/settings?tab=integrations"
-                className="text-blue-400 hover:text-blue-300 underline"
-              >
-                Settings &rarr; Integrations
-              </a>
-              {' '}first.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {userCode && verificationUrl ? (
-              <div className="space-y-3">
-                <p className="text-xs text-neutral-400">
-                  Open the link below on your phone or computer, then enter the code:
-                </p>
-                <div className="flex items-center gap-3">
-                  <a
-                    href={verificationUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-blue-400 hover:text-blue-300 underline"
-                  >
-                    {verificationUrl}
-                  </a>
+
+              {googleCalendars.length > 0 ? (
+                <div className="space-y-1">
+                  <span className="text-xs text-neutral-400">Select calendars to display</span>
+                  <div className="max-h-40 overflow-y-auto rounded-md bg-neutral-800 border border-neutral-600 divide-y divide-neutral-700">
+                    {googleCalendars.map((cal) => (
+                      <label
+                        key={cal.id}
+                        className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-neutral-750"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedCalendarIds.includes(cal.id)}
+                          onChange={() => toggleCalendar(cal.id)}
+                          className="rounded border-neutral-600 bg-neutral-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+                        />
+                        <span
+                          className="w-2.5 h-2.5 rounded-full shrink-0"
+                          style={{ backgroundColor: cal.backgroundColor }}
+                        />
+                        <span className="text-sm text-neutral-200 truncate">
+                          {cal.summary}
+                          {cal.primary && (
+                            <span className="text-neutral-500 ml-1 text-xs">(primary)</span>
+                          )}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <code className="text-2xl font-bold tracking-widest text-neutral-100 bg-neutral-800 border border-neutral-600 rounded-lg px-4 py-2">
-                    {userCode}
-                  </code>
-                  {deviceFlowPolling && (
-                    <span className="text-xs text-neutral-500 animate-pulse">
-                      Waiting for authorization...
+              ) : (
+                <p className="text-xs text-neutral-500">No calendars found.</p>
+              )}
+            </>
+          ) : !credentialsConfigured ? (
+            <div className="space-y-2">
+              <p className="text-xs text-neutral-400">
+                Google OAuth credentials are required to connect your calendar.
+              </p>
+              <p className="text-xs text-neutral-500">
+                Set up your Client ID and Client Secret in{' '}
+                <a
+                  href="/editor/settings?tab=integrations"
+                  className="text-blue-400 hover:text-blue-300 underline"
+                >
+                  Settings &rarr; Integrations
+                </a>
+                {' '}first.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {userCode && verificationUrl ? (
+                <div className="space-y-3">
+                  <p className="text-xs text-neutral-400">
+                    Open the link below on your phone or computer, then enter the code:
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <a
+                      href={verificationUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-blue-400 hover:text-blue-300 underline"
+                    >
+                      {verificationUrl}
+                    </a>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <code className="text-2xl font-bold tracking-widest text-neutral-100 bg-neutral-800 border border-neutral-600 rounded-lg px-4 py-2">
+                      {userCode}
+                    </code>
+                    {deviceFlowPolling && (
+                      <span className="text-xs text-neutral-500 animate-pulse">
+                        Waiting for authorization...
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={startDeviceFlow}
+                  disabled={deviceFlowPolling}
+                >
+                  Sign in with Google
+                </Button>
+              )}
+              {deviceFlowError && (
+                <p className="text-xs text-red-400">{deviceFlowError}</p>
+              )}
+              <p className="text-xs text-neutral-500">
+                Sign in to automatically see your calendars. Requires a Google OAuth client
+                of type &quot;TVs and Limited Input devices&quot; in the Cloud Console.
+              </p>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ICS / iCal Feeds section */}
+      <section>
+        <h3 className="text-sm font-medium text-neutral-300 mb-3 uppercase tracking-wider">
+          iCal / ICS Feeds
+        </h3>
+        <div className="space-y-3">
+          {icalSources.length > 0 && (
+            <div className="rounded-md bg-neutral-800 border border-neutral-600 divide-y divide-neutral-700">
+              {icalSources.map((source) => (
+                <div key={source.id}>
+                  <div className="flex items-center gap-3 px-3 py-2">
+                    <input
+                      type="checkbox"
+                      checked={source.enabled}
+                      onChange={() => toggleICalSource(source.id)}
+                      className="rounded border-neutral-600 bg-neutral-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+                    />
+                    <span
+                      className="w-2.5 h-2.5 rounded-full shrink-0"
+                      style={{ backgroundColor: source.color }}
+                    />
+                    <span className="text-sm text-neutral-200 truncate flex-1">
+                      {source.name}
                     </span>
+                    <button
+                      onClick={() => setEditingId(editingId === source.id ? null : source.id)}
+                      className="text-xs text-neutral-500 hover:text-neutral-300 transition-colors"
+                    >
+                      {editingId === source.id ? 'done' : 'edit'}
+                    </button>
+                    <button
+                      onClick={() => removeICalSource(source.id)}
+                      className="text-xs text-neutral-500 hover:text-red-400 transition-colors"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                  {editingId === source.id && (
+                    <div className="px-3 pb-3 space-y-2">
+                      <input
+                        type="text"
+                        value={source.name}
+                        onChange={(e) => updateICalSource(source.id, { name: e.target.value })}
+                        className="w-full rounded-md bg-neutral-900 border border-neutral-600 px-2.5 py-1.5 text-sm text-neutral-200 focus:border-blue-500 focus:outline-none"
+                        placeholder="Feed name"
+                      />
+                      <input
+                        type="text"
+                        value={source.url}
+                        onChange={(e) => updateICalSource(source.id, { url: e.target.value })}
+                        className="w-full rounded-md bg-neutral-900 border border-neutral-600 px-2.5 py-1.5 text-sm text-neutral-200 focus:border-blue-500 focus:outline-none font-mono text-xs"
+                        placeholder="https://example.com/calendar.ics"
+                      />
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs text-neutral-400 mr-1">Color</span>
+                        {ICAL_COLOR_PALETTE.map((color) => (
+                          <button
+                            key={color}
+                            onClick={() => updateICalSource(source.id, { color })}
+                            className="w-5 h-5 rounded-full border-2 transition-colors"
+                            style={{
+                              backgroundColor: color,
+                              borderColor: source.color === color ? '#fff' : 'transparent',
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
-              </div>
-            ) : (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={startDeviceFlow}
-                disabled={deviceFlowPolling}
-              >
-                Sign in with Google
-              </Button>
-            )}
-            {deviceFlowError && (
-              <p className="text-xs text-red-400">{deviceFlowError}</p>
-            )}
-            <p className="text-xs text-neutral-500">
-              Sign in to automatically see your calendars. Requires a Google OAuth client
-              of type &quot;TVs and Limited Input devices&quot; in the Cloud Console.
-            </p>
-          </div>
-        )}
+              ))}
+            </div>
+          )}
 
+          {showAddForm ? (
+            <div className="rounded-md bg-neutral-800 border border-neutral-600 p-3 space-y-2">
+              <input
+                type="text"
+                value={newFeedName}
+                onChange={(e) => setNewFeedName(e.target.value)}
+                className="w-full rounded-md bg-neutral-900 border border-neutral-600 px-2.5 py-1.5 text-sm text-neutral-200 focus:border-blue-500 focus:outline-none"
+                placeholder="Feed name (e.g. Work, Sports)"
+                autoFocus
+              />
+              <input
+                type="text"
+                value={newFeedUrl}
+                onChange={(e) => setNewFeedUrl(e.target.value)}
+                className="w-full rounded-md bg-neutral-900 border border-neutral-600 px-2.5 py-1.5 text-sm text-neutral-200 focus:border-blue-500 focus:outline-none font-mono text-xs"
+                placeholder="https://example.com/calendar.ics"
+              />
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-neutral-400 mr-1">Color</span>
+                {ICAL_COLOR_PALETTE.map((color) => (
+                  <button
+                    key={color}
+                    onClick={() => setNewFeedColor(color)}
+                    className="w-5 h-5 rounded-full border-2 transition-colors"
+                    style={{
+                      backgroundColor: color,
+                      borderColor: newFeedColor === color ? '#fff' : 'transparent',
+                    }}
+                  />
+                ))}
+              </div>
+              <div className="flex items-center gap-2 pt-1">
+                <Button variant="primary" size="sm" onClick={addICalSource} disabled={!newFeedName.trim() || !newFeedUrl.trim()}>
+                  Add
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => { setShowAddForm(false); setNewFeedName(''); setNewFeedUrl(''); }}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button variant="secondary" size="sm" onClick={() => setShowAddForm(true)}>
+              + Add Feed
+            </Button>
+          )}
+
+          <p className="text-xs text-neutral-500">
+            Add ICS/iCal feed URLs from Google Calendar, Apple Calendar, Outlook, Nextcloud, or any service that provides .ics feeds.
+          </p>
+        </div>
+      </section>
+
+      {/* Shared settings */}
+      <section>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <Slider
@@ -299,7 +491,7 @@ export default function CalendarSection({ values, onChange }: Props) {
             />
           </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </div>
   );
 }

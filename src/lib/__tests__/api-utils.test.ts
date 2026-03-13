@@ -300,7 +300,7 @@ describe('getLocationFromConfig', () => {
         displayWidth: 1080,
         displayHeight: 1920,
         weather: { provider: 'openweathermap', latitude: 0, longitude: 0, units: 'metric' },
-        calendar: { googleCalendarId: '', googleCalendarIds: [], maxEvents: 10, daysAhead: 7 },
+        calendar: { googleCalendarId: '', googleCalendarIds: [], icalSources: [], maxEvents: 10, daysAhead: 7 },
       },
       screens: [],
     });
@@ -319,7 +319,7 @@ describe('getLocationFromConfig', () => {
         displayWidth: 1080,
         displayHeight: 1920,
         weather: { provider: 'openweathermap', latitude: 35.68, longitude: 139.69, units: 'metric' },
-        calendar: { googleCalendarId: '', googleCalendarIds: [], maxEvents: 10, daysAhead: 7 },
+        calendar: { googleCalendarId: '', googleCalendarIds: [], icalSources: [], maxEvents: 10, daysAhead: 7 },
       },
       screens: [],
     });
@@ -342,7 +342,7 @@ describe('getLocationFromConfig', () => {
         displayWidth: 1080,
         displayHeight: 1920,
         weather: { provider: 'openweathermap', latitude: 0, longitude: 0, units: 'metric' },
-        calendar: { googleCalendarId: '', googleCalendarIds: [], maxEvents: 10, daysAhead: 7 },
+        calendar: { googleCalendarId: '', googleCalendarIds: [], icalSources: [], maxEvents: 10, daysAhead: 7 },
       },
       screens: [],
     });
@@ -394,7 +394,7 @@ describe('getLocationFromConfig', () => {
         displayWidth: 1080,
         displayHeight: 1920,
         weather: { provider: 'openweathermap' as const, latitude: 0, longitude: 0, units: 'metric' as const },
-        calendar: { googleCalendarId: '', googleCalendarIds: [], maxEvents: 10, daysAhead: 7 },
+        calendar: { googleCalendarId: '', googleCalendarIds: [], icalSources: [], maxEvents: 10, daysAhead: 7 },
       },
       screens: [],
     };

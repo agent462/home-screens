@@ -20,6 +20,7 @@ function makeConfig(version: number): ScreenConfiguration {
       calendar: {
         googleCalendarId: '',
         googleCalendarIds: [],
+        icalSources: [],
         maxEvents: 10,
         daysAhead: 7,
       },

@@ -93,9 +93,32 @@ export interface WeatherSettings {
   units: 'metric' | 'imperial';
 }
 
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  start: string;
+  end: string;
+  location?: string;
+  description?: string;
+  allDay: boolean;
+  calendarColor?: string;
+  sourceId?: string;
+  sourceName?: string;
+}
+
+export interface ICalSource {
+  id: string;
+  type: 'ical';
+  name: string;
+  url: string;
+  color: string;
+  enabled: boolean;
+}
+
 export interface CalendarSettings {
   googleCalendarId: string;
   googleCalendarIds: string[];
+  icalSources: ICalSource[];
   maxEvents: number;
   daysAhead: number;
 }
@@ -212,6 +235,7 @@ export interface CalendarConfig {
   showLocation: boolean;
   maxEvents: number;
   showWeekNumbers: boolean;
+  sourceFilter?: string[];  // undefined or empty = all sources (merged)
 }
 
 // Unified weather module config

@@ -55,7 +55,7 @@ describe('writeConfig', () => {
         latitude: 0,
         longitude: 0,
         weather: { provider: 'weatherapi' as const, apiKey: '', latitude: 0, longitude: 0, units: 'imperial' as const },
-        calendar: { googleCalendarId: '', googleCalendarIds: [], maxEvents: 10, daysAhead: 7 },
+        calendar: { googleCalendarId: '', googleCalendarIds: [], icalSources: [], maxEvents: 10, daysAhead: 7 },
       },
       screens: [{ id: 'test', name: 'Test', backgroundImage: '', modules: [] }],
     };
@@ -81,7 +81,7 @@ describe('writeConfig', () => {
         latitude: 0,
         longitude: 0,
         weather: { provider: 'weatherapi' as const, apiKey: '', latitude: 0, longitude: 0, units: 'imperial' as const },
-        calendar: { googleCalendarId: '', googleCalendarIds: [], maxEvents: 10, daysAhead: 7 },
+        calendar: { googleCalendarId: '', googleCalendarIds: [], icalSources: [], maxEvents: 10, daysAhead: 7 },
       },
       screens: [],
     };
@@ -101,7 +101,7 @@ describe('writeConfig', () => {
         latitude: 40.7,
         longitude: -74.0,
         weather: { provider: 'openweathermap' as const, apiKey: 'abc', latitude: 40.7, longitude: -74.0, units: 'metric' as const },
-        calendar: { googleCalendarId: 'cal1', googleCalendarIds: ['cal1', 'cal2'], maxEvents: 5, daysAhead: 14 },
+        calendar: { googleCalendarId: 'cal1', googleCalendarIds: ['cal1', 'cal2'], icalSources: [], maxEvents: 5, daysAhead: 14 },
       },
       screens: [
         { id: 's1', name: 'Living Room', backgroundImage: '/bg.jpg', modules: [] },

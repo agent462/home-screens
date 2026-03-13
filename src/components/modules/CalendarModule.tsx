@@ -13,6 +13,8 @@ interface CalendarEvent {
   location?: string;
   allDay?: boolean;
   calendarColor?: string;
+  sourceId?: string;
+  sourceName?: string;
 }
 
 interface CalendarModuleProps {
@@ -428,7 +430,11 @@ const VIEW_COMPONENTS: Record<CalendarViewMode, React.ComponentType<{
 };
 
 export default function CalendarModule({ config, style, events, timezone }: CalendarModuleProps) {
-  const allEvents = events ?? [];
+  const rawEvents = events ?? [];
+  const sourceFilter = config.sourceFilter;
+  const allEvents = (sourceFilter && sourceFilter.length > 0)
+    ? rawEvents.filter((ev) => !ev.sourceId || sourceFilter.includes(ev.sourceId))
+    : rawEvents;
   const today = startOfDay(createTZDate(timezone));
   const viewMode = config.viewMode ?? 'daily';
   const ViewComponent = VIEW_COMPONENTS[viewMode];

@@ -61,6 +61,7 @@ interface SettingsState {
   units: string;
   locationName: string | null;
   selectedCalendarIds: string[];
+  icalSources: import('@/types/config').ICalSource[];
   maxEvents: number;
   daysAhead: number;
   rotationInterval: number;
@@ -94,6 +95,7 @@ function initSettings(settings: GlobalSettings | undefined): SettingsState {
     selectedCalendarIds:
       settings?.calendar.googleCalendarIds ??
       (settings?.calendar.googleCalendarId ? [settings.calendar.googleCalendarId] : []),
+    icalSources: settings?.calendar.icalSources ?? [],
     maxEvents: settings?.calendar.maxEvents ?? 10,
     daysAhead: settings?.calendar.daysAhead ?? 7,
     rotationInterval: (settings?.rotationIntervalMs ?? 30000) / 1000,
@@ -197,6 +199,7 @@ export default function SettingsPage() {
         calendar: {
           googleCalendarId: state.selectedCalendarIds[0] ?? '',
           googleCalendarIds: state.selectedCalendarIds,
+          icalSources: state.icalSources,
           maxEvents: state.maxEvents,
           daysAhead: state.daysAhead,
         },
@@ -403,6 +406,7 @@ export default function SettingsPage() {
               <CalendarSection
                 values={{
                   selectedCalendarIds: state.selectedCalendarIds,
+                  icalSources: state.icalSources,
                   maxEvents: state.maxEvents,
                   daysAhead: state.daysAhead,
                 }}

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchCalendarEvents } from '@/lib/google-calendar';
+import { fetchICalEvents } from '@/lib/ical-calendar';
 import { readConfig } from '@/lib/config';
 import { errorResponse, createTTLCache } from '@/lib/api-utils';
+import type { CalendarEvent } from '@/types/config';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,28 +29,61 @@ export async function GET(request: NextRequest) {
         ? [config.settings.calendar.googleCalendarId]
         : [];
 
-  if (calendarIds.length === 0) {
+  const icalSources = (config.settings.calendar.icalSources ?? []).filter(s => s.enabled);
+
+  if (calendarIds.length === 0 && icalSources.length === 0) {
     return NextResponse.json(
-      { error: 'No calendars selected. Sign in to Google from the editor settings.' },
+      { error: 'No calendars configured. Add a Google account or ICS feed in editor settings.' },
       { status: 400 },
     );
   }
 
   const daysAhead = config.settings.calendar.daysAhead ?? 7;
-  const timeMin = searchParams.get('timeMin') ?? new Date().toISOString();
-  const timeMax = searchParams.get('timeMax') ?? new Date(Date.now() + daysAhead * 86400000).toISOString();
+  // Round to nearest minute so cache keys are reusable
+  const nowMs = Math.floor(Date.now() / 60000) * 60000;
+  const timeMin = searchParams.get('timeMin') ?? new Date(nowMs).toISOString();
+  const timeMax = searchParams.get('timeMax') ?? new Date(nowMs + daysAhead * 86400000).toISOString();
   const maxEvents = config.settings.calendar.maxEvents ?? 50;
 
-  const cacheKey = `${calendarIds.sort().join(',')}:${timeMin}:${timeMax}:${maxEvents}`;
+  const icalKey = icalSources.map(s => `${s.id}:${s.color}:${s.url}`).join(',');
+  const cacheKey = `g:${[...calendarIds].sort().join(',')};i:${icalKey};${timeMin}:${timeMax}:${maxEvents}`;
   const cached = cache.get(cacheKey);
   if (cached) return NextResponse.json(cached);
 
-  try {
-    const events = await fetchCalendarEvents(calendarIds, timeMin, timeMax);
-    const result = events.slice(0, maxEvents);
-    cache.set(cacheKey, result);
-    return NextResponse.json(result);
-  } catch (error) {
-    return errorResponse(error, 'Failed to fetch calendar events');
+  // Fetch Google and ICS events independently — track success so we
+  // don't cache an empty result when all sources failed transiently.
+  let googleEvents: CalendarEvent[] = [];
+  let googleOk = calendarIds.length === 0; // no Google configured = vacuously ok
+  if (calendarIds.length) {
+    try {
+      googleEvents = await fetchCalendarEvents(calendarIds, timeMin, timeMax);
+      googleOk = true;
+    } catch (error) {
+      console.error('Google Calendar fetch failed', error);
+    }
   }
+
+  let icalEvents: CalendarEvent[] = [];
+  let icalOk = icalSources.length === 0;
+  if (icalSources.length) {
+    try {
+      icalEvents = await fetchICalEvents(icalSources, timeMin, timeMax);
+      icalOk = true;
+    } catch (error) {
+      console.error('ICS calendar fetch failed', error);
+    }
+  }
+
+  // If every configured source failed, return an error instead of caching empty
+  if (!googleOk && !icalOk) {
+    return errorResponse(null, 'Failed to fetch calendar events');
+  }
+
+  // Merge, sort, slice
+  const allEvents = [...googleEvents, ...icalEvents]
+    .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
+    .slice(0, maxEvents);
+
+  cache.set(cacheKey, allEvents);
+  return NextResponse.json(allEvents);
 }

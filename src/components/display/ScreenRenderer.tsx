@@ -11,6 +11,7 @@ export interface SharedDisplayData {
   wapiData: unknown;
   pirateData: unknown;
   noaaData: unknown;
+  openMeteoData: unknown;
   calendarData: unknown;
 }
 
@@ -56,6 +57,7 @@ export default function ScreenRenderer({ screen, settings, rotatingBackground, s
     if (p === 'weatherapi') return sharedData.wapiData as Record<string, unknown> | null;
     if (p === 'pirateweather') return sharedData.pirateData as Record<string, unknown> | null;
     if (p === 'noaa') return sharedData.noaaData as Record<string, unknown> | null;
+    if (p === 'open-meteo') return sharedData.openMeteoData as Record<string, unknown> | null;
     return null;
   }
 

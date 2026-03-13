@@ -1,16 +1,8 @@
 import { google } from 'googleapis';
 import { getAuthenticatedClient } from '@/lib/google-auth';
+import type { CalendarEvent } from '@/types/config';
 
-export interface CalendarEvent {
-  id: string;
-  title: string;
-  start: string;
-  end: string;
-  location?: string;
-  description?: string;
-  allDay: boolean;
-  calendarColor?: string;
-}
+export type { CalendarEvent };
 
 export async function fetchCalendarEvents(
   calendarIds: string[],
@@ -31,8 +23,12 @@ export async function fetchCalendarEvents(
   ]);
 
   const calendarColorMap = new Map<string, string>();
+  const calendarNameMap = new Map<string, string>();
   for (const cal of calListRes.data.items ?? []) {
-    if (cal.id) calendarColorMap.set(cal.id, cal.backgroundColor ?? '#3b82f6');
+    if (cal.id) {
+      calendarColorMap.set(cal.id, cal.backgroundColor ?? '#3b82f6');
+      calendarNameMap.set(cal.id, cal.summary ?? cal.id);
+    }
   }
 
   // Map event colorId values to their actual hex colors
@@ -53,6 +49,7 @@ export async function fetchCalendarEvents(
       });
 
       const calColor = calendarColorMap.get(calendarId) ?? '#3b82f6';
+      const calName = calendarNameMap.get(calendarId) ?? calendarId;
       const items = response.data.items ?? [];
       return items.map((event) => ({
         id: event.id ?? '',
@@ -65,6 +62,8 @@ export async function fetchCalendarEvents(
         calendarColor: event.colorId
           ? eventColorMap.get(event.colorId) ?? calColor
           : calColor,
+        sourceId: calendarId,
+        sourceName: calName,
       }));
     }),
   );

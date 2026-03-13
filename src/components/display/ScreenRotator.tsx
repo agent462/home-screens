@@ -138,11 +138,12 @@ function useSharedDisplayData(screens: Screen[], settings: GlobalSettings): Shar
   const baseParams = `lat=${lat}&lon=${lon}&units=${settings.weather.units}`;
 
   // Determine which weather providers are needed across ALL screens
-  const { needsOWM, needsWAPI, needsPirate, needsNOAA } = useMemo(() => {
+  const { needsOWM, needsWAPI, needsPirate, needsNOAA, needsOpenMeteo } = useMemo(() => {
     let owm = false;
     let wapi = false;
     let pirate = false;
     let noaa = false;
+    let openMeteo = false;
     for (const screen of screens) {
       for (const mod of screen.modules) {
         if (mod.type === 'weather') {
@@ -151,30 +152,36 @@ function useSharedDisplayData(screens: Screen[], settings: GlobalSettings): Shar
           if (p === 'weatherapi') wapi = true;
           if (p === 'pirateweather') pirate = true;
           if (p === 'noaa') noaa = true;
+          if (p === 'open-meteo') openMeteo = true;
         }
       }
     }
-    return { needsOWM: owm, needsWAPI: wapi, needsPirate: pirate, needsNOAA: noaa };
+    return { needsOWM: owm, needsWAPI: wapi, needsPirate: pirate, needsNOAA: noaa, needsOpenMeteo: openMeteo };
   }, [screens, globalProvider]);
 
   const owmUrl = needsOWM ? `/api/weather?${baseParams}&provider=openweathermap` : '';
   const wapiUrl = needsWAPI ? `/api/weather?${baseParams}&provider=weatherapi` : '';
   const pirateUrl = needsPirate ? `/api/weather?${baseParams}&provider=pirateweather` : '';
   const noaaUrl = needsNOAA ? `/api/weather?${baseParams}&provider=noaa` : '';
+  const openMeteoUrl = needsOpenMeteo ? `/api/weather?${baseParams}&provider=open-meteo` : '';
   const [owmData] = useFetchData(owmUrl, WEATHER_REFRESH_MS);
   const [wapiData] = useFetchData(wapiUrl, WEATHER_REFRESH_MS);
   const [pirateData] = useFetchData(pirateUrl, WEATHER_REFRESH_MS);
   const [noaaData] = useFetchData(noaaUrl, WEATHER_REFRESH_MS);
+  const [openMeteoData] = useFetchData(openMeteoUrl, WEATHER_REFRESH_MS);
 
   const calendarIdList = settings.calendar.googleCalendarIds?.length
     ? settings.calendar.googleCalendarIds
     : settings.calendar.googleCalendarId ? [settings.calendar.googleCalendarId] : [];
-  const calendarUrl = calendarIdList.length
-    ? `/api/calendar?calendarIds=${encodeURIComponent(calendarIdList.join(','))}`
+  const hasIcalSources = settings.calendar.icalSources?.some(s => s.enabled);
+  const calendarUrl = (calendarIdList.length || hasIcalSources)
+    ? calendarIdList.length
+      ? `/api/calendar?calendarIds=${encodeURIComponent(calendarIdList.join(','))}`
+      : '/api/calendar'
     : '';
   const [calendarData] = useFetchData(calendarUrl, CALENDAR_REFRESH_MS);
 
-  return { owmData, wapiData, pirateData, noaaData, calendarData };
+  return { owmData, wapiData, pirateData, noaaData, openMeteoData, calendarData };
 }
 
 /** Prefetch next screen's module data ~5s before rotation fires.

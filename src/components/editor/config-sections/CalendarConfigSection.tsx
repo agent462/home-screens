@@ -1,13 +1,90 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Toggle from '@/components/ui/Toggle';
 import { useModuleConfig } from '@/hooks/useModuleConfig';
+import { useEditorStore } from '@/stores/editor-store';
+import { editorFetch } from '@/lib/editor-fetch';
 import { INPUT_CLASS } from '@/components/editor/PropertyPanel';
 import type { ModuleInstance } from '@/types/config';
 
+interface GoogleCalendar {
+  id: string;
+  summary: string;
+  backgroundColor: string;
+  primary: boolean;
+}
+
+interface CalendarSource {
+  id: string;
+  name: string;
+  color: string;
+}
+
 export function CalendarConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
-  const { config: c, set } = useModuleConfig<{ viewMode?: string; daysToShow?: number; showTime?: boolean; showLocation?: boolean; maxEvents?: number; showWeekNumbers?: boolean }>(mod, screenId);
+  const { config: c, set } = useModuleConfig<{
+    viewMode?: string;
+    daysToShow?: number;
+    showTime?: boolean;
+    showLocation?: boolean;
+    maxEvents?: number;
+    showWeekNumbers?: boolean;
+    sourceFilter?: string[];
+  }>(mod, screenId);
   const viewMode = c.viewMode ?? 'daily';
+  const sourceFilter = c.sourceFilter ?? [];
+
+  // Build list of available sources from global settings + Google API
+  const googleCalendarIds = useEditorStore((s) => s.config?.settings?.calendar?.googleCalendarIds ?? []);
+  const icalSources = useEditorStore((s) => s.config?.settings?.calendar?.icalSources ?? []);
+  const [googleCalendars, setGoogleCalendars] = useState<GoogleCalendar[]>([]);
+
+  useEffect(() => {
+    async function fetchGoogleCals() {
+      try {
+        const res = await editorFetch('/api/calendars');
+        if (res.ok) setGoogleCalendars(await res.json());
+      } catch { /* ignore */ }
+    }
+    if (googleCalendarIds.length > 0) fetchGoogleCals();
+  }, [googleCalendarIds.length]);
+
+  // Merge Google + ICS into a unified source list
+  const availableSources: CalendarSource[] = [];
+  for (const gid of googleCalendarIds) {
+    const cal = googleCalendars.find((c) => c.id === gid);
+    availableSources.push({
+      id: gid,
+      name: cal?.summary ?? gid.split('@')[0],
+      color: cal?.backgroundColor ?? '#3b82f6',
+    });
+  }
+  for (const src of icalSources) {
+    if (src.enabled) {
+      availableSources.push({ id: src.id, name: src.name, color: src.color });
+    }
+  }
+
+  const allSelected = sourceFilter.length === 0;
+
+  function toggleSource(id: string) {
+    if (allSelected) {
+      // Switching from "all" to individual: select all except this one
+      set({ sourceFilter: availableSources.filter((s) => s.id !== id).map((s) => s.id) });
+    } else if (sourceFilter.includes(id)) {
+      const next = sourceFilter.filter((s) => s !== id);
+      // If removing the last one, revert to "all"
+      set({ sourceFilter: next.length === 0 ? undefined : next });
+    } else {
+      const next = [...sourceFilter, id];
+      // If all are now selected, revert to "all"
+      set({ sourceFilter: next.length >= availableSources.length ? undefined : next });
+    }
+  }
+
+  function selectAll() {
+    set({ sourceFilter: undefined });
+  }
 
   return (
     <>
@@ -24,6 +101,39 @@ export function CalendarConfigSection({ mod, screenId }: { mod: ModuleInstance; 
           <option value="month">Month Grid</option>
         </select>
       </label>
+
+      {availableSources.length > 1 && (
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs text-neutral-400">Sources</span>
+          <div className="rounded-md bg-neutral-800 border border-neutral-600 divide-y divide-neutral-700 max-h-40 overflow-y-auto">
+            <label className="flex items-center gap-2.5 px-3 py-1.5 cursor-pointer hover:bg-neutral-750">
+              <input
+                type="radio"
+                checked={allSelected}
+                onChange={selectAll}
+                className="border-neutral-600 bg-neutral-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+              />
+              <span className="text-sm text-neutral-200">All Sources</span>
+            </label>
+            {availableSources.map((src) => (
+              <label key={src.id} className="flex items-center gap-2.5 px-3 py-1.5 cursor-pointer hover:bg-neutral-750">
+                <input
+                  type="checkbox"
+                  checked={allSelected || sourceFilter.includes(src.id)}
+                  onChange={() => toggleSource(src.id)}
+                  className="rounded border-neutral-600 bg-neutral-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+                />
+                <span
+                  className="w-2 h-2 rounded-full shrink-0"
+                  style={{ backgroundColor: src.color }}
+                />
+                <span className="text-sm text-neutral-200 truncate">{src.name}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
       {viewMode === 'daily' && (
         <label className="flex flex-col gap-0.5">
           <span className="text-xs text-neutral-400">Days to Show</span>
