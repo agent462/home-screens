@@ -6,7 +6,7 @@ import {
   Newspaper, TrendingUp, Bitcoin, BookOpen, History,
   Moon, Sunrise, Image, QrCode, BarChart3, Car, Trophy, Wind,
   ListChecks, CloudRain, CalendarRange, Trash2, Medal, Sparkles,
-  Calendar, Globe,
+  Calendar, Globe, UtensilsCrossed,
 } from 'lucide-react';
 import { DEFAULT_MODULE_SIZES } from './constants';
 
@@ -541,6 +541,25 @@ registerModule({
     accentColor: '#22d3ee',
   },
   defaultSize: DEFAULT_MODULE_SIZES.date,
+});
+
+registerModule({
+  type: 'meal-planner',
+  label: 'Meal Planner',
+  icon: UtensilsCrossed,
+  category: 'Personal',
+  defaultConfig: {
+    view: 'week',
+    savedMeals: [],
+    plan: [],
+    slots: ['breakfast', 'lunch', 'dinner'],
+    weekStartDay: 'monday',
+    showEmoji: true,
+    showPrepTime: true,
+    showTags: true,
+    accentColor: '#f59e0b',
+  },
+  defaultSize: DEFAULT_MODULE_SIZES['meal-planner'],
 });
 
 registerModule({

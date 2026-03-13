@@ -43,6 +43,7 @@ import {
   StandingsConfigSection,
   AffirmationsConfigSection,
   DateConfigSection,
+  MealPlannerConfigSection,
   IframeConfigSection,
 } from '@/components/editor/config-sections';
 
@@ -194,6 +195,7 @@ const CONFIG_SECTIONS: Record<string, React.FC<{ mod: ModuleInstance; screenId: 
   standings: StandingsConfigSection,
   affirmations: AffirmationsConfigSection,
   date: DateConfigSection,
+  'meal-planner': MealPlannerConfigSection,
   iframe: IframeConfigSection,
 };
 

@@ -30,6 +30,7 @@ export type ModuleType =
   | 'standings'
   | 'affirmations'
   | 'date'
+  | 'meal-planner'
   | 'iframe';
 
 export interface ModuleStyle {
@@ -569,6 +570,37 @@ export interface AffirmationsConfig {
   showCategoryLabel: boolean;
   timeAware: boolean;
   customEntries: CustomAffirmation[];
+  accentColor: string;
+}
+
+// Meal planner module config
+export type MealPlannerView = 'week' | 'today' | 'next-meal' | 'compact' | 'list';
+export type MealSlotType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
+
+export interface SavedMeal {
+  id: string;
+  name: string;
+  emoji?: string;
+  tags?: string[];
+  prepTime?: number;      // minutes
+  notes?: string;
+}
+
+export interface PlannedMeal {
+  day: number;            // 0=Sun...6=Sat
+  slot: MealSlotType;
+  mealId: string;         // references SavedMeal.id
+}
+
+export interface MealPlannerConfig {
+  view: MealPlannerView;
+  savedMeals: SavedMeal[];
+  plan: PlannedMeal[];
+  slots: MealSlotType[];
+  weekStartDay: 'sunday' | 'monday';
+  showEmoji: boolean;
+  showPrepTime: boolean;
+  showTags: boolean;
   accentColor: string;
 }
 
