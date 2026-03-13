@@ -1,6 +1,6 @@
 # Modules Reference
 
-Home Screens includes 30 built-in modules organized into 7 categories. Each module can be dragged onto the canvas from the module palette in the editor.
+Home Screens includes 31 built-in modules organized into 7 categories. Each module can be dragged onto the canvas from the module palette in the editor.
 
 ## Time & Date
 
@@ -81,7 +81,7 @@ Unified weather module with 8 views and 4 provider options.
 |---|---|---|---|
 | `view` | string | `"hourly"` | Which view to render (see list above) |
 | `iconSet` | string | `"color"` | Icon style: `outline` or `color` |
-| `provider` | string | `"global"` | Weather provider: `global` (use global setting), `openweathermap`, `weatherapi`, `pirateweather`, or `noaa` |
+| `provider` | string | `"global"` | Weather provider: `global` (use global setting), `openweathermap`, `weatherapi`, `pirateweather`, `noaa`, or `open-meteo` |
 | `hoursToShow` | number | `8` | Number of hours to display (hourly view) |
 | `showFeelsLike` | boolean | `true` | Show "feels like" temperature |
 | `daysToShow` | number | `5` | Number of forecast days (daily view) |
@@ -446,6 +446,21 @@ Generates a QR code from any text or URL.
 | `label` | string | `""` | Label text below the code |
 | `fgColor` | string | `"#ffffff"` | Foreground color |
 | `bgColor` | string | `"transparent"` | Background color |
+
+### Web Embed (iFrame)
+
+Embeds any web page or dashboard. Acts as a universal adapter for Home Assistant, Grafana, Google Sheets, Notion, and any embeddable web content.
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `url` | string | `""` | URL of the page to embed |
+| `title` | string | `""` | Accessibility title for the iframe |
+| `refreshIntervalMs` | number | `0` | Auto-refresh interval in ms (0 = off) |
+| `scrollable` | boolean | `false` | Allow scrolling within the embedded page |
+| `sandboxEnabled` | boolean | `false` | Apply sandbox restrictions to the iframe |
+| `sandbox` | string | `"allow-scripts allow-forms allow-popups"` | Sandbox permission tokens (when enabled) |
+
+**Note:** Some websites (e.g. YouTube, Yahoo Finance, Twitter) set `frame-ancestors` or `X-Frame-Options` headers that prevent embedding. Self-hosted services, published Google Docs/Sheets, and sites that explicitly support embedding will work.
 
 ---
 

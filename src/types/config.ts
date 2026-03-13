@@ -29,7 +29,8 @@ export type ModuleType =
   | 'garbage-day'
   | 'standings'
   | 'affirmations'
-  | 'date';
+  | 'date'
+  | 'iframe';
 
 export interface ModuleStyle {
   opacity: number;
@@ -545,6 +546,16 @@ export interface AffirmationsConfig {
   timeAware: boolean;
   customEntries: CustomAffirmation[];
   accentColor: string;
+}
+
+// iFrame / Web embed module config
+export interface IframeConfig {
+  url: string;
+  refreshIntervalMs: number;
+  scrollable: boolean;
+  sandboxEnabled: boolean;
+  sandbox: string;
+  title: string;
 }
 
 // Date module config

@@ -1,0 +1,82 @@
+'use client';
+
+import { useModuleConfig } from '@/hooks/useModuleConfig';
+import { INPUT_CLASS } from '@/components/editor/PropertyPanel';
+import type { ModuleInstance, IframeConfig } from '@/types/config';
+
+export function IframeConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
+  const { config: c, set } = useModuleConfig<IframeConfig>(mod, screenId);
+
+  return (
+    <>
+      <label className="flex flex-col gap-0.5">
+        <span className="text-xs text-neutral-400">URL</span>
+        <input
+          type="url"
+          value={c.url || ''}
+          onChange={(e) => set({ url: e.target.value })}
+          className={INPUT_CLASS}
+          placeholder="https://example.com"
+        />
+      </label>
+
+      <label className="flex flex-col gap-0.5">
+        <span className="text-xs text-neutral-400">Title (accessibility)</span>
+        <input
+          type="text"
+          value={c.title || ''}
+          onChange={(e) => set({ title: e.target.value })}
+          className={INPUT_CLASS}
+          placeholder="e.g. Home Assistant Dashboard"
+        />
+      </label>
+
+      <label className="flex flex-col gap-0.5">
+        <span className="text-xs text-neutral-400">Auto-Refresh (seconds, 0 = off)</span>
+        <input
+          type="number"
+          min={0}
+          value={Math.round((c.refreshIntervalMs || 0) / 1000)}
+          onChange={(e) => set({ refreshIntervalMs: Math.max(0, Number(e.target.value)) * 1000 })}
+          className={INPUT_CLASS}
+        />
+      </label>
+
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={c.scrollable ?? false}
+          onChange={(e) => set({ scrollable: e.target.checked })}
+          className="accent-cyan-500"
+        />
+        <span className="text-xs text-neutral-300">Allow scrolling</span>
+      </label>
+
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={c.sandboxEnabled ?? false}
+          onChange={(e) => set({ sandboxEnabled: e.target.checked })}
+          className="accent-cyan-500"
+        />
+        <span className="text-xs text-neutral-300">Enable sandbox</span>
+      </label>
+
+      {c.sandboxEnabled && (
+        <label className="flex flex-col gap-0.5">
+          <span className="text-xs text-neutral-400">Sandbox permissions</span>
+          <input
+            type="text"
+            value={c.sandbox || ''}
+            onChange={(e) => set({ sandbox: e.target.value })}
+            className={INPUT_CLASS}
+            placeholder="allow-scripts allow-forms"
+          />
+          <span className="text-[10px] text-neutral-500 mt-0.5">
+            Space-separated tokens. Leave empty for maximum restriction.
+          </span>
+        </label>
+      )}
+    </>
+  );
+}

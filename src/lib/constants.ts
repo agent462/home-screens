@@ -74,4 +74,5 @@ export const DEFAULT_MODULE_SIZES: Record<string, { w: number; h: number }> = {
   standings: { w: 500, h: 500 },
   affirmations: { w: 500, h: 200 },
   date: { w: 400, h: 200 },
+  iframe: { w: 500, h: 400 },
 };

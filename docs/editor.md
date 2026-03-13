@@ -11,26 +11,6 @@ The editor has four main areas:
 - **Property Panel** (right sidebar) — configure the selected module's settings and appearance
 - **Screen Tabs** (top) — manage multiple screens
 
-```mermaid
-block-beta
-  columns 1
-  block:tabs["Screen Tabs"]
-    columns 3
-    block:palette["Module Palette"]
-      columns 1
-      p1[" "]
-    end
-    block:canvas["Canvas"]
-      columns 1
-      c1[" "]
-    end
-    block:props["Property Panel"]
-      columns 1
-      pp1[" "]
-    end
-  end
-```
-
 ## Adding Modules
 
 1. Open the **Module Palette** on the left

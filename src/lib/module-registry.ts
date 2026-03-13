@@ -6,7 +6,7 @@ import {
   Newspaper, TrendingUp, Bitcoin, BookOpen, History,
   Moon, Sunrise, Image, QrCode, BarChart3, Car, Trophy, Wind,
   ListChecks, CloudRain, CalendarRange, Trash2, Medal, Sparkles,
-  Calendar,
+  Calendar, Globe,
 } from 'lucide-react';
 import { DEFAULT_MODULE_SIZES } from './constants';
 
@@ -541,4 +541,21 @@ registerModule({
     accentColor: '#22d3ee',
   },
   defaultSize: DEFAULT_MODULE_SIZES.date,
+});
+
+registerModule({
+  type: 'iframe',
+  label: 'Web Embed',
+  icon: Globe,
+  category: 'Media & Display',
+  defaultConfig: {
+    url: '',
+    refreshIntervalMs: 0,
+    scrollable: false,
+    sandboxEnabled: false,
+    sandbox: 'allow-scripts allow-forms allow-popups',
+    title: '',
+  },
+  defaultSize: DEFAULT_MODULE_SIZES.iframe,
+  defaultStyle: { padding: 0 },
 });
