@@ -14,6 +14,11 @@ import type {
 import { DEFAULT_MODULE_STYLE as defaultStyle } from '@/types/config';
 import { getModuleDefinition } from '@/lib/module-registry';
 import { editorFetch } from '@/lib/editor-fetch';
+import type { LayoutExport } from '@/types/layout-export';
+import {
+  createLayoutExport,
+  importLayout as importLayoutCore,
+} from '@/lib/layout-export';
 
 interface EditorState {
   config: ScreenConfiguration | null;
@@ -44,6 +49,8 @@ interface EditorState {
   setActiveProfile: (id: string | undefined) => void;
   exportConfig: () => void;
   importConfig: (json: string) => void;
+  exportLayout: (options?: { screenIds?: string[]; name?: string; description?: string }) => void;
+  importLayoutAction: (layout: LayoutExport, options: { mode: 'add' | 'replace'; applyVisual?: boolean }) => void;
 }
 
 function updateModuleInConfig(
@@ -350,6 +357,44 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (firstId) {
       const url = new URL(window.location.href);
       url.searchParams.set('screen', firstId);
+      window.history.replaceState(null, '', url.toString());
+    }
+  },
+
+  exportLayout: (options = {}) => {
+    const { config } = get();
+    if (!config) return;
+    const layout = createLayoutExport(config, options);
+    const slug = (options.name ?? 'my-layout')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+    const blob = new Blob([JSON.stringify(layout, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `home-screens-${slug}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+
+  importLayoutAction: (layout, options) => {
+    const { config } = get();
+    if (!config) return;
+    const updated = importLayoutCore(layout, config, options);
+    // Select the first of the newly imported screens
+    const existingIds = new Set(config.screens.map((s) => s.id));
+    const firstNewId = updated.screens.find((s) => !existingIds.has(s.id))?.id
+      ?? updated.screens[0]?.id ?? null;
+    set({
+      config: updated,
+      selectedScreenId: firstNewId,
+      selectedModuleId: null,
+      isDirty: true, saveError: null,
+    });
+    if (firstNewId) {
+      const url = new URL(window.location.href);
+      url.searchParams.set('screen', firstNewId);
       window.history.replaceState(null, '', url.toString());
     }
   },

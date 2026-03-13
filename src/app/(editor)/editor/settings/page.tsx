@@ -31,8 +31,8 @@ import ProfilesSection from '@/components/editor/settings/ProfilesSection';
 import SystemSection from '@/components/editor/settings/SystemSection';
 import SecuritySection from '@/components/editor/settings/SecuritySection';
 import StatsSection from '@/components/editor/settings/StatsSection';
+import DataSection from '@/components/editor/settings/DataSection';
 import UpgradeModal from '@/components/editor/UpgradeModal';
-import { useConfirmStore } from '@/stores/confirm-store';
 
 /* ─── Tab definitions ─────────────────────────────── */
 
@@ -133,8 +133,7 @@ export default function SettingsPage() {
   const router = useRouter();
   const initialTab = getInitialTab();
 
-  const { config, updateSettings, saveConfig, loadConfig, exportConfig, importConfig } = useEditorStore();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { config, updateSettings, saveConfig, loadConfig } = useEditorStore();
   const settings = config?.settings;
 
   const [activeTab, setActiveTab] = useState<TabId>(initialTab);
@@ -148,8 +147,8 @@ export default function SettingsPage() {
   }, [config, loadConfig]);
 
   // Re-initialize local state once config arrives (initial load only).
-  // Imports re-sync manually in handleImport. Profile actions that mutate
-  // config.settings (e.g. setActiveProfile) must NOT wipe unsaved form edits.
+  // Imports re-sync via DataSection's onSettingsImported callback.
+  // Profile actions that mutate config.settings (e.g. setActiveProfile) must NOT wipe unsaved form edits.
   const settingsInitRef = useRef(false);
   useEffect(() => {
     if (settings && !settingsInitRef.current) {
@@ -237,24 +236,6 @@ export default function SettingsPage() {
     loadConfig();
     router.push('/editor');
   }
-
-  const handleImport = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        importConfig(reader.result as string);
-        // Refresh local settings state from the newly imported config
-        const imported = useEditorStore.getState().config?.settings;
-        setState(initSettings(imported));
-      } catch {
-        useConfirmStore.getState().alert('Invalid config file.');
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
-  }, [importConfig]);
 
   const activeTarget = upgradeTarget || rollbackTarget;
 
@@ -423,32 +404,12 @@ export default function SettingsPage() {
             )}
 
             {activeTab === 'data' && (
-              <section>
-                <h3 className="text-sm font-medium text-neutral-300 mb-3 uppercase tracking-wider">
-                  Configuration Data
-                </h3>
-                <div className="space-y-4">
-                  <p className="text-xs text-neutral-500">
-                    Export your full configuration as a JSON file for backup or transfer to another device.
-                    Import a previously exported file to restore or migrate settings.
-                  </p>
-                  <div className="flex items-center gap-3">
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".json"
-                      className="hidden"
-                      onChange={handleImport}
-                    />
-                    <Button variant="secondary" onClick={exportConfig}>
-                      Export Config
-                    </Button>
-                    <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>
-                      Import Config
-                    </Button>
-                  </div>
-                </div>
-              </section>
+              <DataSection
+                onSettingsImported={() => {
+                  const imported = useEditorStore.getState().config?.settings;
+                  setState(initSettings(imported));
+                }}
+              />
             )}
 
             {activeTab === 'stats' && (
