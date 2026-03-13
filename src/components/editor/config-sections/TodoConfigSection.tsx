@@ -3,7 +3,7 @@
 import Button from '@/components/ui/Button';
 import { useModuleConfig } from '@/hooks/useModuleConfig';
 import { useListEditor } from '@/hooks/useListEditor';
-import { INPUT_CLASS } from '@/components/editor/PropertyPanel';
+import { INPUT_CLASS, NESTED_INPUT_CLASS } from '@/components/editor/PropertyPanel';
 import type { ModuleInstance, TodoItem } from '@/types/config';
 
 export function TodoConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
@@ -44,7 +44,7 @@ export function TodoConfigSection({ mod, screenId }: { mod: ModuleInstance; scre
             type="text"
             value={it.text}
             onChange={(e) => updateItem(it.id, { text: e.target.value })}
-            className="flex-1 px-2 py-0.5 text-xs bg-neutral-700 border border-neutral-600 rounded text-neutral-200"
+            className={`flex-1 ${NESTED_INPUT_CLASS}`}
           />
           <button onClick={() => removeItem(it.id)} className="text-red-400 text-xs px-1">x</button>
         </div>

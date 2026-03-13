@@ -164,7 +164,6 @@ export interface GlobalSettings {
   screensaver?: ScreensaverSettings;
   cursorHideSeconds?: number;
   activeProfile?: string;
-  piVariant?: 'desktop' | 'lite';
   transitionEffect?: TransitionEffect;
   transitionDuration?: number;
   updateChannel?: 'stable' | 'dev';
@@ -421,7 +420,7 @@ export interface PhotoSlideshowConfig {
 }
 
 // QR code module config
-export type QRCodeMode = 'custom' | 'wifi';
+type QRCodeMode = 'custom' | 'wifi';
 export type WifiAuthType = 'WPA' | 'WEP' | 'nopass';
 
 export interface QRCodeConfig {

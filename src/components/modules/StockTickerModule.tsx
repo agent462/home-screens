@@ -1,19 +1,13 @@
 'use client';
 
 import type { StockTickerConfig, ModuleStyle } from '@/types/config';
-import ModuleWrapper from './ModuleWrapper';
-import { ModuleLoadingState, ModuleEmptyState } from './ModuleStates';
 import {
   formatUSD,
   formatPercent,
   ChangeColor,
-  FinancialCardsView,
-  FinancialTickerView,
-  FinancialTableView,
-  FinancialCompactView,
 } from './financial/shared';
-import type { TableColumn, FinancialItem } from './financial/shared';
-import { useFetchData } from '@/hooks/useFetchData';
+import type { TableColumn, FinancialItem, CompactRow } from './financial/shared';
+import FinancialDataModule from './financial/FinancialDataModule';
 import { stocksUrl } from '@/lib/fetch-keys';
 
 interface StockTickerModuleProps {
@@ -43,6 +37,22 @@ function toFinancialItems(stocks: StockData[]): FinancialItem[] {
       price: stock.price ?? 0,
       changeValue: change,
       changeLabel: `${formatChange(change)} (${formatPercent(changePercent)})`,
+    };
+  });
+}
+
+function toCompactRows(stocks: StockData[]): CompactRow[] {
+  return stocks.map((stock, i) => {
+    const changePercent = stock.changePercent ?? 0;
+    return {
+      key: `${stock.symbol}-${i}`,
+      label: stock.symbol,
+      price: formatUSD(stock.price ?? 0),
+      change: (
+        <ChangeColor value={changePercent}>
+          <span className="tabular-nums w-20 text-right">{formatPercent(changePercent)}</span>
+        </ChangeColor>
+      ),
     };
   });
 }
@@ -80,53 +90,21 @@ const stockTableColumns: TableColumn<StockData>[] = [
 ];
 
 export default function StockTickerModule({ config, style }: StockTickerModuleProps) {
-  const [data, error] = useFetchData<{ stocks: StockData[] }>(
-    stocksUrl(config) ?? '',
-    config.refreshIntervalMs ?? 60000,
-  );
-  const stocks = data?.stocks ?? [];
-  const view = config.view ?? 'cards';
-  const scale = config.cardScale ?? 1;
-  const tickerSpeed = config.tickerSpeed ?? 5;
-
-  if (data === null) {
-    return <ModuleLoadingState style={style} message="Loading…" error={error} />;
-  }
-
-  if (stocks.length === 0) {
-    return <ModuleEmptyState style={style} message="No stock data" />;
-  }
-
   return (
-    <ModuleWrapper style={style}>
-      {view === 'cards' && <FinancialCardsView items={toFinancialItems(stocks)} scale={scale} />}
-      {view === 'ticker' && <FinancialTickerView items={toFinancialItems(stocks)} speed={tickerSpeed} />}
-      {view === 'table' && (
-        <FinancialTableView
-          items={stocks}
-          columns={stockTableColumns}
-          scale={scale}
-          itemKey={(stock, i) => `${stock.symbol}-${i}`}
-        />
-      )}
-      {view === 'compact' && (
-        <FinancialCompactView
-          rows={stocks.map((stock, i) => {
-            const changePercent = stock.changePercent ?? 0;
-            return {
-              key: `${stock.symbol}-${i}`,
-              label: stock.symbol,
-              price: formatUSD(stock.price ?? 0),
-              change: (
-                <ChangeColor value={changePercent}>
-                  <span className="tabular-nums w-20 text-right">{formatPercent(changePercent)}</span>
-                </ChangeColor>
-              ),
-            };
-          })}
-          scale={scale}
-        />
-      )}
-    </ModuleWrapper>
+    <FinancialDataModule<StockData>
+      url={stocksUrl(config) ?? ''}
+      refreshIntervalMs={config.refreshIntervalMs ?? 60000}
+      dataKey="stocks"
+      toFinancialItems={toFinancialItems}
+      toCompactRows={toCompactRows}
+      tableColumns={stockTableColumns}
+      tableItemKey={(stock, i) => `${stock.symbol}-${i}`}
+      view={config.view ?? 'cards'}
+      cardScale={config.cardScale ?? 1}
+      tickerSpeed={config.tickerSpeed ?? 5}
+      style={style}
+      loadingMessage="Loading…"
+      emptyMessage="No stock data"
+    />
   );
 }

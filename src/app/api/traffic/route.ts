@@ -10,7 +10,8 @@ interface RouteInput {
   destination: string;
 }
 
-const cache = createTTLCache<unknown>(5 * 60 * 1000); // 5 minutes
+/** @internal */
+export const cache = createTTLCache<unknown>(5 * 60 * 1000); // 5 minutes
 const geocodeCache = createTTLCache<string>(60 * 60 * 1000); // 1 hour
 
 async function fetchGoogle(routes: RouteInput[], apiKey: string) {

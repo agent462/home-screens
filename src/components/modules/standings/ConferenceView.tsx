@@ -2,7 +2,7 @@
 
 import { useRotatingIndex } from '@/hooks/useRotatingIndex';
 import type { StandingsGroup } from './types';
-import { TeamLogo, formatRecord, getPlayoffTeamCount } from './shared';
+import { formatRecord, getPlayoffTeamCount, StandingsTeamRow } from './shared';
 import { PaginationDots } from '../shared/PaginationDots';
 
 interface ConferenceViewProps {
@@ -37,40 +37,28 @@ function ConferenceColumn({
       </div>
 
       {/* Team rows */}
-      {entries.map((entry) => {
-        const isPlayoffCutoff = showPlayoffLine && entry.rank === playoffCount;
-
-        return (
-          <div
-            key={entry.teamAbbr}
-            className={`flex items-center gap-1 py-0.5 px-1 ${
-              isPlayoffCutoff ? 'border-b border-dashed border-white/20' : ''
-            }`}
-            style={{ borderLeft: `2px solid #${entry.teamColor}` }}
-          >
-            <span
-              className="text-white/25 tabular-nums shrink-0"
-              style={{ fontSize: '0.6em', width: '1em', textAlign: 'right' }}
-            >
-              {entry.rank}
-            </span>
-            <div className="shrink-0">
-              <TeamLogo src={entry.teamLogo} alt={entry.teamAbbr} size={14} />
-            </div>
-            <span className="flex-1 min-w-0 text-white/80 truncate" style={{ fontSize: '0.65em' }}>
-              {entry.teamAbbr}
-              {entry.clincher && (
-                <span className="text-emerald-400/60 ml-0.5" style={{ fontSize: '0.8em' }}>
-                  {entry.clincher}
-                </span>
-              )}
-            </span>
-            <span className="text-white/50 tabular-nums shrink-0" style={{ fontSize: '0.6em' }}>
-              {formatRecord(entry, group.league)}
-            </span>
-          </div>
-        );
-      })}
+      {entries.map((entry) => (
+        <StandingsTeamRow
+          key={entry.teamAbbr}
+          entry={entry}
+          showPlayoffCutoff={showPlayoffLine && entry.rank === playoffCount}
+          showGradientBar={false}
+          borderWidth={2}
+          logoSize={14}
+          rowClassName="flex items-center gap-1 py-0.5 px-1"
+          rankClassName="text-white/25 tabular-nums shrink-0"
+          rankStyle={{ fontSize: '0.6em', width: '1em', textAlign: 'right' }}
+          nameClassName="text-white/80 truncate"
+          nameStyle={{ fontSize: '0.65em' }}
+          teamLabel={entry.teamAbbr}
+          clincherClassName="text-emerald-400/60 ml-0.5"
+          clincherStyle={{ fontSize: '0.8em' }}
+        >
+          <span className="text-white/50 tabular-nums shrink-0" style={{ fontSize: '0.6em' }}>
+            {formatRecord(entry, group.league)}
+          </span>
+        </StandingsTeamRow>
+      ))}
     </div>
   );
 }

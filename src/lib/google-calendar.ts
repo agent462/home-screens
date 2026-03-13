@@ -2,8 +2,6 @@ import { google } from 'googleapis';
 import { getAuthenticatedClient } from '@/lib/google-auth';
 import type { CalendarEvent } from '@/types/config';
 
-export type { CalendarEvent };
-
 export async function fetchCalendarEvents(
   calendarIds: string[],
   timeMin: string,

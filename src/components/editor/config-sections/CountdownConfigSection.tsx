@@ -4,6 +4,7 @@ import Toggle from '@/components/ui/Toggle';
 import Button from '@/components/ui/Button';
 import { useModuleConfig } from '@/hooks/useModuleConfig';
 import { useListEditor } from '@/hooks/useListEditor';
+import { NESTED_INPUT_CLASS } from '@/components/editor/PropertyPanel';
 import type { ModuleInstance, CountdownEvent } from '@/types/config';
 
 export function CountdownConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
@@ -44,7 +45,7 @@ export function CountdownConfigSection({ mod, screenId }: { mod: ModuleInstance;
               value={ev.name}
               onChange={(e) => updateEvent(ev.id, { name: e.target.value })}
               placeholder="Name"
-              className="flex-1 px-2 py-0.5 text-xs bg-neutral-700 border border-neutral-600 rounded text-neutral-200"
+              className={`flex-1 ${NESTED_INPUT_CLASS}`}
             />
             <button onClick={() => removeEvent(ev.id)} className="text-red-400 text-xs px-1">x</button>
           </div>
@@ -52,7 +53,7 @@ export function CountdownConfigSection({ mod, screenId }: { mod: ModuleInstance;
             type="datetime-local"
             value={ev.date.includes('T') ? ev.date.slice(0, 16) : ev.date + 'T00:00'}
             onChange={(e) => updateEvent(ev.id, { date: e.target.value })}
-            className="w-full px-2 py-0.5 text-xs bg-neutral-700 border border-neutral-600 rounded text-neutral-200"
+            className={NESTED_INPUT_CLASS}
           />
         </div>
       ))}

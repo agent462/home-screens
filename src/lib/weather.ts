@@ -140,6 +140,15 @@ interface WAForecastResponse {
   forecast: { forecastday: WAForecastDay[] };
 }
 
+async function fetchWeatherJSON<T>(url: string, provider: string, init?: RequestInit): Promise<T> {
+  const res = await fetchWithTimeout(url, init);
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`${provider} API error ${res.status}: ${body}`);
+  }
+  return res.json();
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────
 
 interface DayAccumulator {
@@ -188,6 +197,7 @@ function aggregateDay(date: string, day: DayAccumulator, units: string, mapIcon:
 
 // ── OpenWeatherMap provider ──────────────────────────────────────────
 
+/** @internal */
 export class OpenWeatherMapProvider implements WeatherProvider {
   private apiKey: string;
 
@@ -197,20 +207,16 @@ export class OpenWeatherMapProvider implements WeatherProvider {
   }
 
   async getHourly(lat: number, lon: number, units: string): Promise<HourlyWeather[]> {
-    const [currentRes, forecastRes] = await Promise.all([
-      fetchWithTimeout(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=${units}&appid=${this.apiKey}`),
-      fetchWithTimeout(`https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&units=${units}&cnt=8&appid=${this.apiKey}`),
+    const [currentData, forecastData] = await Promise.all([
+      fetchWeatherJSON<OWMCurrentResponse>(
+        `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=${units}&appid=${this.apiKey}`,
+        'OpenWeatherMap',
+      ),
+      fetchWeatherJSON<OWMForecastResponse>(
+        `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&units=${units}&cnt=8&appid=${this.apiKey}`,
+        'OpenWeatherMap',
+      ),
     ]);
-    if (!currentRes.ok) {
-      const body = await currentRes.text();
-      throw new Error(`OpenWeatherMap API error ${currentRes.status}: ${body}`);
-    }
-    if (!forecastRes.ok) {
-      const body = await forecastRes.text();
-      throw new Error(`OpenWeatherMap API error ${forecastRes.status}: ${body}`);
-    }
-    const currentData: OWMCurrentResponse = await currentRes.json();
-    const forecastData: OWMForecastResponse = await forecastRes.json();
 
     const current: HourlyWeather = {
       time: new Date(currentData.dt * 1000).toISOString(),
@@ -239,12 +245,7 @@ export class OpenWeatherMapProvider implements WeatherProvider {
 
   async getForecast(lat: number, lon: number, units: string): Promise<ForecastDay[]> {
     const url = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&units=${units}&appid=${this.apiKey}`;
-    const res = await fetchWithTimeout(url);
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`OpenWeatherMap API error ${res.status}: ${body}`);
-    }
-    const data: OWMForecastResponse = await res.json();
+    const data = await fetchWeatherJSON<OWMForecastResponse>(url, 'OpenWeatherMap');
     const dayMap = groupByDate(data.list ?? []);
 
     const days: ForecastDay[] = [];
@@ -272,6 +273,7 @@ export class OpenWeatherMapProvider implements WeatherProvider {
 
 // ── WeatherAPI provider ──────────────────────────────────────────────
 
+/** @internal */
 export class WeatherAPIProvider implements WeatherProvider {
   private apiKey: string;
 
@@ -282,12 +284,7 @@ export class WeatherAPIProvider implements WeatherProvider {
 
   async getHourly(lat: number, lon: number, units: string): Promise<HourlyWeather[]> {
     const url = `https://api.weatherapi.com/v1/forecast.json?key=${this.apiKey}&q=${lat},${lon}&days=2&aqi=no`;
-    const res = await fetchWithTimeout(url);
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`WeatherAPI error ${res.status}: ${body}`);
-    }
-    const data: WAForecastResponse = await res.json();
+    const data = await fetchWeatherJSON<WAForecastResponse>(url, 'WeatherAPI');
     const isCelsius = units === 'metric';
     const isDay = data.current?.is_day === 1;
 
@@ -308,12 +305,7 @@ export class WeatherAPIProvider implements WeatherProvider {
 
   async getForecast(lat: number, lon: number, units: string): Promise<ForecastDay[]> {
     const url = `https://api.weatherapi.com/v1/forecast.json?key=${this.apiKey}&q=${lat},${lon}&days=7&aqi=no`;
-    const res = await fetchWithTimeout(url);
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`WeatherAPI error ${res.status}: ${body}`);
-    }
-    const data: WAForecastResponse = await res.json();
+    const data = await fetchWeatherJSON<WAForecastResponse>(url, 'WeatherAPI');
     const isCelsius = units === 'metric';
 
     return data.forecast.forecastday.map((d) => ({
@@ -419,12 +411,7 @@ class PirateWeatherProvider implements WeatherProvider {
   private async _doFetch(lat: number, lon: number, units: string): Promise<PWResponse> {
     const pwUnits = units === 'imperial' ? 'us' : 'ca';
     const url = `https://api.pirateweather.net/forecast/${this.apiKey}/${lat},${lon}?units=${pwUnits}&version=2`;
-    const res = await fetchWithTimeout(url);
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Pirate Weather API error ${res.status}: ${body}`);
-    }
-    return res.json();
+    return fetchWeatherJSON<PWResponse>(url, 'Pirate Weather');
   }
 
   async getHourly(lat: number, lon: number, units: string): Promise<HourlyWeather[]> {
@@ -575,24 +562,17 @@ class NOAAProvider implements WeatherProvider {
   // No API key needed — NOAA is free and public
   constructor() {}
 
-  private async fetchJSON<T>(url: string): Promise<T> {
-    const res = await fetchWithTimeout(url, {
-      headers: { 'User-Agent': NOAAProvider.USER_AGENT },
-    });
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`NOAA API error ${res.status}: ${body}`);
-    }
-    return res.json();
-  }
+  private static fetchInit = { headers: { 'User-Agent': NOAAProvider.USER_AGENT } };
 
   private async getGridPoint(lat: number, lon: number): Promise<NOAAPointProperties> {
     const key = `${lat.toFixed(4)},${lon.toFixed(4)}`;
     const cached = NOAAProvider.gridCache.get(key);
     if (cached && Date.now() - cached.ts < NOAAProvider.GRID_TTL) return cached.data;
 
-    const data = await this.fetchJSON<{ properties: NOAAPointProperties }>(
+    const data = await fetchWeatherJSON<{ properties: NOAAPointProperties }>(
       `https://api.weather.gov/points/${lat},${lon}`,
+      'NOAA',
+      NOAAProvider.fetchInit,
     );
     const grid = data.properties;
     NOAAProvider.gridCache.set(key, { data: grid, ts: Date.now() });
@@ -606,13 +586,17 @@ class NOAAProvider implements WeatherProvider {
 
   private async getObservation(grid: NOAAPointProperties): Promise<NOAAObservation | null> {
     try {
-      const stations = await this.fetchJSON<{ features: { properties: { stationIdentifier: string } }[] }>(
+      const stations = await fetchWeatherJSON<{ features: { properties: { stationIdentifier: string } }[] }>(
         grid.observationStations,
+        'NOAA',
+        NOAAProvider.fetchInit,
       );
       const stationId = stations.features?.[0]?.properties?.stationIdentifier;
       if (!stationId) return null;
-      const obs = await this.fetchJSON<{ properties: NOAAObservation }>(
+      const obs = await fetchWeatherJSON<{ properties: NOAAObservation }>(
         `https://api.weather.gov/stations/${stationId}/observations/latest`,
+        'NOAA',
+        NOAAProvider.fetchInit,
       );
       return obs.properties;
     } catch {
@@ -623,8 +607,10 @@ class NOAAProvider implements WeatherProvider {
   async getHourly(lat: number, lon: number, units: string): Promise<HourlyWeather[]> {
     const grid = await this.getGridPoint(lat, lon);
     const [forecastData, observation] = await Promise.all([
-      this.fetchJSON<NOAAForecastResponse>(
+      fetchWeatherJSON<NOAAForecastResponse>(
         `https://api.weather.gov/gridpoints/${grid.gridId}/${grid.gridX},${grid.gridY}/forecast/hourly`,
+        'NOAA',
+        NOAAProvider.fetchInit,
       ),
       this.getObservation(grid),
     ]);
@@ -683,8 +669,10 @@ class NOAAProvider implements WeatherProvider {
 
   async getForecast(lat: number, lon: number, units: string): Promise<ForecastDay[]> {
     const grid = await this.getGridPoint(lat, lon);
-    const data = await this.fetchJSON<NOAAForecastResponse>(
+    const data = await fetchWeatherJSON<NOAAForecastResponse>(
       `https://api.weather.gov/gridpoints/${grid.gridId}/${grid.gridX},${grid.gridY}/forecast`,
+      'NOAA',
+      NOAAProvider.fetchInit,
     );
 
     const isMetric = units === 'metric';
@@ -744,8 +732,10 @@ class NOAAProvider implements WeatherProvider {
   }
 
   async getAlerts(lat: number, lon: number, _units: string): Promise<WeatherAlert[]> {
-    const data = await this.fetchJSON<{ features: NOAAAlertFeature[] }>(
+    const data = await fetchWeatherJSON<{ features: NOAAAlertFeature[] }>(
       `https://api.weather.gov/alerts/active?point=${lat},${lon}`,
+      'NOAA',
+      NOAAProvider.fetchInit,
     );
 
     return (data.features ?? []).map((f) => ({
@@ -821,6 +811,7 @@ interface OMDailyResponse {
 
 // ── Open-Meteo provider ───────────────────────────────────────────────
 
+/** @internal */
 export class OpenMeteoProvider implements WeatherProvider {
   // No API key needed — Open-Meteo is free and open
   constructor() {}
@@ -839,12 +830,10 @@ export class OpenMeteoProvider implements WeatherProvider {
       timezone: 'auto',
     });
 
-    const res = await fetchWithTimeout(`https://api.open-meteo.com/v1/forecast?${params}`);
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Open-Meteo API error ${res.status}: ${body}`);
-    }
-    const data: { hourly: OMHourlyResponse } = await res.json();
+    const data = await fetchWeatherJSON<{ hourly: OMHourlyResponse }>(
+      `https://api.open-meteo.com/v1/forecast?${params}`,
+      'Open-Meteo',
+    );
     const h = data.hourly;
     const nowMs = Date.now();
 
@@ -883,12 +872,10 @@ export class OpenMeteoProvider implements WeatherProvider {
       timezone: 'auto',
     });
 
-    const res = await fetchWithTimeout(`https://api.open-meteo.com/v1/forecast?${params}`);
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Open-Meteo API error ${res.status}: ${body}`);
-    }
-    const data: { daily: OMDailyResponse } = await res.json();
+    const data = await fetchWeatherJSON<{ daily: OMDailyResponse }>(
+      `https://api.open-meteo.com/v1/forecast?${params}`,
+      'Open-Meteo',
+    );
     const d = data.daily;
 
     return d.time.map((epoch, i) => ({

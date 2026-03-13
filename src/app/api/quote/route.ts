@@ -1,24 +1,16 @@
-import { NextResponse } from 'next/server';
-import { errorResponse, createTTLCache, fetchWithTimeout } from '@/lib/api-utils';
+import { cachedProxyRoute } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
 
-/** @internal exported for test cleanup */
-export const cache = createTTLCache<unknown>(60 * 60 * 1000); // 1 hour
+const { GET, cache } = cachedProxyRoute({
+  ttlMs: 60 * 60 * 1000,
+  url: 'https://zenquotes.io/api/random',
+  transform: (data) => {
+    const item = (data as Array<{ q: string; a: string }>)[0];
+    return { quote: item.q, author: item.a };
+  },
+  errorMessage: 'Failed to fetch quote',
+});
 
-export async function GET() {
-  try {
-    const cached = cache.get('quote');
-    if (cached) return NextResponse.json(cached);
-
-    const res = await fetchWithTimeout('https://zenquotes.io/api/random');
-    if (!res.ok) return NextResponse.json({ error: 'Failed to fetch quote' }, { status: 502 });
-    const data = await res.json();
-    const item = data[0];
-    const result = { quote: item.q, author: item.a };
-    cache.set('quote', result);
-    return NextResponse.json(result);
-  } catch (error) {
-    return errorResponse(error, 'Failed to fetch quote');
-  }
-}
+/** @internal */
+export { GET, cache };

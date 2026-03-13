@@ -15,7 +15,7 @@ export function AirQualityConfigSection({ mod, screenId }: { mod: ModuleInstance
       <Toggle label="Show UV Index" checked={c.showUV !== false} onChange={(v) => set({ showUV: v })} />
       <Slider
         label="Refresh (minutes)"
-        value={(c.refreshIntervalMs ?? 900000) / 60000}
+        value={(c.refreshIntervalMs ?? 600000) / 60000}
         min={5}
         max={120}
         step={5}

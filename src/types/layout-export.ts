@@ -1,6 +1,6 @@
 import type { Screen, Profile, TransitionEffect } from './config';
 
-export interface LayoutExportMetadata {
+interface LayoutExportMetadata {
   name: string;
   description?: string;
   exportedAt: string;             // ISO date
@@ -10,7 +10,7 @@ export interface LayoutExportMetadata {
   moduleCount: number;
 }
 
-export interface LayoutExportVisual {
+interface LayoutExportVisual {
   rotationIntervalMs: number;
   transitionEffect?: TransitionEffect;
   transitionDuration?: number;

@@ -186,7 +186,7 @@ export function importLayout(
 
 // ── Validation ──────────────────────────────────────────────────────
 
-export interface ValidationResult {
+interface ValidationResult {
   valid: boolean;
   errors: string[];
 }
@@ -240,7 +240,7 @@ export function validateLayoutExport(data: unknown): ValidationResult {
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
-/** Check if a parsed JSON object is a layout export (vs a full config backup) */
+/** @internal Check if a parsed JSON object is a layout export (vs a full config backup) */
 export function isLayoutExport(data: unknown): data is LayoutExport {
   return (
     !!data &&

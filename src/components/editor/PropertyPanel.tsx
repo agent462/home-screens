@@ -49,6 +49,7 @@ import {
 
 // Shared constants — exported for use by config section components
 export const INPUT_CLASS = 'w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200';
+export const NESTED_INPUT_CLASS = 'w-full px-2 py-0.5 text-xs bg-neutral-700 border border-neutral-600 rounded text-neutral-200';
 
 function AccordionSection({ title, defaultOpen = true, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
   const [open, setOpen] = useState(defaultOpen);

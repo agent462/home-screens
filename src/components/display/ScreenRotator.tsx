@@ -6,8 +6,7 @@ import type { Screen, GlobalSettings, ScreenConfiguration, Profile } from '@/typ
 import ScreenRenderer, { resolveProvider } from './ScreenRenderer';
 import type { SharedDisplayData } from './ScreenRenderer';
 import SleepOverlay from './SleepOverlay';
-import { useSleepManager } from '@/hooks/useSleepManager';
-import { useDisplayCommands, useStatusReporter } from '@/hooks/useDisplayCommands';
+import { useDisplayControl } from './useDisplayControl';
 import { useFetchData } from '@/hooks/useFetchData';
 import { useTZClock } from '@/hooks/useTZClock';
 import { resolveProfileScreens } from '@/lib/schedule';
@@ -137,38 +136,24 @@ function useSharedDisplayData(screens: Screen[], settings: GlobalSettings): Shar
   const lon = settings.longitude ?? settings.weather.longitude;
   const baseParams = `lat=${lat}&lon=${lon}&units=${settings.weather.units}`;
 
-  // Determine which weather providers are needed across ALL screens
-  const { needsOWM, needsWAPI, needsPirate, needsNOAA, needsOpenMeteo } = useMemo(() => {
-    let owm = false;
-    let wapi = false;
-    let pirate = false;
-    let noaa = false;
-    let openMeteo = false;
+  const neededProviders = useMemo(() => {
+    const needed = new Set<string>();
     for (const screen of screens) {
       for (const mod of screen.modules) {
-        if (mod.type === 'weather') {
-          const p = resolveProvider(mod, globalProvider);
-          if (p === 'openweathermap') owm = true;
-          if (p === 'weatherapi') wapi = true;
-          if (p === 'pirateweather') pirate = true;
-          if (p === 'noaa') noaa = true;
-          if (p === 'open-meteo') openMeteo = true;
-        }
+        if (mod.type === 'weather') needed.add(resolveProvider(mod, globalProvider));
       }
     }
-    return { needsOWM: owm, needsWAPI: wapi, needsPirate: pirate, needsNOAA: noaa, needsOpenMeteo: openMeteo };
+    return needed;
   }, [screens, globalProvider]);
 
-  const owmUrl = needsOWM ? `/api/weather?${baseParams}&provider=openweathermap` : '';
-  const wapiUrl = needsWAPI ? `/api/weather?${baseParams}&provider=weatherapi` : '';
-  const pirateUrl = needsPirate ? `/api/weather?${baseParams}&provider=pirateweather` : '';
-  const noaaUrl = needsNOAA ? `/api/weather?${baseParams}&provider=noaa` : '';
-  const openMeteoUrl = needsOpenMeteo ? `/api/weather?${baseParams}&provider=open-meteo` : '';
-  const [owmData] = useFetchData(owmUrl, WEATHER_REFRESH_MS);
-  const [wapiData] = useFetchData(wapiUrl, WEATHER_REFRESH_MS);
-  const [pirateData] = useFetchData(pirateUrl, WEATHER_REFRESH_MS);
-  const [noaaData] = useFetchData(noaaUrl, WEATHER_REFRESH_MS);
-  const [openMeteoData] = useFetchData(openMeteoUrl, WEATHER_REFRESH_MS);
+  const weatherUrl = (provider: string) =>
+    neededProviders.has(provider) ? `/api/weather?${baseParams}&provider=${provider}` : '';
+
+  const [owmData] = useFetchData(weatherUrl('openweathermap'), WEATHER_REFRESH_MS);
+  const [wapiData] = useFetchData(weatherUrl('weatherapi'), WEATHER_REFRESH_MS);
+  const [pirateData] = useFetchData(weatherUrl('pirateweather'), WEATHER_REFRESH_MS);
+  const [noaaData] = useFetchData(weatherUrl('noaa'), WEATHER_REFRESH_MS);
+  const [openMeteoData] = useFetchData(weatherUrl('open-meteo'), WEATHER_REFRESH_MS);
 
   const calendarIdList = settings.calendar.googleCalendarIds?.length
     ? settings.calendar.googleCalendarIds
@@ -224,7 +209,6 @@ export default function ScreenRotator({ screens: initialScreens, settings: initi
   const [currentIndex, setCurrentIndex] = useState(0);
   // Bumped on manual navigation to reset the auto-rotation timer
   const [rotationEpoch, setRotationEpoch] = useState(0);
-  const { displayState, dimOpacity, wake, forceSleep, setRemoteBrightness } = useSleepManager(settings.sleep);
   // Shared data needs all screens (for weather provider detection), not just active profile screens
   const sharedData = useSharedDisplayData(allScreens, settings);
 
@@ -258,10 +242,7 @@ export default function ScreenRotator({ screens: initialScreens, settings: initi
   // Stable key derived from resolved screen IDs — changes only when actual set changes
   const screenKey = screens.map((s) => s.id).join(',');
 
-  // Prefetch next screen's API data before rotation fires
-  usePrefetchNextScreen(screens, screenKey, currentIndex, settings.rotationIntervalMs, displayState);
-
-  // Compute safeIndex early so command/status hooks can use it
+  // Compute safeIndex early so display control hook can use it
   const safeIndex = currentIndex < screens.length ? currentIndex : 0;
   const currentScreen = screens[safeIndex];
 
@@ -282,9 +263,24 @@ export default function ScreenRotator({ screens: initialScreens, settings: initi
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screens.length, screenKey]);
 
-  const reload = useCallback(() => {
-    window.location.reload();
+  const resetRotation = useCallback(() => {
+    setRotationEpoch((e) => e + 1);
   }, []);
+
+  const { displayState, dimOpacity } = useDisplayControl({
+    sleep: settings.sleep,
+    screenIndex: safeIndex,
+    screenId: currentScreen?.id ?? '',
+    screenName: currentScreen?.name ?? '',
+    screenCount: screens.length,
+    activeProfile: settings.activeProfile,
+    nextScreen,
+    prevScreen,
+    resetRotation,
+  });
+
+  // Prefetch next screen's API data before rotation fires
+  usePrefetchNextScreen(screens, screenKey, currentIndex, settings.rotationIntervalMs, displayState);
 
   // Reset currentIndex when the active screen set changes (handles both
   // length changes and same-length profile switches with different screens)
@@ -299,30 +295,6 @@ export default function ScreenRotator({ screens: initialScreens, settings: initi
     const interval = setInterval(nextScreen, settings.rotationIntervalMs);
     return () => clearInterval(interval);
   }, [nextScreen, settings.rotationIntervalMs, screens.length, displayState, rotationEpoch]);
-
-  // Wrap next/prev so remote-triggered navigation also resets the rotation timer.
-  const remoteNext = useCallback(() => { nextScreen(); setRotationEpoch((e) => e + 1); }, [nextScreen]);
-  const remotePrev = useCallback(() => { prevScreen(); setRotationEpoch((e) => e + 1); }, [prevScreen]);
-
-  // Remote control — poll for commands from /api/display/commands
-  useDisplayCommands({
-    wake,
-    sleep: forceSleep,
-    nextScreen: remoteNext,
-    prevScreen: remotePrev,
-    setBrightness: setRemoteBrightness,
-    reload,
-  });
-
-  // Report display status to /api/display/status
-  useStatusReporter(
-    safeIndex,
-    currentScreen?.id ?? '',
-    currentScreen?.name ?? '',
-    screens.length,
-    settings.activeProfile,
-    displayState,
-  );
 
   const tv = getTransitionVariants(settings.transitionEffect, settings.transitionDuration);
   const firstRender = useRef(true);

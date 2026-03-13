@@ -4,6 +4,7 @@ import Slider from '@/components/ui/Slider';
 import Button from '@/components/ui/Button';
 import { useModuleConfig } from '@/hooks/useModuleConfig';
 import { useIndexListEditor } from '@/hooks/useListEditor';
+import { NESTED_INPUT_CLASS } from '@/components/editor/PropertyPanel';
 import type { ModuleInstance } from '@/types/config';
 
 export function TrafficConfigSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
@@ -38,7 +39,7 @@ export function TrafficConfigSection({ mod, screenId }: { mod: ModuleInstance; s
               value={r.label}
               onChange={(e) => updateRoute(idx, { label: e.target.value })}
               placeholder="Label"
-              className="flex-1 px-2 py-0.5 text-xs bg-neutral-700 border border-neutral-600 rounded text-neutral-200"
+              className={`flex-1 ${NESTED_INPUT_CLASS}`}
             />
             <button onClick={() => removeRoute(idx)} className="text-red-400 text-xs px-1">x</button>
           </div>
@@ -47,14 +48,14 @@ export function TrafficConfigSection({ mod, screenId }: { mod: ModuleInstance; s
             value={r.origin}
             onChange={(e) => updateRoute(idx, { origin: e.target.value })}
             placeholder="Origin address"
-            className="w-full px-2 py-0.5 text-xs bg-neutral-700 border border-neutral-600 rounded text-neutral-200"
+            className={NESTED_INPUT_CLASS}
           />
           <input
             type="text"
             value={r.destination}
             onChange={(e) => updateRoute(idx, { destination: e.target.value })}
             placeholder="Destination address"
-            className="w-full px-2 py-0.5 text-xs bg-neutral-700 border border-neutral-600 rounded text-neutral-200"
+            className={NESTED_INPUT_CLASS}
           />
         </div>
       ))}

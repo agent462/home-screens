@@ -19,7 +19,7 @@ export function HistoryConfigSection({ mod, screenId }: { mod: ModuleInstance; s
       />
       <Slider
         label="Reload Data (minutes)"
-        value={(c.refreshIntervalMs ?? 3600000) / 60000}
+        value={(c.refreshIntervalMs ?? 86400000) / 60000}
         min={5}
         max={1440}
         step={5}

@@ -4,7 +4,8 @@ import { LEAGUE_MAP } from '@/lib/espn';
 
 export const dynamic = 'force-dynamic';
 
-const cache = createTTLCache<unknown>(5 * 60 * 1000); // 5 minutes
+/** @internal */
+export const cache = createTTLCache<unknown>(5 * 60 * 1000); // 5 minutes
 const colorCache = createTTLCache<Map<string, string>>(60 * 60 * 1000); // 1 hour
 
 // Static division mappings for leagues where ESPN doesn't provide division-level data

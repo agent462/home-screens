@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { errorResponse, createTTLCache, fetchWithTimeout } from '@/lib/api-utils';
+import { cachedProxyRoute, fetchWithTimeout } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,26 +21,20 @@ interface RainViewerResponse {
   };
 }
 
-const cache = createTTLCache<RainViewerResponse>(5 * 60 * 1000); // 5 minutes
-
-export async function GET() {
-  try {
-    const cached = cache.get('rain');
-    if (cached) {
-      return NextResponse.json(cached);
-    }
-
+const { GET, cache } = cachedProxyRoute<RainViewerResponse>({
+  ttlMs: 5 * 60 * 1000,
+  execute: async () => {
     const res = await fetchWithTimeout('https://api.rainviewer.com/public/weather-maps.json');
     if (!res.ok) {
-      return NextResponse.json({ error: `RainViewer API returned ${res.status}` }, { status: 502 });
+      return NextResponse.json(
+        { error: `RainViewer API returned ${res.status}` },
+        { status: 502 },
+      );
     }
+    return await res.json();
+  },
+  errorMessage: 'Failed to fetch rain map data',
+});
 
-    const data: RainViewerResponse = await res.json();
-
-    cache.set('rain', data);
-
-    return NextResponse.json(data);
-  } catch (error) {
-    return errorResponse(error, 'Failed to fetch rain map data');
-  }
-}
+/** @internal */
+export { GET, cache };

@@ -27,11 +27,10 @@ export async function GET() {
     );
   }
 
-  const cacheKey = `${lat}:${lon}`;
-  const cached = cache.get(cacheKey);
-  if (cached) return NextResponse.json(cached);
-
   try {
+    const cacheKey = `${lat}:${lon}`;
+    const cached = cache.get(cacheKey);
+    if (cached) return NextResponse.json(cached);
     const [airRes, uvRes] = await Promise.all([
       fetchWithTimeout(
         `https://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lon}&appid=${apiKey}`,

@@ -82,6 +82,7 @@ function scryptHash(password: string, salt: string): Promise<string> {
   });
 }
 
+/** @internal */
 export async function hashPassword(password: string, salt: string): Promise<string> {
   return scryptHash(password, salt);
 }
@@ -99,6 +100,7 @@ function base64url(buf: Buffer): string {
   return buf.toString('base64url');
 }
 
+/** @internal */
 export function signSession(payload: SessionPayload, cookieSecret: string): string {
   const payloadStr = base64url(Buffer.from(JSON.stringify(payload)));
   const sig = crypto.createHmac('sha256', cookieSecret).update(payloadStr).digest();

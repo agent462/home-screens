@@ -223,7 +223,7 @@ export default function RainMapModule({
     };
   }, [frames, imagesReady, animationSpeedMs, extraDelayLastFrameMs]);
 
-  if (!data) {
+  if (data === null) {
     return <ModuleLoadingState style={style} message="Loading rain map…" error={error} />;
   }
 

@@ -1,15 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import path from 'path';
-import { promises as fs } from 'fs';
-import sharp from 'sharp';
-import { BACKGROUNDS_DIR } from '@/lib/constants';
 import { NASA_APOD_API, NASA_IMAGE_API, getNasaApiKey } from '@/lib/nasa';
 import { requireSession } from '@/lib/auth';
 import { errorResponse, fetchWithTimeout } from '@/lib/api-utils';
+import { downloadAndSaveBackground } from '@/lib/background-download';
 
 export const dynamic = 'force-dynamic';
-
-const BGS = path.join(process.cwd(), BACKGROUNDS_DIR);
 
 /**
  * GET /api/nasa?type=search&query=nebula&page=1
@@ -62,9 +57,6 @@ function isSafeExternalUrl(url: string): boolean {
   }
 }
 
-/**
- * POST /api/nasa — download a NASA image and save it locally as a background
- */
 export async function POST(request: NextRequest) {
   try {
     await requireSession(request);
@@ -79,40 +71,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid image URL' }, { status: 400 });
     }
 
-    const res = await fetchWithTimeout(imageUrl, { timeout: 60_000 });
-    if (!res.ok) throw new Error(`Failed to fetch image: ${res.status}`);
-
-    const contentType = res.headers.get('content-type') ?? '';
-    // Some NASA CDNs serve images as application/octet-stream, so also
-    // accept based on file extension when content-type is ambiguous
-    const hasImageType = contentType.startsWith('image/');
-    const hasImageExt = /\.(jpe?g|png|webp|gif|tiff?)(\?|$)/i.test(imageUrl);
-    if (!hasImageType && !hasImageExt) {
-      return NextResponse.json({ error: 'URL did not return an image' }, { status: 400 });
-    }
-
-    let buffer: Buffer = Buffer.from(await res.arrayBuffer());
-
-    // Convert non-web formats (TIFF, BMP, etc.) to JPEG via sharp
-    const isTiff = contentType.includes('tiff') || /\.tiff?(\?|$)/i.test(imageUrl);
-    if (isTiff || (!contentType.startsWith('image/jpeg') && !contentType.startsWith('image/png') && !contentType.startsWith('image/webp'))) {
-      try {
-        buffer = await sharp(buffer).jpeg({ quality: 90 }).toBuffer();
-      } catch {
-        // If sharp can't process it, try to use the raw buffer anyway
-      }
-    }
-
-    const ext = contentType.includes('png') && !isTiff ? '.png' : contentType.includes('webp') && !isTiff ? '.webp' : '.jpg';
-    const safeName = (filename || `nasa-${Date.now()}`).replace(/[^a-zA-Z0-9._-]/g, '_') + ext;
-
-    await fs.mkdir(BGS, { recursive: true });
-    await fs.writeFile(path.join(BGS, safeName), buffer);
-
-    return NextResponse.json(
-      { path: `/api/backgrounds/serve?file=${encodeURIComponent(safeName)}` },
-      { status: 201 },
+    const result = await downloadAndSaveBackground(
+      imageUrl,
+      filename || `nasa-${Date.now()}`,
+      { convertNonWeb: true, validateImage: true },
     );
+
+    return NextResponse.json(result, { status: 201 });
   } catch (error) {
     if (error instanceof Response) return error;
     return errorResponse(error, 'Failed to download NASA image');
@@ -135,7 +100,7 @@ async function handleApod(params: URLSearchParams) {
     const body = await res.text();
     return NextResponse.json(
       { error: `NASA APOD API error ${res.status}: ${body}` },
-      { status: res.status },
+      { status: 502 },
     );
   }
 
@@ -167,7 +132,7 @@ async function handleSearch(params: URLSearchParams) {
     const body = await res.text();
     return NextResponse.json(
       { error: `NASA Image Library error ${res.status}: ${body}` },
-      { status: res.status },
+      { status: 502 },
     );
   }
 

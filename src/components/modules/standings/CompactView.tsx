@@ -2,7 +2,7 @@
 
 import { useRotatingIndex } from '@/hooks/useRotatingIndex';
 import type { StandingsGroup } from './types';
-import { TeamLogo, formatRecord, getPlayoffTeamCount, StandingsHeader } from './shared';
+import { formatRecord, getPlayoffTeamCount, StandingsHeader, StandingsTeamRow } from './shared';
 
 interface CompactViewProps {
   groups: StandingsGroup[];
@@ -31,47 +31,20 @@ export function CompactView({ groups, teamsToShow, showPlayoffLine, rotationInte
       <div className="flex-1 overflow-hidden">
         {entries.map((entry) => {
           const barWidth = maxWinPct > 0 ? (entry.winPct / maxWinPct) * 100 : 0;
-          const isPlayoffCutoff = showPlayoffLine && entry.rank === playoffCount;
 
           return (
-            <div
+            <StandingsTeamRow
               key={entry.teamAbbr}
-              className={`relative flex items-center gap-2 py-0.5 px-2 ${
-                isPlayoffCutoff ? 'border-b border-dashed border-white/20' : ''
-              }`}
-              style={{ borderLeft: `3px solid #${entry.teamColor}` }}
+              entry={entry}
+              showPlayoffCutoff={showPlayoffLine && entry.rank === playoffCount}
+              barWidth={barWidth}
+              logoSize={16}
+              rowClassName="relative flex items-center gap-2 py-0.5 px-2"
+              nameClassName="text-white/90 truncate font-medium relative"
+              nameStyle={{ fontSize: '0.75em' }}
+              clincherClassName="text-emerald-400/70 ml-1"
+              clincherStyle={{ fontSize: '0.8em' }}
             >
-              {/* Win pct background bar */}
-              <div
-                className="absolute inset-0 pointer-events-none"
-                style={{
-                  background: `linear-gradient(90deg, #${entry.teamColor}10 0%, transparent ${barWidth}%)`,
-                }}
-              />
-
-              {/* Rank */}
-              <span
-                className="text-white/30 tabular-nums shrink-0 relative"
-                style={{ fontSize: '0.7em', width: '1.2em', textAlign: 'right' }}
-              >
-                {entry.rank}
-              </span>
-
-              {/* Logo */}
-              <div className="shrink-0 relative">
-                <TeamLogo src={entry.teamLogo} alt={entry.teamAbbr} size={16} />
-              </div>
-
-              {/* Team name */}
-              <span className="flex-1 min-w-0 text-white/90 truncate font-medium relative" style={{ fontSize: '0.75em' }}>
-                {entry.teamShort || entry.teamAbbr}
-                {entry.clincher && (
-                  <span className="text-emerald-400/70 ml-1" style={{ fontSize: '0.8em' }}>
-                    {entry.clincher}
-                  </span>
-                )}
-              </span>
-
               {/* Record */}
               <span className="text-white/60 tabular-nums shrink-0 relative" style={{ fontSize: '0.7em' }}>
                 {formatRecord(entry, group.league)}
@@ -83,7 +56,7 @@ export function CompactView({ groups, teamsToShow, showPlayoffLine, rotationInte
                   {entry.points}
                 </span>
               )}
-            </div>
+            </StandingsTeamRow>
           );
         })}
       </div>

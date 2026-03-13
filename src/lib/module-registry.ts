@@ -49,6 +49,7 @@ export function getModuleDefinition(type: ModuleType): ModuleDefinition | undefi
   return registry.get(type);
 }
 
+/** @internal */
 export function getAllModuleDefinitions(): ModuleDefinition[] {
   return Array.from(registry.values());
 }

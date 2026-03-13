@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
     const res = await fetchWithTimeout(`${NASA_IMAGE_API}/asset/${encodeURIComponent(nasaId)}`);
     if (!res.ok) {
-      return NextResponse.json({ error: `Asset lookup failed: ${res.status}` }, { status: res.status });
+      return NextResponse.json({ error: `Asset lookup failed: ${res.status}` }, { status: 502 });
     }
 
     const data = await res.json();

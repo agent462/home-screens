@@ -5,7 +5,8 @@ export const dynamic = 'force-dynamic';
 
 const ALLOWED_HOSTS = ['a.espncdn.com'];
 
-const cache = createTTLCache<{ data: ArrayBuffer; contentType: string }>(24 * 60 * 60 * 1000); // 24 hours
+/** @internal */
+export const cache = createTTLCache<{ data: ArrayBuffer; contentType: string }>(24 * 60 * 60 * 1000); // 24 hours
 
 function imageResponse(data: ArrayBuffer, contentType: string) {
   return new Response(data, {

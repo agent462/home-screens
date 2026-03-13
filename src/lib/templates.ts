@@ -1,7 +1,7 @@
 import type { ModuleType } from '@/types/config';
 import type { LayoutExport } from '@/types/layout-export';
 
-export type TemplateOrientation = 'portrait' | 'landscape';
+type TemplateOrientation = 'portrait' | 'landscape';
 
 export interface TemplateMeta {
   id: string;

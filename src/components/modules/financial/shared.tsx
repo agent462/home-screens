@@ -129,7 +129,7 @@ export function FinancialTableView<T>({ items, columns, scale, itemKey }: Financ
 
 // ── Compact View ──
 
-interface CompactRow {
+export interface CompactRow {
   key: string;
   label: ReactNode;
   price: ReactNode;

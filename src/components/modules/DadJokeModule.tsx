@@ -14,7 +14,7 @@ interface DadJokeModuleProps {
 export default function DadJokeModule({ config, style }: DadJokeModuleProps) {
   const [data, error] = useFetchData<{ joke: string }>(dadJokeUrl(), config.refreshIntervalMs);
 
-  if (!data) {
+  if (data === null) {
     return <ModuleLoadingState style={style} message="Loading joke…" error={error} />;
   }
 

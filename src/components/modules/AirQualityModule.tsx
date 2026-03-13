@@ -58,7 +58,7 @@ export default function AirQualityModule({ config, style }: AirQualityModuleProp
     config.refreshIntervalMs ?? 600000,
   );
 
-  if (!data) {
+  if (data === null) {
     return <ModuleLoadingState style={style} message="Loading air quality…" error={error} />;
   }
 

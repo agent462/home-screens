@@ -186,7 +186,7 @@ export async function hasReleaseTarball(tag: string): Promise<boolean> {
 // Git-based version checking (fallback)
 // ---------------------------------------------------------------------------
 
-/** Parse version tags from git, sorted descending */
+/** @internal Parse version tags from git, sorted descending */
 export function parseVersionTags(tagLines: string): TagInfo[] {
   const tags: TagInfo[] = [];
   for (const line of tagLines.split('\n')) {
@@ -346,12 +346,12 @@ function splitVersion(v: string): [string, string | null] {
   return [v.substring(0, idx), v.substring(idx + 1)];
 }
 
-/** Check if a version string has a pre-release suffix (e.g., "0.15.0-rc.1") */
+/** @internal Check if a version string has a pre-release suffix (e.g., "0.15.0-rc.1") */
 export function isPrerelease(version: string): boolean {
   return version.includes('-');
 }
 
-/** Compare two semver strings (with pre-release support).
+/** @internal Compare two semver strings (with pre-release support).
  *  Returns >0 if a > b, <0 if a < b, 0 if equal.
  *  Per semver: 1.0.0-rc.1 < 1.0.0 (pre-release < release) */
 export function compareSemver(a: string, b: string): number {

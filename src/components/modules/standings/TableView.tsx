@@ -2,7 +2,7 @@
 
 import { useRotatingIndex } from '@/hooks/useRotatingIndex';
 import type { StandingsGroup, StandingsEntry } from './types';
-import { TeamLogo, formatRecord, getPlayoffTeamCount, isSoccer, StandingsHeader } from './shared';
+import { formatRecord, getPlayoffTeamCount, isSoccer, StandingsHeader, StandingsTeamRow } from './shared';
 
 interface TableViewProps {
   groups: StandingsGroup[];
@@ -96,77 +96,6 @@ function CellValue({ entry, col, league }: { entry: StandingsEntry; col: string;
   }
 }
 
-function TeamRow({
-  entry,
-  columns,
-  league,
-  showPlayoffLine,
-  isLastPlayoff,
-  maxWinPct,
-}: {
-  entry: StandingsEntry;
-  columns: { key: string; label: string; width: string }[];
-  league: string;
-  showPlayoffLine: boolean;
-  isLastPlayoff: boolean;
-  maxWinPct: number;
-}) {
-  const barWidth = maxWinPct > 0 ? (entry.winPct / maxWinPct) * 100 : 0;
-
-  return (
-    <div
-      className={`relative flex items-center gap-1.5 py-1 px-2 ${
-        showPlayoffLine && isLastPlayoff ? 'border-b border-dashed border-white/20' : ''
-      }`}
-      style={{ borderLeft: `3px solid #${entry.teamColor}` }}
-    >
-      {/* Win pct background bar */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background: `linear-gradient(90deg, #${entry.teamColor}10 0%, transparent ${barWidth}%)`,
-        }}
-      />
-
-      {/* Rank */}
-      <span
-        className="text-white/30 tabular-nums shrink-0 relative"
-        style={{ fontSize: '0.7em', width: '1.2em', textAlign: 'right' }}
-      >
-        {entry.rank}
-      </span>
-
-      {/* Logo */}
-      <div className="shrink-0 relative">
-        <TeamLogo src={entry.teamLogo} alt={entry.teamAbbr} size={18} />
-      </div>
-
-      {/* Team name + clincher */}
-      <div className="flex-1 min-w-0 flex items-center gap-1 relative">
-        <span className="text-white/90 truncate font-medium" style={{ fontSize: '0.8em' }}>
-          {entry.teamShort || entry.teamAbbr}
-        </span>
-        {entry.clincher && (
-          <span className="text-emerald-400/70 font-medium shrink-0" style={{ fontSize: '0.6em' }}>
-            {entry.clincher}
-          </span>
-        )}
-      </div>
-
-      {/* Stat columns */}
-      {columns.map((col) => (
-        <span
-          key={col.key}
-          className={`${col.width} text-right text-white/60 tabular-nums shrink-0 relative`}
-          style={{ fontSize: '0.7em' }}
-        >
-          <CellValue entry={entry} col={col.key} league={league} />
-        </span>
-      ))}
-    </div>
-  );
-}
-
 export function TableView({ groups, teamsToShow, showPlayoffLine, rotationIntervalMs, grouping }: TableViewProps) {
   const index = useRotatingIndex(groups.length, rotationIntervalMs);
   const group = groups[index];
@@ -201,17 +130,29 @@ export function TableView({ groups, teamsToShow, showPlayoffLine, rotationInterv
 
       {/* Team rows */}
       <div className="flex-1 overflow-hidden">
-        {entries.map((entry) => (
-          <TeamRow
-            key={entry.teamAbbr}
-            entry={entry}
-            columns={columns}
-            league={group.league}
-            showPlayoffLine={showPlayoffLine}
-            isLastPlayoff={showPlayoffLine && entry.rank === playoffCount}
-            maxWinPct={maxWinPct}
-          />
-        ))}
+        {entries.map((entry) => {
+          const barWidth = maxWinPct > 0 ? (entry.winPct / maxWinPct) * 100 : 0;
+
+          return (
+            <StandingsTeamRow
+              key={entry.teamAbbr}
+              entry={entry}
+              showPlayoffCutoff={showPlayoffLine && entry.rank === playoffCount}
+              barWidth={barWidth}
+              nameWrapperClassName="flex-1 min-w-0 flex items-center gap-1 relative"
+            >
+              {columns.map((col) => (
+                <span
+                  key={col.key}
+                  className={`${col.width} text-right text-white/60 tabular-nums shrink-0 relative`}
+                  style={{ fontSize: '0.7em' }}
+                >
+                  <CellValue entry={entry} col={col.key} league={group.league} />
+                </span>
+              ))}
+            </StandingsTeamRow>
+          );
+        })}
       </div>
     </div>
   );

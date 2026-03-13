@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { readConfig } from '@/lib/config';
 
 /**
@@ -97,4 +97,62 @@ export function createTTLCache<T>(ttlMs: number) {
       cache.clear();
     },
   };
+}
+
+export type TTLCache<T> = ReturnType<typeof createTTLCache<T>>;
+
+interface CachedProxyRouteOptions<T> {
+  ttlMs: number;
+  cacheKey?: (request: NextRequest) => string;
+  url: string | ((request: NextRequest) => string);
+  fetchInit?: RequestInit;
+  transform: (data: unknown, request: NextRequest) => T;
+  errorMessage: string;
+}
+
+interface CachedProxyRouteCustomOptions<T> {
+  ttlMs: number;
+  cacheKey?: (request: NextRequest) => string;
+  execute: (request: NextRequest) => Promise<T | NextResponse>;
+  errorMessage: string;
+}
+
+type CachedProxyRouteConfig<T> = CachedProxyRouteOptions<T> | CachedProxyRouteCustomOptions<T>;
+
+function isCustomConfig<T>(config: CachedProxyRouteConfig<T>): config is CachedProxyRouteCustomOptions<T> {
+  return 'execute' in config;
+}
+
+export function cachedProxyRoute<T>(config: CachedProxyRouteConfig<T>) {
+  const cache = createTTLCache<T>(config.ttlMs);
+  const keyFn = config.cacheKey ?? (() => '_');
+
+  const GET = async (request: NextRequest = new NextRequest('http://localhost')) => {
+    try {
+      const key = keyFn(request);
+      const cached = cache.get(key);
+      if (cached) return NextResponse.json(cached);
+
+      let result: T | NextResponse;
+      if (isCustomConfig(config)) {
+        result = await config.execute(request);
+      } else {
+        const resolvedUrl = typeof config.url === 'function' ? config.url(request) : config.url;
+        const res = await fetchWithTimeout(resolvedUrl, config.fetchInit);
+        if (!res.ok) {
+          return NextResponse.json({ error: config.errorMessage }, { status: 502 });
+        }
+        const data = await res.json();
+        result = config.transform(data, request);
+      }
+
+      if (result instanceof NextResponse) return result;
+      cache.set(key, result);
+      return NextResponse.json(result);
+    } catch (error) {
+      return errorResponse(error, config.errorMessage);
+    }
+  };
+
+  return { GET, cache };
 }

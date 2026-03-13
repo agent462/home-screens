@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import type { PhotoSlideshowConfig, ModuleStyle } from '@/types/config';
 import ModuleWrapper from './ModuleWrapper';
+import { ModuleLoadingState, ModuleEmptyState } from './ModuleStates';
 import { useFetchData } from '@/hooks/useFetchData';
 import { photoSlideshowUrl } from '@/lib/fetch-keys';
 import { useRotatingIndex } from '@/hooks/useRotatingIndex';
@@ -13,7 +14,7 @@ interface PhotoSlideshowModuleProps {
 }
 
 export default function PhotoSlideshowModule({ config, style }: PhotoSlideshowModuleProps) {
-  const [data] = useFetchData<string[]>(photoSlideshowUrl(config), 600000);
+  const [data, error] = useFetchData<string[]>(photoSlideshowUrl(config), 600000);
   const files = data ?? [];
   const intervalMs = config.intervalMs ?? 30000;
   const index = useRotatingIndex(files.length, intervalMs);
@@ -44,14 +45,12 @@ export default function PhotoSlideshowModule({ config, style }: PhotoSlideshowMo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index, files]);
 
+  if (data === null) {
+    return <ModuleLoadingState style={style} message="Loading photos…" error={error} />;
+  }
+
   if (files.length === 0) {
-    return (
-      <ModuleWrapper style={{ ...style, padding: 0 }}>
-        <div className="flex items-center justify-center h-full opacity-50" style={{ fontSize: '0.875em' }}>
-          No photos found
-        </div>
-      </ModuleWrapper>
-    );
+    return <ModuleEmptyState style={style} message="No photos found" />;
   }
 
   const isFade = config.transition === 'fade';

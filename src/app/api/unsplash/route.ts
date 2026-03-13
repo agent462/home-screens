@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import path from 'path';
-import { BACKGROUNDS_DIR } from '@/lib/constants';
 import { UNSPLASH_API, getUnsplashAccessKey, trackDownload } from '@/lib/unsplash';
 import { requireSession } from '@/lib/auth';
 import { errorResponse, fetchWithTimeout } from '@/lib/api-utils';
+import { downloadAndSaveBackground } from '@/lib/background-download';
 
 export const dynamic = 'force-dynamic';
-
-const BGS = path.join(process.cwd(), BACKGROUNDS_DIR);
 
 export async function GET(request: NextRequest) {
   try {
@@ -35,7 +32,7 @@ export async function GET(request: NextRequest) {
       const body = await res.text();
       return NextResponse.json(
         { error: `Unsplash API error ${res.status}: ${body}` },
-        { status: res.status },
+        { status: 502 },
       );
     }
 
@@ -69,7 +66,6 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST to download an image and save it locally as a background
 export async function POST(request: NextRequest) {
   try {
     await requireSession(request);
@@ -86,26 +82,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing imageUrl' }, { status: 400 });
     }
 
-    // Trigger Unsplash download tracking (required by their API guidelines)
     if (downloadUrl && accessKey) {
       trackDownload(downloadUrl, accessKey);
     }
 
-    // Download the image
-    const res = await fetchWithTimeout(imageUrl);
-    if (!res.ok) throw new Error(`Failed to fetch image: ${res.status}`);
+    const result = await downloadAndSaveBackground(
+      imageUrl,
+      filename || `unsplash-${Date.now()}`,
+    );
 
-    const buffer = Buffer.from(await res.arrayBuffer());
-    const contentType = res.headers.get('content-type') ?? 'image/jpeg';
-    const ext = contentType.includes('png') ? '.png' : contentType.includes('webp') ? '.webp' : '.jpg';
-    const safeName = (filename || `unsplash-${Date.now()}`).replace(/[^a-zA-Z0-9._-]/g, '_') + ext;
-
-    // Save to backgrounds directory
-    const { promises: fs } = await import('fs');
-    await fs.mkdir(BGS, { recursive: true });
-    await fs.writeFile(path.join(BGS, safeName), buffer);
-
-    return NextResponse.json({ path: `/api/backgrounds/serve?file=${encodeURIComponent(safeName)}` }, { status: 201 });
+    return NextResponse.json(result, { status: 201 });
   } catch (error) {
     if (error instanceof Response) return error;
     return errorResponse(error, 'Failed to download image');

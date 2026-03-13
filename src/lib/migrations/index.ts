@@ -19,7 +19,7 @@ const migrations: Migration[] = [
   },
 ];
 
-/** Get all migrations sorted by version */
+/** @internal Get all migrations sorted by version */
 export function getMigrations(): Migration[] {
   return [...migrations].sort((a, b) => a.version - b.version);
 }
@@ -47,7 +47,7 @@ export function migrateUp(
   return { config: result, migrationsRun };
 }
 
-/** Run migrations from currentVersion down to targetVersion */
+/** @internal Run migrations from currentVersion down to targetVersion */
 export function migrateDown(
   config: ScreenConfiguration,
   targetVersion: number,

@@ -1,0 +1,80 @@
+'use client';
+
+import type { ModuleStyle } from '@/types/config';
+import ModuleWrapper from '../ModuleWrapper';
+import { ModuleLoadingState, ModuleEmptyState } from '../ModuleStates';
+import {
+  FinancialCardsView,
+  FinancialTickerView,
+  FinancialTableView,
+  FinancialCompactView,
+} from './shared';
+import type { FinancialItem, TableColumn, CompactRow } from './shared';
+import { useFetchData } from '@/hooks/useFetchData';
+
+interface FinancialDataModuleProps<TItem> {
+  url: string;
+  refreshIntervalMs: number;
+  dataKey: string;
+  toFinancialItems: (items: TItem[]) => FinancialItem[];
+  toCompactRows: (items: TItem[]) => CompactRow[];
+  tableColumns: TableColumn<TItem>[];
+  tableItemKey: (item: TItem, index: number) => string;
+  view: string;
+  cardScale: number;
+  tickerSpeed: number;
+  style: ModuleStyle;
+  loadingMessage: string;
+  emptyMessage: string;
+  compactLabelWidth?: string;
+}
+
+export default function FinancialDataModule<TItem>({
+  url,
+  refreshIntervalMs,
+  dataKey,
+  toFinancialItems,
+  toCompactRows,
+  tableColumns,
+  tableItemKey,
+  view,
+  cardScale,
+  tickerSpeed,
+  style,
+  loadingMessage,
+  emptyMessage,
+  compactLabelWidth,
+}: FinancialDataModuleProps<TItem>) {
+  const [data, error] = useFetchData<Record<string, TItem[]>>(url, refreshIntervalMs);
+  const items = (data?.[dataKey] as TItem[] | undefined) ?? [];
+
+  if (data === null) {
+    return <ModuleLoadingState style={style} message={loadingMessage} error={error} />;
+  }
+
+  if (items.length === 0) {
+    return <ModuleEmptyState style={style} message={emptyMessage} />;
+  }
+
+  return (
+    <ModuleWrapper style={style}>
+      {view === 'cards' && <FinancialCardsView items={toFinancialItems(items)} scale={cardScale} />}
+      {view === 'ticker' && <FinancialTickerView items={toFinancialItems(items)} speed={tickerSpeed} />}
+      {view === 'table' && (
+        <FinancialTableView
+          items={items}
+          columns={tableColumns}
+          scale={cardScale}
+          itemKey={tableItemKey}
+        />
+      )}
+      {view === 'compact' && (
+        <FinancialCompactView
+          rows={toCompactRows(items)}
+          scale={cardScale}
+          labelWidth={compactLabelWidth}
+        />
+      )}
+    </ModuleWrapper>
+  );
+}

@@ -14,7 +14,7 @@ interface QuoteModuleProps {
 export default function QuoteModule({ config, style }: QuoteModuleProps) {
   const [data, error] = useFetchData<{ quote: string; author: string }>(quoteUrl(), config.refreshIntervalMs ?? 300000);
 
-  if (!data) {
+  if (data === null) {
     return <ModuleLoadingState style={style} message="Loading quote…" error={error} />;
   }
 

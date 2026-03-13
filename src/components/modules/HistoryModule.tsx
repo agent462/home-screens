@@ -24,7 +24,7 @@ export default function HistoryModule({ config, style }: HistoryModuleProps) {
   const rotationMs = config.rotationIntervalMs ?? 10000;
   const index = useRotatingIndex(events.length, rotationMs);
 
-  if (!data) {
+  if (data === null) {
     return <ModuleLoadingState style={style} message="Loading history…" error={error} />;
   }
 

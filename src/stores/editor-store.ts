@@ -69,7 +69,14 @@ function updateModuleInConfig(
   };
 }
 
-export const useEditorStore = create<EditorState>((set, get) => ({
+export const useEditorStore = create<EditorState>((set, get) => {
+  const mutateConfig = (fn: (config: ScreenConfiguration) => Partial<EditorState>) => {
+    const { config } = get();
+    if (!config) return;
+    set({ isDirty: true, saveError: null, ...fn(config) });
+  };
+
+  return {
   config: null,
   selectedScreenId: null,
   selectedModuleId: null,
@@ -130,8 +137,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectModule: (id) => set({ selectedModuleId: id }),
 
   addModule: (screenId, type, position) => {
-    const { config } = get();
-    if (!config) return;
     const def = getModuleDefinition(type);
     if (!def) return;
     const newModule: ModuleInstance = {
@@ -143,85 +148,69 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       config: { ...def.defaultConfig },
       style: { ...defaultStyle, ...def.defaultStyle },
     };
-    const updated = {
-      ...config,
-      screens: config.screens.map((s) =>
-        s.id === screenId ? { ...s, modules: [...s.modules, newModule] } : s,
-      ),
-    };
-    set({ config: updated, isDirty: true, saveError: null, selectedModuleId: newModule.id });
+    mutateConfig((config) => ({
+      config: {
+        ...config,
+        screens: config.screens.map((s) =>
+          s.id === screenId ? { ...s, modules: [...s.modules, newModule] } : s,
+        ),
+      },
+      selectedModuleId: newModule.id,
+    }));
   },
 
   removeModule: (screenId, moduleId) => {
-    const { config, selectedModuleId } = get();
-    if (!config) return;
-    const updated = {
-      ...config,
-      screens: config.screens.map((s) =>
-        s.id === screenId ? { ...s, modules: s.modules.filter((m) => m.id !== moduleId) } : s,
-      ),
-    };
-    set({
-      config: updated,
-      isDirty: true, saveError: null,
+    const { selectedModuleId } = get();
+    mutateConfig((config) => ({
+      config: {
+        ...config,
+        screens: config.screens.map((s) =>
+          s.id === screenId ? { ...s, modules: s.modules.filter((m) => m.id !== moduleId) } : s,
+        ),
+      },
       selectedModuleId: selectedModuleId === moduleId ? null : selectedModuleId,
-    });
+    }));
   },
 
   updateModule: (screenId, moduleId, updates) => {
-    const { config } = get();
-    if (!config) return;
-    set({
+    mutateConfig((config) => ({
       config: updateModuleInConfig(config, screenId, moduleId, (m) => ({ ...m, ...updates })),
-      isDirty: true, saveError: null,
-    });
+    }));
   },
 
   updateModuleStyle: (screenId, moduleId, style) => {
-    const { config } = get();
-    if (!config) return;
-    set({
+    mutateConfig((config) => ({
       config: updateModuleInConfig(config, screenId, moduleId, (m) => ({
         ...m,
         style: { ...m.style, ...style },
       })),
-      isDirty: true, saveError: null,
-    });
+    }));
   },
 
   moveModule: (screenId, moduleId, position) => {
-    const { config } = get();
-    if (!config) return;
-    set({
+    mutateConfig((config) => ({
       config: updateModuleInConfig(config, screenId, moduleId, (m) => ({ ...m, position })),
-      isDirty: true, saveError: null,
-    });
+    }));
   },
 
   resizeModule: (screenId, moduleId, size) => {
-    const { config } = get();
-    if (!config) return;
-    set({
+    mutateConfig((config) => ({
       config: updateModuleInConfig(config, screenId, moduleId, (m) => ({ ...m, size })),
-      isDirty: true, saveError: null,
-    });
+    }));
   },
 
   addScreen: () => {
-    const { config } = get();
-    if (!config) return;
     const newScreen: Screen = {
       id: uuidv4(),
-      name: `Screen ${config.screens.length + 1}`,
+      name: `Screen ${(get().config?.screens.length ?? 0) + 1}`,
       backgroundImage: '',
       modules: [],
     };
-    set({
+    mutateConfig((config) => ({
       config: { ...config, screens: [...config.screens, newScreen] },
       selectedScreenId: newScreen.id,
       selectedModuleId: null,
-      isDirty: true, saveError: null,
-    });
+    }));
     const url = new URL(window.location.href);
     url.searchParams.set('screen', newScreen.id);
     window.history.replaceState(null, '', url.toString());
@@ -231,18 +220,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { config, selectedScreenId } = get();
     if (!config || config.screens.length <= 1) return;
     const screens = config.screens.filter((s) => s.id !== id);
-    // Prune deleted screen from all profile screenIds
     const profiles = config.profiles?.map((p) => ({
       ...p,
       screenIds: p.screenIds.filter((sid) => sid !== id),
     }));
     const newSelectedId = selectedScreenId === id ? screens[0]?.id ?? null : selectedScreenId;
-    set({
+    mutateConfig(() => ({
       config: { ...config, screens, profiles },
       selectedScreenId: newSelectedId,
       selectedModuleId: null,
-      isDirty: true, saveError: null,
-    });
+    }));
     if (newSelectedId) {
       const url = new URL(window.location.href);
       url.searchParams.set('screen', newSelectedId);
@@ -251,65 +238,52 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   updateScreen: (id, updates) => {
-    const { config } = get();
-    if (!config) return;
-    set({
+    mutateConfig((config) => ({
       config: {
         ...config,
         screens: config.screens.map((s) => (s.id === id ? { ...s, ...updates } : s)),
       },
-      isDirty: true, saveError: null,
-    });
+    }));
   },
 
   updateSettings: (settings) => {
-    const { config } = get();
-    if (!config) return;
-    set({
+    mutateConfig((config) => ({
       config: { ...config, settings: { ...config.settings, ...settings } },
-      isDirty: true, saveError: null,
-    });
+    }));
   },
 
   addProfile: (name: string) => {
-    const { config } = get();
-    if (!config) return;
-    const newProfile: Profile = {
-      id: uuidv4(),
-      name,
-      screenIds: config.screens.map((s) => s.id),
-    };
-    set({
-      config: { ...config, profiles: [...(config.profiles ?? []), newProfile] },
-      isDirty: true, saveError: null,
+    mutateConfig((config) => {
+      const newProfile: Profile = {
+        id: uuidv4(),
+        name,
+        screenIds: config.screens.map((s) => s.id),
+      };
+      return {
+        config: { ...config, profiles: [...(config.profiles ?? []), newProfile] },
+      };
     });
   },
 
   removeProfile: (id: string) => {
-    const { config } = get();
-    if (!config) return;
-    const profiles = (config.profiles ?? []).filter((p) => p.id !== id);
-    const settings = config.settings.activeProfile === id
-      ? { ...config.settings, activeProfile: undefined }
-      : config.settings;
-    set({
-      config: { ...config, profiles, settings },
-      isDirty: true, saveError: null,
+    mutateConfig((config) => {
+      const profiles = (config.profiles ?? []).filter((p) => p.id !== id);
+      const settings = config.settings.activeProfile === id
+        ? { ...config.settings, activeProfile: undefined }
+        : config.settings;
+      return { config: { ...config, profiles, settings } };
     });
   },
 
   updateProfile: (id: string, updates: Partial<Profile>) => {
-    const { config } = get();
-    if (!config) return;
-    set({
+    mutateConfig((config) => ({
       config: {
         ...config,
         profiles: (config.profiles ?? []).map((p) =>
           p.id === id ? { ...p, ...updates } : p,
         ),
       },
-      isDirty: true, saveError: null,
-    });
+    }));
   },
 
   reorderProfiles: (fromIndex: number, toIndex: number) => {
@@ -318,16 +292,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const profiles = [...config.profiles];
     const [moved] = profiles.splice(fromIndex, 1);
     profiles.splice(toIndex, 0, moved);
-    set({ config: { ...config, profiles }, isDirty: true, saveError: null });
+    mutateConfig(() => ({ config: { ...config, profiles } }));
   },
 
   setActiveProfile: (id: string | undefined) => {
-    const { config } = get();
-    if (!config) return;
-    set({
+    mutateConfig((config) => ({
       config: { ...config, settings: { ...config.settings, activeProfile: id } },
-      isDirty: true, saveError: null,
-    });
+    }));
   },
 
   exportConfig: () => {
@@ -343,13 +314,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   importConfig: (json: string) => {
-    const config = JSON.parse(json) as ScreenConfiguration;
-    if (!config.screens || !Array.isArray(config.screens) || !config.settings) {
+    const parsed = JSON.parse(json) as ScreenConfiguration;
+    if (!parsed.screens || !Array.isArray(parsed.screens) || !parsed.settings) {
       throw new Error('Invalid config file: missing screens or settings');
     }
-    const firstId = config.screens[0]?.id ?? null;
+    const firstId = parsed.screens[0]?.id ?? null;
     set({
-      config,
+      config: parsed,
       selectedScreenId: firstId,
       selectedModuleId: null,
       isDirty: true, saveError: null,
@@ -379,18 +350,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   importLayoutAction: (layout, options) => {
-    const { config } = get();
-    if (!config) return;
-    const updated = importLayoutCore(layout, config, options);
-    // Select the first of the newly imported screens
-    const existingIds = new Set(config.screens.map((s) => s.id));
-    const firstNewId = updated.screens.find((s) => !existingIds.has(s.id))?.id
-      ?? updated.screens[0]?.id ?? null;
-    set({
-      config: updated,
-      selectedScreenId: firstNewId,
-      selectedModuleId: null,
-      isDirty: true, saveError: null,
+    let firstNewId: string | null = null;
+    mutateConfig((config) => {
+      const updated = importLayoutCore(layout, config, options);
+      const existingIds = new Set(config.screens.map((s) => s.id));
+      firstNewId = updated.screens.find((s) => !existingIds.has(s.id))?.id
+        ?? updated.screens[0]?.id ?? null;
+      return {
+        config: updated,
+        selectedScreenId: firstNewId,
+        selectedModuleId: null,
+      };
     });
     if (firstNewId) {
       const url = new URL(window.location.href);
@@ -398,4 +368,4 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       window.history.replaceState(null, '', url.toString());
     }
   },
-}));
+}});

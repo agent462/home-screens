@@ -6,9 +6,8 @@ import { errorResponse, createTTLCache, getLocationFromConfig } from '@/lib/api-
 
 export const dynamic = 'force-dynamic';
 
-// Server-side cache: avoids redundant external API calls when multiple
-// modules (or page reloads) request the same provider within the TTL.
-const cache = createTTLCache<unknown>(5 * 60 * 1000); // 5 minutes
+/** @internal */
+export const cache = createTTLCache<unknown>(5 * 60 * 1000); // 5 minutes
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -36,12 +35,6 @@ export async function GET(request: NextRequest) {
 
   const { lat, lon } = location;
 
-  const cacheKey = `${provider}:${lat}:${lon}:${units}:${type}`;
-  const cached = cache.get(cacheKey);
-  if (cached) {
-    return NextResponse.json(cached);
-  }
-
   const secretKeyMap: Record<string, 'openweathermap_key' | 'weatherapi_key' | 'pirateweather_key'> = {
     openweathermap: 'openweathermap_key',
     weatherapi: 'weatherapi_key',
@@ -53,6 +46,12 @@ export async function GET(request: NextRequest) {
     : undefined;
 
   try {
+    const cacheKey = `${provider}:${lat}:${lon}:${units}:${type}`;
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      return NextResponse.json(cached);
+    }
+
     const weatherProvider = createWeatherProvider(provider, apiKey);
     let result: Record<string, unknown>;
 
