@@ -1,19 +1,23 @@
 #!/bin/bash
-# Shrink a Raspberry Pi image using PiShrink via Podman
+# Shrink a Raspberry Pi image using PiShrink
 #
-# Usage: ./shrink-image.sh <image-file>
+# Usage: ./shrink-image.sh <image-file> [new-image-file]
 #
-# On macOS, volume mounts don't support loop device operations, so the image
-# must be copied into the VM's local filesystem, shrunk there, then copied back.
-# On Linux, runs directly in a privileged container with volume mount.
+# macOS: Uses PiShrink-macOS (native, no Docker/Podman needed)
+#        Install: https://github.com/lisanet/PiShrink-macOS
+# Linux: Uses PiShrink in a privileged Podman container
 
 set -e
 
 IMAGE_FILE="$1"
+NEW_IMAGE="$2"
 
 if [[ -z "$IMAGE_FILE" ]]; then
-    echo "Usage: $0 <image-file>"
-    echo "Example: $0 home-screens.img"
+    echo "Usage: $0 <image-file> [new-image-file]"
+    echo ""
+    echo "Examples:"
+    echo "  $0 home-screens.img                          # shrink in place"
+    echo "  $0 home-screens.img home-screens-shrunk.img  # shrink to new file"
     exit 1
 fi
 
@@ -30,96 +34,89 @@ IMAGE_DIR="$(dirname "$IMAGE_FILE")"
 echo "Shrinking image: $IMAGE_FILE"
 echo "Image size: $(du -h "$IMAGE_FILE" | cut -f1)"
 
-# Check if podman is available
-if ! command -v podman &>/dev/null; then
-    echo "Error: podman not found"
-    echo "Install podman first"
-    exit 1
-fi
-
 if [[ "$(uname)" == "Darwin" ]]; then
-    # macOS: virtiofs mounts don't support loop device operations
-    # Must copy image into VM's local filesystem
-    echo ""
-    echo "macOS detected — copying image into Podman VM"
-    echo "(virtiofs mounts don't support loop devices)"
-    echo ""
-
-    if ! podman machine info &>/dev/null; then
-        echo "Error: Podman machine is not running"
-        echo "Start it with: podman machine start"
+    # =========================================================================
+    # macOS: Use PiShrink-macOS (native ext2/3/4 tools, no VM needed)
+    # https://github.com/lisanet/PiShrink-macOS
+    # =========================================================================
+    if ! command -v pishrink &>/dev/null; then
+        echo ""
+        echo "Error: pishrink not found"
+        echo ""
+        echo "Install PiShrink-macOS:"
+        echo "  git clone https://github.com/lisanet/PiShrink-macOS.git"
+        echo "  cd PiShrink-macOS"
+        echo "  make"
+        echo "  sudo make install"
         exit 1
     fi
 
-    VM_WORKDIR="/var/tmp/pishrink-$$"
-
-    # Clean up VM work directory on exit (success or failure)
-    cleanup_vm() {
-        podman machine ssh "sudo rm -rf $VM_WORKDIR" 2>/dev/null || true
-    }
-    trap cleanup_vm EXIT
-
-    # Check VM disk space
-    VM_FREE=$(podman machine ssh "df / --output=avail -B1 | tail -1" 2>/dev/null || echo "0")
-    IMAGE_SIZE=$(stat -f%z "$IMAGE_FILE" 2>/dev/null || stat -c%s "$IMAGE_FILE" 2>/dev/null)
-    NEEDED=$((IMAGE_SIZE * 3 / 2))
-
-    if [[ "$VM_FREE" -lt "$NEEDED" ]]; then
-        echo "Warning: Podman VM may not have enough disk space"
-        echo "  Available: $((VM_FREE / 1024 / 1024)) MB"
-        echo "  Image size: $((IMAGE_SIZE / 1024 / 1024)) MB"
-        echo "  Recommended: $((NEEDED / 1024 / 1024)) MB"
-        echo ""
-        read -p "Continue anyway? [y/N] " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            exit 1
-        fi
+    echo ""
+    if [[ -n "$NEW_IMAGE" ]]; then
+        # Get absolute path for new image
+        NEW_DIR="$(cd "$(dirname "$NEW_IMAGE")" 2>/dev/null && pwd || pwd)"
+        NEW_IMAGE="${NEW_DIR}/$(basename "$NEW_IMAGE")"
+        echo "Shrinking to: $NEW_IMAGE"
+        pishrink "$IMAGE_FILE" "$NEW_IMAGE"
+    else
+        pishrink "$IMAGE_FILE"
     fi
-
-    echo "Creating work directory in VM..."
-    podman machine ssh "sudo mkdir -p $VM_WORKDIR && sudo chmod 777 $VM_WORKDIR"
-
-    echo "Copying image to VM (this may take a while)..."
-    podman machine ssh "cat > $VM_WORKDIR/$IMAGE_NAME" < "$IMAGE_FILE"
-
-    echo "Running PiShrink in container..."
-    podman machine ssh "podman run --rm --privileged \
-        -v $VM_WORKDIR:$VM_WORKDIR \
-        -w $VM_WORKDIR \
-        docker.io/library/debian:bookworm-slim \
-        bash -c 'apt-get update && apt-get install -y parted dosfstools e2fsprogs wget udev && \
-            wget -q https://raw.githubusercontent.com/Drewsif/PiShrink/master/pishrink.sh && \
-            chmod +x pishrink.sh && \
-            ./pishrink.sh \"$IMAGE_NAME\"'"
-
-    echo "Copying shrunk image back..."
-    SHRUNK_FILE="${IMAGE_FILE%.img}-shrunk.img"
-    podman machine ssh "cat \"$VM_WORKDIR/$IMAGE_NAME\"" > "$SHRUNK_FILE"
-
-    # VM cleanup handled by EXIT trap
 
     echo ""
     echo "Done!"
-    echo "Original: $IMAGE_FILE ($(du -h "$IMAGE_FILE" | cut -f1))"
-    echo "Shrunk:   $SHRUNK_FILE ($(du -h "$SHRUNK_FILE" | cut -f1))"
+    if [[ -n "$NEW_IMAGE" ]]; then
+        echo "Original: $IMAGE_FILE ($(du -h "$IMAGE_FILE" | cut -f1))"
+        echo "Shrunk:   $NEW_IMAGE ($(du -h "$NEW_IMAGE" | cut -f1))"
+    else
+        echo "Shrunk: $IMAGE_FILE ($(du -h "$IMAGE_FILE" | cut -f1))"
+    fi
 
 else
-    # Linux: volume mounts work with loop devices
-    echo "Running PiShrink in privileged container..."
+    # =========================================================================
+    # Linux: Use PiShrink in a privileged Podman/Docker container
+    # =========================================================================
+    CONTAINER_CMD=""
+    if command -v podman &>/dev/null; then
+        CONTAINER_CMD="podman"
+    elif command -v docker &>/dev/null; then
+        CONTAINER_CMD="docker"
+    else
+        echo "Error: podman or docker not found"
+        exit 1
+    fi
 
-    podman run --rm --privileged \
+    SHRINK_ARGS="'$IMAGE_NAME'"
+    if [[ -n "$NEW_IMAGE" ]]; then
+        NEW_NAME="$(basename "$NEW_IMAGE")"
+        SHRINK_ARGS="'$IMAGE_NAME' '$NEW_NAME'"
+    fi
+
+    echo "Running PiShrink in privileged container ($CONTAINER_CMD)..."
+
+    $CONTAINER_CMD run --rm --privileged \
         -v "$IMAGE_DIR":/workdir:Z \
         -w /workdir \
         docker.io/library/debian:bookworm-slim \
         bash -c "
+            set -e
             apt-get update && apt-get install -y parted dosfstools e2fsprogs wget udev
             wget -q https://raw.githubusercontent.com/Drewsif/PiShrink/master/pishrink.sh
             chmod +x pishrink.sh
-            ./pishrink.sh '$IMAGE_NAME'
+            ./pishrink.sh $SHRINK_ARGS
         "
 
     echo ""
-    echo "Done! Shrunk image: $IMAGE_FILE"
-    echo "Size: $(du -h "$IMAGE_FILE" | cut -f1)"
+    echo "Done!"
+    if [[ -n "$NEW_IMAGE" ]]; then
+        # Move output to requested path if different from image dir
+        NEW_DIR="$(cd "$(dirname "$NEW_IMAGE")" 2>/dev/null && pwd || pwd)"
+        NEW_ABS="${NEW_DIR}/$(basename "$NEW_IMAGE")"
+        if [[ "$IMAGE_DIR/$NEW_NAME" != "$NEW_ABS" ]]; then
+            mv "$IMAGE_DIR/$NEW_NAME" "$NEW_ABS"
+        fi
+        echo "Original: $IMAGE_FILE ($(du -h "$IMAGE_FILE" | cut -f1))"
+        echo "Shrunk:   $NEW_ABS ($(du -h "$NEW_ABS" | cut -f1))"
+    else
+        echo "Shrunk: $IMAGE_FILE ($(du -h "$IMAGE_FILE" | cut -f1))"
+    fi
 fi

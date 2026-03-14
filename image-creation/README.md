@@ -97,6 +97,17 @@ sudo dd if=/dev/rdiskN of=home-screens-v1.0.0.img bs=4m status=progress
 
 ### 5. Shrink the image
 
+**macOS** (requires [PiShrink-macOS](https://github.com/lisanet/PiShrink-macOS)):
+```bash
+# Install once:
+git clone https://github.com/lisanet/PiShrink-macOS.git
+cd PiShrink-macOS && make && sudo make install
+
+# Shrink:
+./shrink-image.sh home-screens-v1.0.0.img
+```
+
+**Linux** (uses Podman/Docker automatically):
 ```bash
 ./shrink-image.sh home-screens-v1.0.0.img
 ```
@@ -122,7 +133,7 @@ zip -9 home-screens-v1.0.0.zip home-screens-v1.0.0.img
 ```
 image-creation/
 ├── build-image.sh          # Main build orchestrator
-├── shrink-image.sh         # PiShrink wrapper (Podman)
+├── shrink-image.sh         # PiShrink wrapper (native macOS / Podman Linux)
 ├── upload-image.sh         # Upload image to GitHub release
 ├── README.md               # This file
 └── scripts/
@@ -240,5 +251,6 @@ cat /etc/systemd/system/getty@tty1.service.d/autologin.conf
 
 - [Home Screens install.sh](../scripts/install.sh) — Standard installation script
 - [upgrade.sh setup-system](../scripts/upgrade.sh) — System configuration (services, kiosk, Plymouth)
-- [PiShrink](https://github.com/Drewsif/PiShrink) — Image shrinking tool
+- [PiShrink-macOS](https://github.com/lisanet/PiShrink-macOS) — Native macOS image shrinking (no VM needed)
+- [PiShrink](https://github.com/Drewsif/PiShrink) — Original PiShrink (Linux, used via Podman container)
 - [Raspberry Pi docs](../docs/raspberry-pi.md) — Kiosk deployment guide
