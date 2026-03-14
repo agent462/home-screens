@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Slider from '@/components/ui/Slider';
 import { DISPLAY_PRESETS, DISPLAY_TRANSFORMS } from '@/lib/constants';
 
@@ -32,6 +33,9 @@ interface Props {
 export default function DisplaySection({ values, onChange }: Props) {
   const { displayWidth, displayHeight, displayTransform, rotationInterval, cursorHideSeconds, transitionEffect, transitionDuration } = values;
 
+  const isPreset = DISPLAY_PRESETS.some((p) => p.width === displayWidth && p.height === displayHeight);
+  const [isCustom, setIsCustom] = useState(!isPreset);
+
   return (
     <section>
       <h3 className="text-sm font-medium text-neutral-300 mb-3 uppercase tracking-wider">
@@ -40,9 +44,13 @@ export default function DisplaySection({ values, onChange }: Props) {
       <label className="block mb-3">
         <span className="text-xs text-neutral-400">Display Resolution</span>
         <select
-          value={`${displayWidth}x${displayHeight}`}
+          value={isCustom ? 'custom' : `${displayWidth}x${displayHeight}`}
           onChange={(e) => {
-            if (e.target.value === 'custom') return;
+            if (e.target.value === 'custom') {
+              setIsCustom(true);
+              return;
+            }
+            setIsCustom(false);
             const [w, h] = e.target.value.split('x').map(Number);
             onChange({ displayWidth: w, displayHeight: h });
           }}
@@ -53,12 +61,37 @@ export default function DisplaySection({ values, onChange }: Props) {
               {p.label}
             </option>
           ))}
-          {!DISPLAY_PRESETS.some((p) => p.width === displayWidth && p.height === displayHeight) && (
-            <option value={`${displayWidth}x${displayHeight}`}>
-              Custom ({displayWidth} x {displayHeight})
-            </option>
-          )}
+          <option value="custom">Custom...</option>
         </select>
+        {isCustom && (
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              type="number"
+              value={displayWidth}
+              min={320}
+              max={7680}
+              onChange={(e) => {
+                const w = parseInt(e.target.value, 10);
+                if (w > 0) onChange({ displayWidth: w });
+              }}
+              className="block w-full rounded-md bg-neutral-800 border border-neutral-600 text-sm text-neutral-200 px-3 py-2 focus:outline-none focus:border-blue-500"
+              placeholder="Width"
+            />
+            <span className="text-neutral-500 text-sm">×</span>
+            <input
+              type="number"
+              value={displayHeight}
+              min={320}
+              max={7680}
+              onChange={(e) => {
+                const h = parseInt(e.target.value, 10);
+                if (h > 0) onChange({ displayHeight: h });
+              }}
+              className="block w-full rounded-md bg-neutral-800 border border-neutral-600 text-sm text-neutral-200 px-3 py-2 focus:outline-none focus:border-blue-500"
+              placeholder="Height"
+            />
+          </div>
+        )}
         <p className="text-xs text-neutral-500 mt-1">
           Match this to your physical display. Changing resolution affects the module canvas size.
         </p>
