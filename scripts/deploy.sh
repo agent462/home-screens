@@ -84,6 +84,7 @@ cd "$PROJECT_DIR" && npm run build
 step "Syncing build output..."
 rsync -azP --delete \
   --exclude 'cache' \
+  --exclude '/node_modules' \
   "$PROJECT_DIR/.next/" "$HOST:$REMOTE_DIR/.next/"
 
 # --- Install dependencies ---

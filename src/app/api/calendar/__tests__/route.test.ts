@@ -272,6 +272,33 @@ describe('ICS + Google Calendar merging', () => {
     expect(json[0].title).toBe('ICS Only Event');
   });
 
+  it('returns Google events when ical-calendar module fails to load (partial success)', async () => {
+    mockReadConfig.mockResolvedValue(
+      makeConfig({
+        googleCalendarIds: ['primary'],
+        icalSources: [
+          { id: 'ics-1', type: 'ical', name: 'ICS', url: 'https://example.com/cal.ics', color: '#ff0000', enabled: true },
+        ],
+      }),
+    );
+
+    mockFetchGoogle.mockResolvedValue([
+      makeEvent('g1', '2026-03-13T10:00:00Z', 'Google Event'),
+    ]);
+    // Simulate node-ical not installed — the dynamic import() itself throws
+    mockFetchICal.mockImplementation(() => {
+      throw new Error('Cannot find module node-ical');
+    });
+
+    const req = makeRequest();
+    const res = await GET(req);
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json).toHaveLength(1);
+    expect(json[0].title).toBe('Google Event');
+  });
+
   it('returns Google events when ICS fails (partial success)', async () => {
     mockReadConfig.mockResolvedValue(
       makeConfig({

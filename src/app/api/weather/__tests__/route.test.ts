@@ -298,6 +298,46 @@ describe('GET /api/weather', () => {
     expect(mockCreateWeatherProvider).toHaveBeenCalledWith('open-meteo', undefined);
   });
 
+  it('returns 400 when API key is required but not configured', async () => {
+    mockGetLocation.mockResolvedValue({ lat: '40.7', lon: '-74.0' });
+    mockReadConfig.mockResolvedValue({ screens: [], settings: {} } as never);
+    mockGetSecret.mockResolvedValue(null);
+    mockCreateWeatherProvider.mockClear();
+
+    const req = makeRequest({ provider: 'pirateweather' });
+    const res = await GET(req);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/No API key configured for pirateweather/);
+    expect(mockCreateWeatherProvider).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for any keyed provider without a secret', async () => {
+    mockGetLocation.mockResolvedValue({ lat: '40.7', lon: '-74.0' });
+    mockReadConfig.mockResolvedValue({ screens: [], settings: {} } as never);
+    mockGetSecret.mockResolvedValue(null);
+
+    for (const provider of ['openweathermap', 'weatherapi', 'pirateweather']) {
+      const req = makeRequest({ provider });
+      const res = await GET(req);
+      expect(res.status).toBe(400);
+    }
+  });
+
+  it('does NOT return 400 for keyless providers (noaa, open-meteo)', async () => {
+    setupDefaults();
+    mockGetSecret.mockClear();
+    const provider = makeMockProvider();
+    mockCreateWeatherProvider.mockReturnValue(provider as never);
+
+    for (const p of ['noaa', 'open-meteo']) {
+      const req = makeRequest({ provider: p });
+      const res = await GET(req);
+      expect(res.status).toBe(200);
+    }
+  });
+
   it('returns 500 via errorResponse when provider throws', async () => {
     setupDefaults();
     mockCreateWeatherProvider.mockImplementation(() => {

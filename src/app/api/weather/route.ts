@@ -41,9 +41,17 @@ export async function GET(request: NextRequest) {
     pirateweather: 'pirateweather_key',
   };
   // NOAA and Open-Meteo require no API key — skip the secret lookup
-  const apiKey = secretKeyMap[provider]
-    ? (await getSecret(secretKeyMap[provider]) ?? undefined)
+  const secretKey = secretKeyMap[provider];
+  const apiKey = secretKey
+    ? (await getSecret(secretKey) ?? undefined)
     : undefined;
+
+  if (secretKey && !apiKey) {
+    return NextResponse.json(
+      { error: `No API key configured for ${provider}. Add it in Settings → Integrations.` },
+      { status: 400 },
+    );
+  }
 
   try {
     const cacheKey = `${provider}:${lat}:${lon}:${units}:${type}`;

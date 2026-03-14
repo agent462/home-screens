@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchCalendarEvents } from '@/lib/google-calendar';
-import { fetchICalEvents } from '@/lib/ical-calendar';
 import { readConfig } from '@/lib/config';
 import { errorResponse, createTTLCache } from '@/lib/api-utils';
 import type { CalendarEvent } from '@/types/config';
@@ -67,6 +66,9 @@ export async function GET(request: NextRequest) {
   let icalOk = icalSources.length === 0;
   if (icalSources.length) {
     try {
+      // Lazy-import so the route still works when node-ical isn't installed
+      // (e.g. git-based upgrade that skipped npm install)
+      const { fetchICalEvents } = await import('@/lib/ical-calendar');
       icalEvents = await fetchICalEvents(icalSources, timeMin, timeMax);
       icalOk = true;
     } catch (error) {

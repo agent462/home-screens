@@ -22,9 +22,25 @@ export function usePreviewData(): PreviewData {
 
   useEffect(() => {
     async function fetchPreviewData() {
-      // Fetch both providers in parallel; the server-side cache + secrets
-      // check means unconfigured providers will simply fail gracefully
-      const providers = ['openweathermap', 'weatherapi', 'pirateweather', 'noaa', 'open-meteo'] as const;
+      // Only fetch providers that have API keys configured (or need none).
+      // Check secrets first to avoid 400/500 errors for unconfigured providers.
+      const allProviders: string[] = ['openweathermap', 'weatherapi', 'pirateweather', 'noaa', 'open-meteo'];
+      const noKeyNeeded = new Set(['noaa', 'open-meteo']);
+      let providers = allProviders;
+      try {
+        const secretsRes = await fetch('/api/secrets');
+        if (secretsRes.ok) {
+          const secrets: Record<string, boolean> = await secretsRes.json();
+          const keyMap: Record<string, string> = {
+            openweathermap: 'openweathermap_key',
+            weatherapi: 'weatherapi_key',
+            pirateweather: 'pirateweather_key',
+          };
+          providers = allProviders.filter(p => noKeyNeeded.has(p) || secrets[keyMap[p]]);
+        }
+      } catch {
+        // Fall back to all providers if secrets check fails
+      }
       const results = await Promise.allSettled(
         providers.map(async (p) => {
           const res = await fetch(`/api/weather?provider=${p}`);
