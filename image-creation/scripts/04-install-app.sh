@@ -83,8 +83,7 @@ if [[ "$HS_LOCAL" == "true" ]]; then
         version: 1,
         settings: {
           rotationIntervalMs: 30000,
-          displayWidth: 1080, displayHeight: 1920, displayTransform: '90',
-          piVariant: 'lite',
+          displayWidth: 0, displayHeight: 0,
           latitude: 0, longitude: 0,
           weather: { provider: 'weatherapi', latitude: 0, longitude: 0, units: 'imperial' },
           calendar: { googleCalendarId: '', googleCalendarIds: [], icalSources: [], maxEvents: 10, daysAhead: 7 }
@@ -160,10 +159,13 @@ fi
 chown -R "${APP_USER}:${APP_USER}" "${INSTALL_BASE}"
 
 # ============================================================================
-# Ensure seed config has piVariant for tarball installs
+# Patch seed config defaults
 # ============================================================================
-# The local-build path writes piVariant into the seed config above.
-# For tarball installs, the release seed may not have it, so patch it in.
+# The image is generic — display detection happens at boot via firstboot.
+# Seed with 0x0 dimensions so setup-system omits DISPLAY_MODE and cage
+# auto-detects the connected display's native resolution.
+log_info "Configuring seed defaults"
+
 if [[ -f "${APP_DIR}/data/config.json" ]]; then
     node -e "
       const fs = require('fs');
@@ -171,6 +173,7 @@ if [[ -f "${APP_DIR}/data/config.json" ]]; then
       const c = JSON.parse(fs.readFileSync(f, 'utf-8'));
       const s = c.settings = c.settings || {};
       if (!s.piVariant) s.piVariant = 'lite';
+      if (!s.displayTransform) s.displayTransform = '90';
       if (!s.calendar) s.calendar = {};
       if (!s.calendar.icalSources) s.calendar.icalSources = [];
       fs.writeFileSync(f, JSON.stringify(c, null, 2) + '\n');
