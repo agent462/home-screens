@@ -131,10 +131,14 @@ ${marker_end}"
     echo "${kiosk_block}" >> "${tmp}"
     mv "${tmp}" "${profile}"
     trap - RETURN
-    return 0
   else
     # Fresh install — append
     echo "${kiosk_block}" >> "${profile}"
-    return 0
   fi
+
+  # Fix ownership when running as root during image build / setup-system
+  if [ "$(id -u)" -eq 0 ] && [ -n "${USER}" ] && [ "${USER}" != "root" ]; then
+    chown "${USER}:${USER}" "${profile}"
+  fi
+  return 0
 }

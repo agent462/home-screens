@@ -35,45 +35,36 @@ SyncIntervalSec=5min
 EOF
 
 # ============================================================================
-# Configure zram swap (compressed RAM swap — no SD card wear)
-# Install zram BEFORE removing disk swap to avoid a no-swap state on failure.
+# Swap — use Pi OS's native rpi-swap (zram-generator based)
+# Pi OS ships with rpi-swap which manages a zram swap device via
+# systemd-zram-setup@zram0.service.  No extra packages needed.
+# We just remove the legacy dphys-swapfile (disk-backed) if present, and
+# apply sysctl tuning for compressed-RAM swap.
 # ============================================================================
-log_info "Configuring zram swap"
-if ! dpkg -l | grep -q zram-tools; then
-    apt-get -y install --no-install-recommends zram-tools
+log_info "Configuring swap (using native rpi-swap / zram-generator)"
+
+# Remove zram-tools if present — it conflicts with the native zram-generator
+if dpkg -l zram-tools &>/dev/null; then
+    apt-get -y purge zram-tools 2>/dev/null || true
+    log_info "  Removed conflicting zram-tools package"
 fi
 
-if [[ -f /etc/default/zramswap ]]; then
-    cat > /etc/default/zramswap << 'EOF'
-# zram swap configuration for Home Screens
-ALGO=zstd
-PERCENT=25
-PRIORITY=100
-EOF
-    cat > /etc/sysctl.d/99-home-screens-zram.conf << 'EOF'
-# Zram swap tuning
+cat > /etc/sysctl.d/99-home-screens-zram.conf << 'EOF'
+# Swap tuning for zram (compressed RAM swap)
 vm.swappiness=10
 vm.vfs_cache_pressure=50
 EOF
-    log_info "  Configured zram with zstd compression"
-else
-    log_warn "  zram-tools not available — keeping disk swap as fallback"
-fi
 
-# ============================================================================
-# Disable disk-backed swap (only after zram is confirmed)
-# ============================================================================
-if dpkg -l | grep -q zram-tools; then
-    log_info "Disabling disk-backed swap (zram is active)"
-    if systemctl is-active --quiet dphys-swapfile 2>/dev/null; then
-        systemctl stop dphys-swapfile
-    fi
-    if systemctl is-enabled --quiet dphys-swapfile 2>/dev/null; then
-        systemctl disable dphys-swapfile
-    fi
-    apt-get -y purge dphys-swapfile 2>/dev/null || true
-    rm -f /var/swap
+# Remove legacy disk-backed swap
+if systemctl is-active --quiet dphys-swapfile 2>/dev/null; then
+    systemctl stop dphys-swapfile
 fi
+if systemctl is-enabled --quiet dphys-swapfile 2>/dev/null; then
+    systemctl disable dphys-swapfile
+fi
+apt-get -y purge dphys-swapfile 2>/dev/null || true
+rm -f /var/swap
+log_info "  Swap configured (native rpi-swap + sysctl tuning)"
 
 # ============================================================================
 # Disable unnecessary services

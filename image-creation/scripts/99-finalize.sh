@@ -121,8 +121,9 @@ mkdir -p /opt/home-screens/bin
 cat > /opt/home-screens/bin/firstboot.sh << 'FBEOF'
 #!/bin/bash
 # Home Screens First Boot Initialization
-
-set -e
+# NOTE: Do NOT use `set -e` — individual failures are handled inline and must
+# not prevent the .initialized marker from being written (which would cause
+# the script to re-run on every boot).
 
 APP_DIR="/opt/home-screens/current"
 APP_USER="hs"
@@ -130,17 +131,17 @@ CONFIG_FILE="${APP_DIR}/data/config.json"
 
 log() {
     echo "[Home Screens FirstBoot] $1"
-    logger -t home-screens-firstboot "$1"
+    logger -t home-screens-firstboot "$1" 2>/dev/null || true
 }
 
 log "Starting first boot initialization"
 
-# Regenerate SSH host keys
+# Regenerate SSH host keys (use ssh-keygen -A instead of dpkg-reconfigure
+# to avoid a systemd deadlock — this unit declares Before=ssh.service, so
+# dpkg-reconfigure's attempt to restart ssh would block forever).
 if [ ! -f /etc/ssh/ssh_host_rsa_key ]; then
     log "Regenerating SSH host keys"
-    dpkg-reconfigure openssh-server
-    # Restart sshd in case it started before keys were ready
-    systemctl restart ssh 2>/dev/null || systemctl restart sshd 2>/dev/null || true
+    ssh-keygen -A
 fi
 
 # Regenerate machine-id (empty file triggers systemd auto-regeneration,
@@ -274,31 +275,46 @@ else
 fi
 
 # ============================================================================
-# Done
+# Clear WiFi credentials — LAST STEP before shutdown
+# (Placed last because this will disconnect SSH-over-WiFi sessions)
 # ============================================================================
-log_info "Image preparation complete"
+log_info "Removing WiFi credentials (disabled)"
+
+# NetworkManager connection profiles (Bookworm+)
+#rm -f /etc/NetworkManager/system-connections/*.nmconnection 2>/dev/null || true
+
+# Legacy wpa_supplicant (pre-Bookworm or manual config)
+#for f in /etc/wpa_supplicant/wpa_supplicant*.conf; do
+#    [ -f "$f" ] && : > "$f"
+#done
+
+# ============================================================================
+# Done — shut down for imaging
+# ============================================================================
+log_info "Image preparation complete — shutting down"
 echo ""
 echo "=============================================="
-echo "NEXT STEPS:"
+echo "Image ready. System is shutting down."
+echo ""
+echo "NEXT STEPS (after power light goes off):"
 echo "=============================================="
 echo ""
-echo "1. Shutdown the Pi:"
-echo "   sudo shutdown -h now"
+echo "1. Remove SD card and insert into a Linux or macOS computer"
 echo ""
-echo "2. Remove SD card and insert into a Linux or macOS computer"
-echo ""
-echo "3. Create the image:"
+echo "2. Create the image:"
 echo "   Linux:  sudo dd if=/dev/sdX of=home-screens.img bs=4M status=progress"
 echo "   macOS:  diskutil unmountDisk /dev/diskN"
 echo "           sudo dd if=/dev/rdiskN of=home-screens.img bs=4m status=progress"
 echo ""
-echo "4. Shrink the image:"
+echo "3. Shrink the image:"
 echo "   ./shrink-image.sh home-screens.img"
 echo ""
-echo "5. Compress for distribution:"
+echo "4. Compress for distribution:"
 echo "   xz -9 -T0 home-screens.img"
 echo ""
-echo "6. Upload to GitHub release:"
+echo "5. Upload to GitHub release:"
 echo "   ./upload-image.sh v1.0.0 home-screens.img.xz"
 echo ""
 echo "=============================================="
+
+shutdown -h now

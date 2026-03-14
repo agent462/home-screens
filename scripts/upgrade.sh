@@ -593,6 +593,13 @@ if [ -n "${DISPLAY_MODE}" ] || [ -n "${DISPLAY_TRANSFORM}" ]; then
   ) &
 fi
 
+# Wait for the Next.js server before launching Chromium (defense in depth —
+# on first boot the server may be delayed by firstboot tasks).
+for _i in $(seq 1 120); do
+  (echo > /dev/tcp/localhost/3000) 2>/dev/null && break
+  sleep 1
+done
+
 # Launch Chromium (exec replaces this script)
 # --remote-debugging-port enables programmatic page reload after deploys/upgrades
 exec chromium --kiosk \
@@ -614,6 +621,10 @@ exec chromium --kiosk \
     fi
 
     # 9. Cage auto-launch in .bash_profile (idempotent: updates stale blocks)
+    #    Re-source kiosk.conf so PI_VARIANT reflects step 7's output (on the
+    #    very first run kiosk.conf didn't exist when we sourced it at the top).
+    [ -f "${KIOSK_CONF}" ] && source "${KIOSK_CONF}"
+    PI_VARIANT="${PI_VARIANT:-desktop}"
     if write_kiosk_block "${PI_VARIANT}" "${APP_DIR}"; then
       changed="${changed}bash-profile,"
     fi
