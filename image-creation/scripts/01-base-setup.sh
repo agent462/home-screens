@@ -31,6 +31,9 @@ else
 fi
 
 log_info "Configuring SSH for password authentication"
+# Remove any drop-in configs that override PasswordAuthentication
+# (Pi OS Bookworm ships with sshd_config.d/ files that set it to 'no')
+rm -f /etc/ssh/sshd_config.d/*.conf
 # Replace any existing PasswordAuthentication line (commented or not)
 sed -i 's/^#\?PasswordAuthentication\b.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
 # If no line existed at all, append it

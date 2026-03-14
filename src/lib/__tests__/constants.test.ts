@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { snapToGrid, GRID_SIZE } from '../constants';
+import { snapToGrid, GRID_SIZE, RESOLUTION_PRESETS, deriveDisplayTransform } from '../constants';
 
 describe('snapToGrid', () => {
   it('snaps exact multiples to themselves', () => {
@@ -23,5 +23,40 @@ describe('snapToGrid', () => {
     expect(snapToGrid(-GRID_SIZE / 2)).toEqual(expect.closeTo(0, 0));
     // Past midpoint rounds down
     expect(snapToGrid(-GRID_SIZE / 2 - 1)).toBe(-GRID_SIZE);
+  });
+});
+
+describe('RESOLUTION_PRESETS', () => {
+  it('has correct structure with short < long for each entry', () => {
+    expect(RESOLUTION_PRESETS.length).toBeGreaterThan(0);
+    for (const p of RESOLUTION_PRESETS) {
+      expect(p).toHaveProperty('label');
+      expect(p).toHaveProperty('short');
+      expect(p).toHaveProperty('long');
+      expect(p.short).toBeLessThan(p.long);
+    }
+  });
+
+  it('has unique short values (used as select keys)', () => {
+    const shorts = RESOLUTION_PRESETS.map((p) => p.short);
+    expect(new Set(shorts).size).toBe(shorts.length);
+  });
+});
+
+describe('deriveDisplayTransform', () => {
+  it('maps portrait + not flipped to 90', () => {
+    expect(deriveDisplayTransform('portrait', false)).toBe('90');
+  });
+
+  it('maps portrait + flipped to 270', () => {
+    expect(deriveDisplayTransform('portrait', true)).toBe('270');
+  });
+
+  it('maps landscape + not flipped to normal', () => {
+    expect(deriveDisplayTransform('landscape', false)).toBe('normal');
+  });
+
+  it('maps landscape + flipped to 180', () => {
+    expect(deriveDisplayTransform('landscape', true)).toBe('180');
   });
 });

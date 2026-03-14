@@ -415,6 +415,47 @@ describe('editor store', () => {
     });
   });
 
+  describe('scaleAllModules', () => {
+    it('scales modules across all screens and marks dirty', () => {
+      const store = useEditorStore;
+      const config = makeConfig({
+        screens: [
+          {
+            id: 's1', name: 'Screen 1', backgroundImage: '', modules: [
+              { id: 'mod-1', type: 'clock', position: { x: 0, y: 0 }, size: { w: 1040, h: 1900 }, zIndex: 1, config: {}, style: { ...DEFAULT_MODULE_STYLE } },
+            ],
+          },
+          {
+            id: 's2', name: 'Screen 2', backgroundImage: '', modules: [
+              { id: 'mod-2', type: 'text', position: { x: 0, y: 1600 }, size: { w: 1040, h: 300 }, zIndex: 1, config: {}, style: { ...DEFAULT_MODULE_STYLE } },
+            ],
+          },
+        ],
+      });
+      store.setState({ config, isDirty: false });
+
+      // Portrait 1080x1920 → Landscape 1920x1080
+      store.getState().scaleAllModules(1080, 1920, 1920, 1080);
+
+      const state = store.getState();
+      expect(state.isDirty).toBe(true);
+      // Both screens should have modules that fit within 1920x1080
+      for (const screen of state.config!.screens) {
+        for (const mod of screen.modules) {
+          expect(mod.position.x + mod.size.w).toBeLessThanOrEqual(1920);
+          expect(mod.position.y + mod.size.h).toBeLessThanOrEqual(1080);
+        }
+      }
+    });
+
+    it('does nothing when config is null', () => {
+      const store = useEditorStore;
+      store.setState({ config: null });
+      store.getState().scaleAllModules(1080, 1920, 1920, 1080);
+      expect(store.getState().config).toBeNull();
+    });
+  });
+
   describe('removeScreen prunes profiles', () => {
     it('removes deleted screen ID from all profile screenIds', () => {
       const store = useEditorStore;

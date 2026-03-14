@@ -2,24 +2,24 @@
 export const DEFAULT_DISPLAY_WIDTH = 1080;
 export const DEFAULT_DISPLAY_HEIGHT = 1920;
 
-// Display resolution presets
-export const DISPLAY_PRESETS = [
-  { label: 'Portrait 1080p (1080 x 1920)', width: 1080, height: 1920 },
-  { label: 'Portrait 1440p (1440 x 2560)', width: 1440, height: 2560 },
-  { label: 'Portrait 4K (2160 x 3840)', width: 2160, height: 3840 },
-  { label: 'Landscape 720p (1280 x 720)', width: 1280, height: 720 },
-  { label: 'Landscape 1080p (1920 x 1080)', width: 1920, height: 1080 },
-  { label: 'Landscape 1440p (2560 x 1440)', width: 2560, height: 1440 },
-  { label: 'Landscape 4K (3840 x 2160)', width: 3840, height: 2160 },
+// Orientation-agnostic resolution presets.
+// `short` is the smaller dimension, `long` is the larger.
+// Portrait: width = short, height = long.  Landscape: width = long, height = short.
+export const RESOLUTION_PRESETS = [
+  { label: '720p HD', short: 720, long: 1280 },
+  { label: '1080p Full HD', short: 1080, long: 1920 },
+  { label: '1440p QHD', short: 1440, long: 2560 },
+  { label: '4K UHD', short: 2160, long: 3840 },
 ] as const;
 
-// Display orientation presets (wlr-randr transform values)
-export const DISPLAY_TRANSFORMS = [
-  { label: 'Landscape (no rotation)', value: 'normal' },
-  { label: 'Portrait (90° clockwise)', value: '90' },
-  { label: 'Inverted Landscape (180°)', value: '180' },
-  { label: 'Portrait (270° clockwise)', value: '270' },
-] as const;
+/** Derive the wlr-randr transform value from orientation + flip. */
+export function deriveDisplayTransform(
+  orientation: 'portrait' | 'landscape',
+  flipped: boolean,
+): 'normal' | '90' | '180' | '270' {
+  if (orientation === 'portrait') return flipped ? '270' : '90';
+  return flipped ? '180' : 'normal';
+}
 
 // Config file path
 export const CONFIG_FILE_PATH = 'data/config.json';

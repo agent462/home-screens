@@ -2,7 +2,10 @@
 
 import { useState } from 'react';
 import Slider from '@/components/ui/Slider';
-import { DISPLAY_PRESETS, DISPLAY_TRANSFORMS } from '@/lib/constants';
+import {
+  RESOLUTION_PRESETS,
+  deriveDisplayTransform,
+} from '@/lib/constants';
 
 const TRANSITION_OPTIONS = [
   { value: 'fade', label: 'Fade' },
@@ -30,37 +33,107 @@ interface Props {
   onChange: (updates: Partial<DisplaySettings>) => void;
 }
 
+function resolvePreset(width: number, height: number) {
+  const short = Math.min(width, height);
+  const long = Math.max(width, height);
+  return RESOLUTION_PRESETS.find((p) => p.short === short && p.long === long) ?? null;
+}
+
 export default function DisplaySection({ values, onChange }: Props) {
   const { displayWidth, displayHeight, displayTransform, rotationInterval, cursorHideSeconds, transitionEffect, transitionDuration } = values;
 
-  const isPreset = DISPLAY_PRESETS.some((p) => p.width === displayWidth && p.height === displayHeight);
-  const [isCustom, setIsCustom] = useState(!isPreset);
+  // Derive orientation from the actual dimensions (source of truth for the canvas),
+  // not from displayTransform which may be out of sync from the old UI.
+  const orientation = displayWidth < displayHeight ? 'portrait' : 'landscape';
+  const flipped = orientation === 'portrait'
+    ? displayTransform === '270'
+    : displayTransform === '180';
+  const preset = resolvePreset(displayWidth, displayHeight);
+  const [userPickedCustom, setUserPickedCustom] = useState(false);
+  const isCustom = userPickedCustom || !preset;
+
+  // Build the select value from the matched preset's short dimension
+  const presetValue = preset ? String(preset.short) : 'custom';
+
+  function applyPreset(short: number, long: number, orient: 'portrait' | 'landscape', flip: boolean) {
+    const w = orient === 'portrait' ? short : long;
+    const h = orient === 'portrait' ? long : short;
+    onChange({
+      displayWidth: w,
+      displayHeight: h,
+      displayTransform: deriveDisplayTransform(orient, flip),
+    });
+  }
+
+  function setOrientation(newOrientation: 'portrait' | 'landscape') {
+    if (newOrientation === orientation) return;
+    // Swap width/height and update transform
+    onChange({
+      displayWidth: displayHeight,
+      displayHeight: displayWidth,
+      displayTransform: deriveDisplayTransform(newOrientation, flipped),
+    });
+    setUserPickedCustom(false);
+  }
+
+  function setFlipped(newFlipped: boolean) {
+    onChange({
+      displayTransform: deriveDisplayTransform(orientation, newFlipped),
+    });
+  }
 
   return (
     <section>
       <h3 className="text-sm font-medium text-neutral-300 mb-3 uppercase tracking-wider">
         Display
       </h3>
+
+      {/* Orientation toggle */}
+      <div className="mb-3">
+        <span className="text-xs text-neutral-400">Orientation</span>
+        <div className="mt-1 flex rounded-md overflow-hidden border border-neutral-600">
+          {(['portrait', 'landscape'] as const).map((o) => (
+            <button
+              key={o}
+              type="button"
+              onClick={() => setOrientation(o)}
+              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                orientation === o
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-neutral-800 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-700'
+              }`}
+            >
+              {o === 'portrait' ? 'Portrait' : 'Landscape'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Resolution picker */}
       <label className="block mb-3">
-        <span className="text-xs text-neutral-400">Display Resolution</span>
+        <span className="text-xs text-neutral-400">Resolution</span>
         <select
-          value={isCustom ? 'custom' : `${displayWidth}x${displayHeight}`}
+          value={isCustom ? 'custom' : presetValue}
           onChange={(e) => {
             if (e.target.value === 'custom') {
-              setIsCustom(true);
+              setUserPickedCustom(true);
               return;
             }
-            setIsCustom(false);
-            const [w, h] = e.target.value.split('x').map(Number);
-            onChange({ displayWidth: w, displayHeight: h });
+            setUserPickedCustom(false);
+            const p = RESOLUTION_PRESETS.find((r) => String(r.short) === e.target.value);
+            if (p) applyPreset(p.short, p.long, orientation, flipped);
           }}
           className="mt-1 block w-full rounded-md bg-neutral-800 border border-neutral-600 text-sm text-neutral-200 px-3 py-2 focus:outline-none focus:border-blue-500"
         >
-          {DISPLAY_PRESETS.map((p) => (
-            <option key={`${p.width}x${p.height}`} value={`${p.width}x${p.height}`}>
-              {p.label}
-            </option>
-          ))}
+          {RESOLUTION_PRESETS.map((p) => {
+            const w = orientation === 'portrait' ? p.short : p.long;
+            const h = orientation === 'portrait' ? p.long : p.short;
+            return (
+              <option key={p.short} value={String(p.short)}>
+                {p.label} ({w} × {h})
+              </option>
+            );
+          })}
           <option value="custom">Custom...</option>
         </select>
         {isCustom && (
@@ -96,21 +169,21 @@ export default function DisplaySection({ values, onChange }: Props) {
           Match this to your physical display. Changing resolution affects the module canvas size.
         </p>
       </label>
-      <label className="block mb-3">
-        <span className="text-xs text-neutral-400">Display Orientation</span>
-        <select
-          value={displayTransform}
-          onChange={(e) => onChange({ displayTransform: e.target.value })}
-          className="mt-1 block w-full rounded-md bg-neutral-800 border border-neutral-600 text-sm text-neutral-200 px-3 py-2 focus:outline-none focus:border-blue-500"
-        >
-          {DISPLAY_TRANSFORMS.map((t) => (
-            <option key={t.value} value={t.value}>{t.label}</option>
-          ))}
-        </select>
-        <p className="text-xs text-neutral-500 mt-1">
-          Physical rotation applied via wlr-randr on the kiosk. Takes effect on next boot.
-        </p>
+
+      {/* Flip toggle for inverted mounts */}
+      <label className="flex items-center gap-2 mb-3 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={flipped}
+          onChange={(e) => setFlipped(e.target.checked)}
+          className="rounded bg-neutral-800 border-neutral-600 text-blue-600 focus:ring-blue-500 focus:ring-offset-0"
+        />
+        <span className="text-sm text-neutral-300">Flip display (inverted mount)</span>
       </label>
+      <p className="text-xs text-neutral-500 -mt-1 mb-3">
+        Enable if your monitor is mounted upside-down. Rotates the display 180° from its base orientation.
+      </p>
+
       <hr className="my-6 border-neutral-700" />
       <div className="mb-3">
         <Slider

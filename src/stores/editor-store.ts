@@ -19,6 +19,7 @@ import {
   createLayoutExport,
   importLayout as importLayoutCore,
 } from '@/lib/layout-export';
+import { scaleModulesToFit } from '@/lib/module-utils';
 
 interface EditorState {
   config: ScreenConfiguration | null;
@@ -51,6 +52,7 @@ interface EditorState {
   importConfig: (json: string) => void;
   exportLayout: (options?: { screenIds?: string[]; name?: string; description?: string }) => void;
   importLayoutAction: (layout: LayoutExport, options: { mode: 'add' | 'replace'; applyVisual?: boolean }) => void;
+  scaleAllModules: (oldWidth: number, oldHeight: number, newWidth: number, newHeight: number) => void;
 }
 
 function updateModuleInConfig(
@@ -367,5 +369,14 @@ export const useEditorStore = create<EditorState>((set, get) => {
       url.searchParams.set('screen', firstNewId);
       window.history.replaceState(null, '', url.toString());
     }
+  },
+
+  scaleAllModules: (oldWidth, oldHeight, newWidth, newHeight) => {
+    mutateConfig((config) => ({
+      config: {
+        ...config,
+        screens: scaleModulesToFit(config.screens, oldWidth, oldHeight, newWidth, newHeight),
+      },
+    }));
   },
 }});

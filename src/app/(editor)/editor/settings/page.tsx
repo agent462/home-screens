@@ -32,7 +32,9 @@ import SystemSection from '@/components/editor/settings/SystemSection';
 import SecuritySection from '@/components/editor/settings/SecuritySection';
 import StatsSection from '@/components/editor/settings/StatsSection';
 import DataSection from '@/components/editor/settings/DataSection';
+import OrientationChangeModal from '@/components/editor/settings/OrientationChangeModal';
 import UpgradeModal from '@/components/editor/UpgradeModal';
+import { countOffCanvasModules, totalModuleCount } from '@/lib/module-utils';
 
 /* ─── Tab definitions ─────────────────────────────── */
 
@@ -133,7 +135,7 @@ export default function SettingsPage() {
   const router = useRouter();
   const initialTab = getInitialTab();
 
-  const { config, updateSettings, saveConfig, loadConfig } = useEditorStore();
+  const { config, updateSettings, saveConfig, loadConfig, scaleAllModules } = useEditorStore();
   const settings = config?.settings;
 
   const [activeTab, setActiveTab] = useState<TabId>(initialTab);
@@ -165,6 +167,46 @@ export default function SettingsPage() {
     setState((prev) => ({ ...prev, ...updates }));
     setSaveMessage(null);
   }, []);
+
+  // Orientation change modal state
+  const [orientationModal, setOrientationModal] = useState<{
+    offCanvasCount: number;
+    totalCount: number;
+    oldWidth: number;
+    oldHeight: number;
+    newWidth: number;
+    newHeight: number;
+    pendingUpdates: Partial<SettingsState>;
+  } | null>(null);
+
+  const handleDisplayChange = useCallback((updates: Partial<SettingsState>) => {
+    const newW = updates.displayWidth ?? state.displayWidth;
+    const newH = updates.displayHeight ?? state.displayHeight;
+    const shrunk = newW < state.displayWidth || newH < state.displayHeight;
+
+    if (!shrunk || !config) {
+      update(updates);
+      return;
+    }
+
+    const offCanvas = countOffCanvasModules(config.screens, newW, newH);
+
+    if (offCanvas === 0) {
+      update(updates);
+      return;
+    }
+
+    setOrientationModal({
+      offCanvasCount: offCanvas,
+      totalCount: totalModuleCount(config.screens),
+      // Use saved config dimensions — modules are laid out against those, not unsaved form state
+      oldWidth: config.settings.displayWidth,
+      oldHeight: config.settings.displayHeight,
+      newWidth: newW,
+      newHeight: newH,
+      pendingUpdates: updates,
+    });
+  }, [state.displayWidth, state.displayHeight, config, update]);
 
   function handleTabChange(tab: TabId) {
     setActiveTab(tab);
@@ -332,7 +374,7 @@ export default function SettingsPage() {
                   transitionEffect: state.transitionEffect,
                   transitionDuration: state.transitionDuration,
                 }}
-                onChange={update}
+                onChange={handleDisplayChange}
               />
             )}
 
@@ -425,6 +467,30 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+
+      {orientationModal && (
+        <OrientationChangeModal
+          offCanvasCount={orientationModal.offCanvasCount}
+          totalModuleCount={orientationModal.totalCount}
+          newWidth={orientationModal.newWidth}
+          newHeight={orientationModal.newHeight}
+          onCancel={() => setOrientationModal(null)}
+          onSwitchAnyway={() => {
+            update(orientationModal.pendingUpdates);
+            setOrientationModal(null);
+          }}
+          onScaleToFit={() => {
+            update(orientationModal.pendingUpdates);
+            scaleAllModules(
+              orientationModal.oldWidth,
+              orientationModal.oldHeight,
+              orientationModal.newWidth,
+              orientationModal.newHeight,
+            );
+            setOrientationModal(null);
+          }}
+        />
+      )}
     </div>
   );
 }

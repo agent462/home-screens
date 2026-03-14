@@ -105,7 +105,7 @@ cat > /etc/systemd/system/home-screens-firstboot.service << EOF
 Description=Home Screens First Boot Initialization
 ConditionPathExists=!/opt/home-screens/.initialized
 After=network.target
-Before=home-screens.service
+Before=home-screens.service ssh.service sshd.service
 
 [Service]
 Type=oneshot
@@ -139,6 +139,8 @@ log "Starting first boot initialization"
 if [ ! -f /etc/ssh/ssh_host_rsa_key ]; then
     log "Regenerating SSH host keys"
     dpkg-reconfigure openssh-server
+    # Restart sshd in case it started before keys were ready
+    systemctl restart ssh 2>/dev/null || systemctl restart sshd 2>/dev/null || true
 fi
 
 # Regenerate machine-id (empty file triggers systemd auto-regeneration,
