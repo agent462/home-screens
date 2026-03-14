@@ -149,6 +149,12 @@ export default function NasaBrowser({ selectedScreenId, hasNasaKey }: Props) {
     </div>
   );
 
+  const nasaNote = (
+    <p className="text-[11px] text-neutral-500 leading-snug">
+      Note: Some NASA images include embedded timestamps or watermarks that cannot be removed.
+    </p>
+  );
+
   const apodBeforeGrid = (
     <>
       {!hasNasaKey && (
@@ -162,6 +168,7 @@ export default function NasaBrowser({ selectedScreenId, hasNasaKey }: Props) {
           Refresh
         </Button>
       )}
+      {nasaNote}
     </>
   );
 
@@ -188,6 +195,7 @@ export default function NasaBrowser({ selectedScreenId, hasNasaKey }: Props) {
       attribution="Images courtesy of NASA"
       searchPlaceholder="Search NASA images..."
       headerSlot={modeToggle}
+      beforeGrid={nasaNote}
     />
   );
 }
