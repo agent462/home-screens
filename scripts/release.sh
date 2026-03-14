@@ -32,7 +32,7 @@ if [[ "$BUMP" == pre* ]]; then
 fi
 
 # npm version bumps package.json, commits, and creates a v-prefixed tag
-npm version "$BUMP" "${PRE_ARGS[@]}" -m "release v%s"
+npm version "$BUMP" ${PRE_ARGS[@]+"${PRE_ARGS[@]}"} -m "release v%s"
 
 # Push commit and tag
 git push origin main --follow-tags
