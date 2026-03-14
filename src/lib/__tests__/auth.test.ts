@@ -136,7 +136,12 @@ describe('session signing', () => {
     const now = Math.floor(Date.now() / 1000);
     const payload = { iat: now, exp: now + 3600 };
     const cookie = signSession(payload, secret);
-    const tampered = cookie.slice(0, -2) + 'XX';
+    // Flip a character in the middle of the signature (not the tail,
+    // where base64url padding bits can absorb small changes).
+    const dotIdx = cookie.indexOf('.');
+    const midSig = dotIdx + Math.floor((cookie.length - dotIdx) / 2);
+    const flipped = cookie[midSig] === 'A' ? 'B' : 'A';
+    const tampered = cookie.slice(0, midSig) + flipped + cookie.slice(midSig + 1);
     expect(verifySession(tampered, secret)).toBeNull();
   });
 

@@ -10,6 +10,7 @@ import { hasReleaseTarball, GITHUB_REPO } from './version';
 const APP_DIR = process.env.HOME_SCREENS_DIR || '/opt/home-screens/current';
 
 type UpgradeStep =
+  | 'idle'
   | 'preflight'
   | 'backup'
   | 'download'
@@ -155,7 +156,7 @@ const currentUpgrade: {
   running: false,
   cancelled: false,
   childProcess: null,
-  progress: { step: 'complete', progress: 100, message: 'Idle' },
+  progress: { step: 'idle', progress: 0, message: 'Idle' },
   listeners: new Set(),
   deploying: false,
 };

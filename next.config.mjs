@@ -6,6 +6,9 @@ const nextConfig = {
     workerThreads: false,
     cpus: 2,
   },
+  outputFileTracingIncludes: {
+    '/api/calendar': ['./node_modules/temporal-polyfill/**/*'],
+  },
   async headers() {
     return [
       {

@@ -102,6 +102,11 @@ export function useUpgradeStream(
   // Per-step accumulated log output
   const [stepLogs, setStepLogs] = useState<Record<string, string>>({});
 
+  // Track whether any real (non-terminal) step has been received from the server.
+  // Guards against the stale 'complete' or 'idle' initial state from subscribeToEvents
+  // closing the SSE before the upgrade has actually started.
+  const hasSeenRealStep = useRef(false);
+
   const progressRef = useRef(progress);
   const activeStepRef = useRef(activeStep);
   progressRef.current = progress;
@@ -129,6 +134,18 @@ export function useUpgradeStream(
       ((event: MessageEvent) => {
         try {
           const data = JSON.parse(event.data) as ProgressData & { type: string };
+
+          // Ignore the server's idle state — no upgrade is running yet.
+          // This arrives from subscribeToEvents() before our POST triggers the upgrade.
+          if (data.step === 'idle') return;
+
+          // Track whether we've seen any real pipeline step (not a terminal state).
+          // This prevents a stale 'complete' from subscribeToEvents closing the SSE
+          // before the upgrade has started.
+          if (data.step !== 'complete' && data.step !== 'error') {
+            hasSeenRealStep.current = true;
+          }
+
           setProgress({
             step: data.step,
             progress: data.progress,
@@ -147,10 +164,10 @@ export function useUpgradeStream(
             setActiveStep(data.step);
           }
 
-          if (data.step === 'complete') {
+          if (data.step === 'complete' && hasSeenRealStep.current) {
             setDone(true);
             es.close();
-          } else if (data.step === 'error') {
+          } else if (data.step === 'error' && hasSeenRealStep.current) {
             setFailed(true);
             es.close();
           }
@@ -194,8 +211,18 @@ export function useUpgradeStream(
           message: 'Server restarted. Reconnecting...',
         });
         setDone(true);
+      } else if (!hasSeenRealStep.current) {
+        // SSE failed before any upgrade events arrived — connection issue, not a step failure
+        setFailed(true);
+        setProgress({
+          step: 'error',
+          progress: 0,
+          message: 'Failed to connect to upgrade stream',
+          error:
+            'Could not establish a connection to monitor the upgrade. Try refreshing the page.',
+        });
       } else if (current.step !== 'complete' && current.step !== 'error') {
-        // Unexpected disconnect — show error so the UI doesn't freeze
+        // Unexpected disconnect mid-upgrade — show which step was active
         const stepLabel = STEP_LABELS[currentActive] || currentActive;
         setFailed(true);
         setProgress({
@@ -260,13 +287,21 @@ export function useWaitForServer(done: boolean): string | null {
     let cancelled = false;
 
     async function waitForServer() {
-      setReloadStatus('Waiting for server to restart...');
+      setReloadStatus('Server is shutting down...');
       // Wait past the nohup restart delay (3s) plus buffer
       await new Promise((r) => setTimeout(r, 4000));
 
-      setReloadStatus('Waiting for new server...');
-      const deadline = Date.now() + 60000; // 60s max wait
+      const start = Date.now();
+      const deadline = start + 60000; // 60s max wait
+      let serverResponded = false;
+
       while (!cancelled && Date.now() < deadline) {
+        const elapsed = Math.round((Date.now() - start) / 1000);
+
+        if (!serverResponded) {
+          setReloadStatus(`Waiting for new server to start... (${elapsed}s)`);
+        }
+
         try {
           // Poll /api/system/version which returns { upgradeRunning }.
           // The OLD server (still alive during nohup delay) returns
@@ -277,19 +312,24 @@ export function useWaitForServer(done: boolean): string | null {
           if (res.ok) {
             const data = await res.json();
             if (!data.upgradeRunning) {
-              setReloadStatus('Reloading...');
+              setReloadStatus('New server is ready — reloading page...');
               window.location.reload();
               return;
             }
+            // Old server still running — update message
+            serverResponded = true;
+            setReloadStatus(`Waiting for old server to finish... (${elapsed}s)`);
           }
         } catch {
-          // Server not ready yet
+          // Server not responding yet — expected during restart
+          serverResponded = false;
         }
         await new Promise((r) => setTimeout(r, 2000));
       }
 
       // Fallback: reload anyway after timeout
       if (!cancelled) {
+        setReloadStatus('Reloading...');
         window.location.reload();
       }
     }

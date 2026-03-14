@@ -215,7 +215,7 @@ describe('subscribeToEvents', () => {
     upgradeModule.subscribeToEvents((e) => events.push(e));
 
     expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({ type: 'progress', step: 'complete', progress: 100 });
+    expect(events[0]).toMatchObject({ type: 'progress', step: 'idle', progress: 0 });
   });
 
   it('returns an unsubscribe function that removes the listener', async () => {
@@ -384,7 +384,7 @@ describe('runUpgrade — git path', () => {
   it('runs all git pipeline steps in order', async () => {
     setupSpawnForSuccess();
 
-    // Skip the initial idle "complete" event — only track steps from pipeline start
+    // Skip the initial idle event — only track steps from pipeline start
     const steps: string[] = [];
     let pipelineStarted = false;
     upgradeModule.subscribeToEvents((e) => {
@@ -796,7 +796,7 @@ describe('progress event structure', () => {
   it('progress increases monotonically (no backwards jumps) across pipeline steps', async () => {
     setupSpawnForSuccess();
 
-    // Skip the initial idle state (progress=100) — only track pipeline progress
+    // Skip the initial idle state — only track pipeline progress
     const progressValues: number[] = [];
     let pipelineStarted = false;
     upgradeModule.subscribeToEvents((e) => {
