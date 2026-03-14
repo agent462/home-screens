@@ -475,15 +475,15 @@ async function runTarballUpgrade(targetTag: string): Promise<void> {
       },
     },
     setupSystemStep(75),
-    restartStep(85),
     {
       step: 'cleanup',
-      progress: 95,
+      progress: 85,
       message: 'Finalizing...',
       run: async () => {
         await runUpgradeScript('cleanup-rollback', [], streamTo('cleanup'), { cwd: APP_DIR });
       },
     },
+    restartStep(92),
     completeStep(`Upgrade to ${targetTag} complete!`),
   ];
 
