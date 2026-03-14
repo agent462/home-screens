@@ -16,6 +16,26 @@ warn()  { echo -e "${YELLOW}[!]${NC} $1"; }
 error() { echo -e "${RED}[x]${NC} $1"; exit 1; }
 step()  { echo -e "\n${GREEN}==>${NC} $1"; }
 
+setup_logging() {
+  # Tee all stdout/stderr to a log file so users can share it when debugging.
+  # Call once, early in the script, before any meaningful output.
+  LOGFILE="${HOME}/home-screens-install.log"
+  if : > "${LOGFILE}" 2>/dev/null; then
+    exec > >(tee -a "${LOGFILE}") 2>&1
+  else
+    warn "Could not create log file at ${LOGFILE} — continuing without file log"
+    LOGFILE=""
+  fi
+  local os_name
+  os_name=$(. /etc/os-release 2>/dev/null && echo "${PRETTY_NAME:-}" || uname -s)
+  echo "Home Screens install — $(date '+%Y-%m-%d %H:%M:%S %Z')"
+  echo "System: $(uname -m), ${os_name:-$(uname -s)}"
+  if command -v free &>/dev/null; then
+    echo "Memory: $(free -h 2>/dev/null | awk '/^Mem:/{print $2" total"}')"
+  fi
+  echo "---"
+}
+
 # --- Preflight checks ---
 
 check_arch() {

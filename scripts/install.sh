@@ -18,6 +18,9 @@ NODE_MAJOR=22
 # --- Shared functions ---
 source "$(dirname "$0")/lib/common.sh"
 
+# --- Install log ---
+setup_logging
+
 # --- Parse flags ---
 PI_VARIANT="desktop"
 REQUESTED_VERSION=""
@@ -226,6 +229,10 @@ echo "  Kiosk:        cage (launches automatically on TTY1)"
 echo "  App:          ${APP_DIR}"
 echo "  Data:         ${APP_DIR}/data/config.json"
 echo ""
+if [ -n "${LOGFILE:-}" ]; then
+  echo "  Log:          ${LOGFILE}"
+  echo ""
+fi
 echo "  Commands:"
 echo "    sudo systemctl start home-screens    # start server"
 echo "    sudo systemctl status home-screens   # check status"
