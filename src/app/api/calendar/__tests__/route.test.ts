@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { CalendarEvent, ScreenConfiguration } from '@/types/config';
 
@@ -565,7 +565,7 @@ describe('time parameters', () => {
   it('defaults daysAhead to 7 when not configured', async () => {
     const config = makeConfig({ googleCalendarIds: ['primary'] });
     // Remove daysAhead to trigger the ?? 7 fallback
-    delete (config.settings.calendar as Record<string, unknown>).daysAhead;
+    delete (config.settings.calendar as unknown as Record<string, unknown>).daysAhead;
     mockReadConfig.mockResolvedValue(config);
     mockFetchGoogle.mockResolvedValue([]);
 
@@ -584,7 +584,7 @@ describe('time parameters', () => {
         { id: 'ics-1', type: 'ical', name: 'ICS', url: 'https://example.com/cal.ics', color: '#ff0000', enabled: true },
       ],
     });
-    delete (config.settings.calendar as Record<string, unknown>).maxEvents;
+    delete (config.settings.calendar as unknown as Record<string, unknown>).maxEvents;
     mockReadConfig.mockResolvedValue(config);
 
     // Create 60 events to verify the 50-event cap

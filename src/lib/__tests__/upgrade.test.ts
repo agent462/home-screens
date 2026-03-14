@@ -761,7 +761,7 @@ describe('cancelUpgrade — deploy phase blocking', () => {
     expect(upgradeModule.isDeploying()).toBe(true);
 
     // Let deploy finish
-    deployChildResolve?.();
+    deployChildResolve!();
     await upgradePromise;
 
     expect(upgradeModule.isDeploying()).toBe(false);

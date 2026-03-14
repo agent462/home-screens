@@ -54,7 +54,7 @@ function makePostRequest(
     formData.set('directory', directory);
   }
   for (const f of files) {
-    const blob = new Blob([f.content], { type: f.type });
+    const blob = new Blob([new Uint8Array(f.content)], { type: f.type });
     formData.append('file', new File([blob], f.name, { type: f.type }));
   }
   return new NextRequest('http://localhost/api/backgrounds', {

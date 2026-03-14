@@ -6,7 +6,6 @@ import {
   TEMPLATE_CATEGORIES,
 } from '@/lib/templates';
 import type { TemplateMeta } from '@/lib/templates';
-import type { ModuleType } from '@/types/config';
 import { getAllModuleDefinitions } from '@/lib/module-registry';
 
 // ---------------------------------------------------------------------------
