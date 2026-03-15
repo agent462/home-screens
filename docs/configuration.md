@@ -217,7 +217,7 @@ Profiles support overnight windows (e.g. 23:00–06:00). When multiple profiles 
 
 ### ModuleType
 
-There are 30 module types:
+There are 33 module types:
 
 ```typescript
 type ModuleType =
@@ -250,7 +250,10 @@ type ModuleType =
   | 'multi-month'
   | 'garbage-day'
   | 'standings'
-  | 'affirmations';
+  | 'affirmations'
+  | 'date'
+  | 'meal-planner'
+  | 'iframe';
 ```
 
 ### ModuleStyle

@@ -76,5 +76,5 @@ You can switch to the **Dev** channel in **Settings > System** to get pre-releas
 ## Next Steps
 
 - [Editor Guide](editor.md) -- learn how to build your screens
-- [Modules Reference](modules.md) -- see all 30 available modules
+- [Modules Reference](modules.md) -- see all 33 available modules
 - [Raspberry Pi Deployment](raspberry-pi.md) -- set up a dedicated kiosk display

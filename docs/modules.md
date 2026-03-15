@@ -1,6 +1,6 @@
 # Modules Reference
 
-Home Screens includes 31 built-in modules organized into 7 categories. Each module can be dragged onto the canvas from the module palette in the editor.
+Home Screens includes 33 built-in modules organized into 7 categories. Each module can be dragged onto the canvas from the module palette in the editor.
 
 ## Time & Date
 
@@ -66,6 +66,28 @@ Displays multiple months in a vertical or horizontal layout with today highlight
 | `showWeekNumbers` | boolean | `false` | Show ISO week numbers |
 | `highlightWeekends` | boolean | `true` | Dim weekend days |
 | `showAdjacentDays` | boolean | `true` | Show days from adjacent months in empty cells |
+
+### Date
+
+A dedicated date display widget with multiple visual layouts and optional metadata (week number, day of year).
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `view` | string | `"full"` | Display style: `full`, `minimal`, `stacked`, `editorial`, or `banner` |
+| `dateFormat` | string | `"MMMM d"` | Date format string (date-fns format, used in minimal view) |
+| `showDayName` | boolean | `true` | Show day of week name |
+| `showYear` | boolean | `false` | Show year |
+| `showWeekNumber` | boolean | `false` | Show week number (e.g. "Week 12") |
+| `showDayOfYear` | boolean | `false` | Show day of year (e.g. "Day 75") |
+| `accentColor` | string | `"#ffffff"` | Accent color for day number and dividers |
+
+**View details:**
+
+- **full** — Large centered day number with month name and optional day name.
+- **minimal** — Compact single-line format with custom date formatting.
+- **stacked** — Vertically stacked layout with decorative divider lines.
+- **editorial** — Horizontal layout with large day number on left and details on right.
+- **banner** — Horizontal all-caps banner with elements separated by bullets.
 
 ---
 
@@ -371,6 +393,32 @@ Displays rotating positive affirmations with multiple visual styles. Time-aware 
 - **card** — Rounded card with accent-colored left border.
 - **minimal** — Simple text with no decoration.
 - **typewriter** — Typewriter-style animation that types out each affirmation.
+
+### Meal Planner
+
+A meal planning widget for organizing daily meals across configurable slots (breakfast, lunch, dinner, snack). Time-aware slot detection highlights the current or next meal.
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `view` | string | `"today"` | Display style: `week`, `today`, `next-meal`, `compact`, or `list` |
+| `slots` | array | `["breakfast", "lunch", "dinner", "snack"]` | Enabled meal slots |
+| `weekStartDay` | string | `"sunday"` | First day of week: `sunday` or `monday` |
+| `showEmoji` | boolean | `true` | Show meal emoji |
+| `showPrepTime` | boolean | `true` | Show prep time in minutes |
+| `showTags` | boolean | `true` | Show meal tags |
+| `accentColor` | string | `"#a78bfa"` | Accent color for highlights |
+| `savedMeals` | array | `[]` | Meal definitions with name, emoji, tags, prep time, and notes |
+| `plan` | array | `[]` | Weekly schedule mapping day + slot to a saved meal |
+
+Meals are configured in the editor with emoji, prep time, tags (quick, healthy, vegetarian, etc.), and notes. The weekly plan assigns meals to specific day/slot combinations.
+
+**View details:**
+
+- **week** — Grid showing all 7 days and meal slots at a glance with today highlighted.
+- **today** — Vertical stack of slot cards for today with active slot highlighted.
+- **next-meal** — Large display of the next upcoming meal with context label (Now/Coming Up/Tomorrow).
+- **compact** — Two-column layout showing Today and Tomorrow side-by-side.
+- **list** — Full week listed vertically with day headers, showing only days with meals.
 
 ---
 

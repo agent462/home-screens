@@ -34,7 +34,7 @@ npx vitest run src/lib/__tests__/config.test.ts  # Run a single test file
 - `(editor)` — configuration editor at `/editor`, has toolbars/panels
 
 ### Module System
-The codebase uses a **module registry pattern**. Each of the 30 widget types requires:
+The codebase uses a **module registry pattern**. Each of the 33 widget types requires:
 1. A React component in `src/components/modules/`
 2. A type in the `ModuleType` union (`src/types/config.ts`)
 3. A config interface in `src/types/config.ts`
