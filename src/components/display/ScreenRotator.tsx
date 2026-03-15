@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { flushSync } from 'react-dom';
 import type { Screen, GlobalSettings, ScreenConfiguration, Profile } from '@/types/config';
 import ScreenRenderer, { resolveProvider } from './ScreenRenderer';
 import type { SharedDisplayData } from './ScreenRenderer';
@@ -10,11 +10,12 @@ import { useDisplayControl } from './useDisplayControl';
 import { useFetchData } from '@/hooks/useFetchData';
 import { useTZClock } from '@/hooks/useTZClock';
 import { resolveProfileScreens } from '@/lib/schedule';
-import { getTransitionVariants } from '@/lib/transitions';
+import { getTransitionConfig, getViewTransitionKeyframes } from '@/lib/transitions';
 import { WEATHER_REFRESH_MS, CALENDAR_REFRESH_MS, DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT } from '@/lib/constants';
 import { displayCache } from '@/lib/display-cache';
 import { prefetchScreen } from '@/lib/prefetch';
 import { useIdleCursor } from '@/hooks/useIdleCursor';
+import type { TransitionEffect } from '@/types/config';
 
 /** How often the display polls for config changes (ms) */
 const CONFIG_POLL_MS = 3_000;
@@ -203,6 +204,55 @@ function usePrefetchNextScreen(
   }, [screenKey, currentIndex, rotationIntervalMs, displayState]);
 }
 
+// ---- View Transitions API integration ----
+
+const supportsViewTransitions = typeof document !== 'undefined' && 'startViewTransition' in document;
+
+/**
+ * Wraps a DOM update in the View Transitions API for smooth compositor-driven
+ * animation. Falls back to a direct update when the API isn't available.
+ *
+ * View Transitions capture GPU-backed screenshots of the old and new states,
+ * then animate between them as flat textures on the compositor thread. This is
+ * dramatically cheaper than animating live DOM layers.
+ */
+function startScreenTransition(
+  updateFn: () => void,
+  effect: TransitionEffect,
+  durationMs: number,
+  easing: string,
+) {
+  if (!supportsViewTransitions || durationMs === 0 || effect === 'none') {
+    updateFn();
+    return;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const vt = (document as any).startViewTransition(() => {
+    flushSync(updateFn);
+  });
+
+  const kf = getViewTransitionKeyframes(effect);
+
+  vt.ready.then(() => {
+    const opts: KeyframeAnimationOptions = { duration: durationMs, easing, fill: 'both' };
+
+    document.documentElement.animate(kf.exit, {
+      ...opts,
+      pseudoElement: '::view-transition-old(root)',
+    });
+    document.documentElement.animate(kf.enter, {
+      ...opts,
+      pseudoElement: '::view-transition-new(root)',
+    });
+  }).catch(() => {
+    // A concurrent startViewTransition() call aborted this transition.
+    // The DOM update already committed via flushSync; only the animation is lost.
+  });
+}
+
+// ---- Main component ----
+
 export default function ScreenRotator({ screens: initialScreens, settings: initialSettings, profiles: initialProfiles }: ScreenRotatorProps) {
   const { screens: allScreens, settings, profiles } = useLiveConfig(initialScreens, initialSettings, initialProfiles);
   const cursorRef = useIdleCursor(settings.cursorHideSeconds ?? 3);
@@ -246,20 +296,40 @@ export default function ScreenRotator({ screens: initialScreens, settings: initi
   const safeIndex = currentIndex < screens.length ? currentIndex : 0;
   const currentScreen = screens[safeIndex];
 
+  // Transition config — stored in refs so callbacks don't recreate on config changes
+  const tc = getTransitionConfig(settings.transitionEffect, settings.transitionDuration);
+  const effectRef = useRef<TransitionEffect>(settings.transitionEffect ?? 'fade');
+  const durationMsRef = useRef(tc.duration * 1000);
+  const easingRef = useRef(tc.easing);
+  useEffect(() => {
+    effectRef.current = settings.transitionEffect ?? 'fade';
+    durationMsRef.current = tc.duration * 1000;
+    easingRef.current = tc.easing;
+  }, [settings.transitionEffect, tc.duration, tc.easing]);
+
+  // Navigation wrapped in View Transitions
   const goToScreen = useCallback((index: number) => {
-    setCurrentIndex(index);
-    setRotationEpoch((e) => e + 1);
+    startScreenTransition(
+      () => { setCurrentIndex(index); setRotationEpoch((e) => e + 1); },
+      effectRef.current, durationMsRef.current, easingRef.current,
+    );
   }, []);
 
   const nextScreen = useCallback(() => {
     if (screens.length <= 1) return;
-    setCurrentIndex((prev) => (prev + 1) % screens.length);
+    startScreenTransition(
+      () => { setCurrentIndex((prev) => (prev + 1) % screens.length); },
+      effectRef.current, durationMsRef.current, easingRef.current,
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screens.length, screenKey]);
 
   const prevScreen = useCallback(() => {
     if (screens.length <= 1) return;
-    setCurrentIndex((prev) => (prev - 1 + screens.length) % screens.length);
+    startScreenTransition(
+      () => { setCurrentIndex((prev) => (prev - 1 + screens.length) % screens.length); },
+      effectRef.current, durationMsRef.current, easingRef.current,
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screens.length, screenKey]);
 
@@ -283,7 +353,8 @@ export default function ScreenRotator({ screens: initialScreens, settings: initi
   usePrefetchNextScreen(screens, screenKey, currentIndex, settings.rotationIntervalMs, displayState);
 
   // Reset currentIndex when the active screen set changes (handles both
-  // length changes and same-length profile switches with different screens)
+  // length changes and same-length profile switches with different screens).
+  // No animation — this is a hard reset (e.g. profile switch).
   useEffect(() => {
     setCurrentIndex(0);
   }, [screenKey]);
@@ -296,10 +367,6 @@ export default function ScreenRotator({ screens: initialScreens, settings: initi
     return () => clearInterval(interval);
   }, [nextScreen, settings.rotationIntervalMs, screens.length, displayState, rotationEpoch]);
 
-  const tv = getTransitionVariants(settings.transitionEffect, settings.transitionDuration);
-  const firstRender = useRef(true);
-  useEffect(() => { firstRender.current = false; }, []);
-
   if (screens.length === 0) {
     return (
       <div style={{ width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666' }}>
@@ -309,19 +376,8 @@ export default function ScreenRotator({ screens: initialScreens, settings: initi
   }
 
   return (
-    <div ref={cursorRef} style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden', backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', perspective: settings.transitionEffect === 'flip' ? 1200 : undefined }}>
-      <AnimatePresence mode={tv.mode}>
-        <motion.div
-          key={currentScreen.id}
-          initial={firstRender.current ? false : tv.initial}
-          animate={tv.animate}
-          exit={tv.exit}
-          transition={tv.transition}
-          style={tv.mode === 'sync' ? { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' } : undefined}
-        >
-          <ScreenRenderer screen={currentScreen} settings={settings} rotatingBackground={rotatingBackgrounds[currentScreen.id]} sharedData={sharedData} displayW={displayW} displayH={displayH} scale={scale} />
-        </motion.div>
-      </AnimatePresence>
+    <div ref={cursorRef} style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden', backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <ScreenRenderer screen={currentScreen} settings={settings} rotatingBackground={rotatingBackgrounds[currentScreen.id]} sharedData={sharedData} displayW={displayW} displayH={displayH} scale={scale} />
 
       {screens.length > 1 && (
         <div
@@ -333,6 +389,7 @@ export default function ScreenRotator({ screens: initialScreens, settings: initi
             display: 'flex',
             gap: 8,
             zIndex: 100,
+            viewTransitionName: 'pagination',
           }}
         >
           {screens.map((s, i) => (

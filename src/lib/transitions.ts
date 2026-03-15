@@ -1,91 +1,116 @@
 import type { TransitionEffect } from '@/types/config';
-import type { Transition, TargetAndTransition } from 'framer-motion';
 
-interface TransitionVariants {
-  initial: TargetAndTransition | false;
-  animate: TargetAndTransition;
-  exit: TargetAndTransition;
-  transition: Transition;
-  mode: 'wait' | 'sync';
+export interface TransitionConfig {
+  /** Duration in seconds */
+  duration: number;
+  /** CSS easing function */
+  easing: string;
 }
 
-export function getTransitionVariants(
+/**
+ * Returns CSS animation configuration for screen transitions.
+ *
+ * All keyframes use compositor-only properties (transform, opacity) via
+ * translate3d / scale3d so animations run on the GPU compositor thread
+ * instead of the main JavaScript thread. This is critical for smooth
+ * 60fps transitions on low-powered devices like Raspberry Pi.
+ *
+ * The one exception is 'blur' which uses the CSS filter property — this
+ * triggers paint but the radius is kept small (8px) to limit cost.
+ */
+export function getTransitionConfig(
   effect: TransitionEffect = 'fade',
   duration: number = 0.6,
-): TransitionVariants {
-  const base: Transition = { duration, ease: 'easeInOut' };
-
-  switch (effect) {
-    case 'fade':
-      return {
-        initial: { opacity: 0 },
-        animate: { opacity: 1, scale: 1 },
-        exit: { opacity: 0, scale: 1.02 },
-        transition: base,
-        mode: 'wait',
-      };
-
-    case 'slide':
-      return {
-        initial: { x: '100%', opacity: 0 },
-        animate: { x: 0, opacity: 1 },
-        exit: { x: '-100%', opacity: 0 },
-        transition: base,
-        mode: 'wait',
-      };
-
-    case 'slide-up':
-      return {
-        initial: { y: '100%', opacity: 0 },
-        animate: { y: 0, opacity: 1 },
-        exit: { y: '-100%', opacity: 0 },
-        transition: base,
-        mode: 'wait',
-      };
-
-    case 'zoom':
-      return {
-        initial: { scale: 0.8, opacity: 0 },
-        animate: { scale: 1, opacity: 1 },
-        exit: { scale: 1.2, opacity: 0 },
-        transition: base,
-        mode: 'wait',
-      };
-
-    case 'flip':
-      return {
-        initial: { rotateY: 90, opacity: 0 },
-        animate: { rotateY: 0, opacity: 1 },
-        exit: { rotateY: -90, opacity: 0 },
-        transition: base,
-        mode: 'wait',
-      };
-
-    case 'blur':
-      return {
-        initial: { opacity: 0, filter: 'blur(20px)' },
-        animate: { opacity: 1, filter: 'blur(0px)' },
-        exit: { opacity: 0, filter: 'blur(20px)' },
-        transition: base,
-        mode: 'wait',
-      };
-
-    case 'crossfade':
-      return {
-        initial: { opacity: 0 },
-        animate: { opacity: 1 },
-        exit: { opacity: 0 },
-        transition: base,
-        mode: 'sync',
-      };
-
-    case 'none':
-      return {
-        initial: false,
-        animate: { opacity: 1 },
-        exit: { opacity: 0 },
-        transition: { duration: 0 },
-        mode: 'wait',
-      };
+): TransitionConfig {
+  if (effect === 'none') {
+    return { duration: 0, easing: 'ease-in-out' };
   }
+
+  return { duration, easing: 'ease-in-out' };
+}
+
+/**
+ * Returns WAAPI-compatible Keyframe arrays for use with the View Transitions
+ * API. View Transitions animate GPU-backed screenshots (flat textures) rather
+ * than live DOM, making them dramatically cheaper for the compositor — critical
+ * for smooth transitions at high resolutions on Raspberry Pi.
+ */
+export function getViewTransitionKeyframes(effect: TransitionEffect = 'fade') {
+  const gpu = 'translate3d(0,0,0)';
+
+  const enter: Keyframe[] = (() => {
+    switch (effect) {
+      case 'slide':
+        return [
+          { opacity: 0, transform: 'translate3d(100%,0,0)' },
+          { opacity: 1, transform: gpu },
+        ];
+      case 'slide-up':
+        return [
+          { opacity: 0, transform: 'translate3d(0,100%,0)' },
+          { opacity: 1, transform: gpu },
+        ];
+      case 'zoom':
+        return [
+          { opacity: 0, transform: 'scale3d(0.8,0.8,1)' },
+          { opacity: 1, transform: 'scale3d(1,1,1)' },
+        ];
+      case 'flip':
+        return [
+          { opacity: 0, transform: 'perspective(1200px) rotateY(90deg)' },
+          { opacity: 1, transform: 'perspective(1200px) rotateY(0deg)' },
+        ];
+      case 'blur':
+        return [
+          { opacity: 0, filter: 'blur(8px)', transform: gpu },
+          { opacity: 1, filter: 'blur(0px)', transform: gpu },
+        ];
+      case 'fade':
+      case 'crossfade':
+      default:
+        return [
+          { opacity: 0, transform: gpu },
+          { opacity: 1, transform: gpu },
+        ];
+    }
+  })();
+
+  const exit: Keyframe[] = (() => {
+    switch (effect) {
+      case 'slide':
+        return [
+          { opacity: 1, transform: gpu },
+          { opacity: 0, transform: 'translate3d(-100%,0,0)' },
+        ];
+      case 'slide-up':
+        return [
+          { opacity: 1, transform: gpu },
+          { opacity: 0, transform: 'translate3d(0,-100%,0)' },
+        ];
+      case 'zoom':
+        return [
+          { opacity: 1, transform: 'scale3d(1,1,1)' },
+          { opacity: 0, transform: 'scale3d(1.2,1.2,1)' },
+        ];
+      case 'flip':
+        return [
+          { opacity: 1, transform: 'perspective(1200px) rotateY(0deg)' },
+          { opacity: 0, transform: 'perspective(1200px) rotateY(-90deg)' },
+        ];
+      case 'blur':
+        return [
+          { opacity: 1, filter: 'blur(0px)', transform: gpu },
+          { opacity: 0, filter: 'blur(8px)', transform: gpu },
+        ];
+      case 'fade':
+      case 'crossfade':
+      default:
+        return [
+          { opacity: 1, transform: gpu },
+          { opacity: 0, transform: gpu },
+        ];
+    }
+  })();
+
+  return { enter, exit };
 }

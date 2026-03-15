@@ -44,3 +44,31 @@ body {
 .animate-ticker-scroll {
   animation: ticker-scroll linear infinite;
 }
+
+/* ============================================================================
+   View Transitions API — suppress default crossfade so we apply custom
+   animations via WAAPI. Pagination dots and sleep overlay are excluded from
+   the transition so they stay stable while screens animate.
+   ============================================================================ */
+
+::view-transition {
+  background: #000;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+
+::view-transition-old(pagination),
+::view-transition-new(pagination),
+::view-transition-group(pagination) {
+  animation: none;
+}
+
+::view-transition-old(sleep-overlay),
+::view-transition-new(sleep-overlay),
+::view-transition-group(sleep-overlay) {
+  animation: none;
+}
+

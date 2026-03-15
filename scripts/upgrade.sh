@@ -602,6 +602,7 @@ done
 
 # Launch Chromium (exec replaces this script)
 # --remote-debugging-port enables programmatic page reload after deploys/upgrades
+# GPU flags improve animation/transition smoothness on the Pi
 exec chromium --kiosk \
   --noerrdialogs \
   --disable-infobars \
@@ -612,6 +613,13 @@ exec chromium --kiosk \
   --password-store=basic \
   --ozone-platform=wayland \
   --remote-debugging-port=9222 \
+  --ignore-gpu-blocklist \
+  --enable-gpu-rasterization \
+  --enable-zero-copy \
+  --num-raster-threads=2 \
+  --enable-oop-rasterization \
+  --force-gpu-mem-available-mb=256 \
+  --enable-features=CanvasOopRasterization \
   http://localhost:3000/display'
 
     if [ ! -f "${LAUNCHER}" ] || [ "$(cat "${LAUNCHER}")" != "${DESIRED_LAUNCHER}" ]; then

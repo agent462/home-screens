@@ -48,6 +48,13 @@ chromium-browser \
   --no-first-run \
   --disable-session-crashed-bubble \
   --disable-translate \
+  --ignore-gpu-blocklist \
+  --enable-gpu-rasterization \
+  --enable-zero-copy \
+  --num-raster-threads=2 \
+  --enable-oop-rasterization \
+  --force-gpu-mem-available-mb=256 \
+  --enable-features=CanvasOopRasterization \
   http://localhost:3000/display &
 BROWSER_PID=$!
 
