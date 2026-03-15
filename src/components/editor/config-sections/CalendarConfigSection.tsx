@@ -38,12 +38,18 @@ export function CalendarConfigSection({ mod, screenId }: { mod: ModuleInstance; 
   const googleCalendarIds = useEditorStore((s) => s.config?.settings?.calendar?.googleCalendarIds ?? []);
   const icalSources = useEditorStore((s) => s.config?.settings?.calendar?.icalSources ?? []);
   const [googleCalendars, setGoogleCalendars] = useState<GoogleCalendar[]>([]);
+  const [googleAuthError, setGoogleAuthError] = useState(false);
 
   useEffect(() => {
     async function fetchGoogleCals() {
       try {
         const res = await editorFetch('/api/calendars');
-        if (res.ok) setGoogleCalendars(await res.json());
+        if (res.ok) {
+          setGoogleCalendars(await res.json());
+          setGoogleAuthError(false);
+        } else if (res.status === 403) {
+          setGoogleAuthError(true);
+        }
       } catch { /* ignore */ }
     }
     if (googleCalendarIds.length > 0) fetchGoogleCals();
@@ -51,11 +57,23 @@ export function CalendarConfigSection({ mod, screenId }: { mod: ModuleInstance; 
 
   // Merge Google + ICS into a unified source list
   const availableSources: CalendarSource[] = [];
+  let unnamedCount = 0;
   for (const gid of googleCalendarIds) {
     const cal = googleCalendars.find((c) => c.id === gid);
+    let name = cal?.summary;
+    if (!name) {
+      // Fallback: email-style IDs show local part, opaque hashes get a generic label
+      const local = gid.split('@')[0];
+      if (/^[a-z0-9]{20,}$/i.test(local)) {
+        unnamedCount++;
+        name = unnamedCount > 1 ? `Google Calendar ${unnamedCount}` : 'Google Calendar';
+      } else {
+        name = local;
+      }
+    }
     availableSources.push({
       id: gid,
-      name: cal?.summary ?? gid.split('@')[0],
+      name,
       color: cal?.backgroundColor ?? '#3b82f6',
     });
   }
@@ -101,6 +119,12 @@ export function CalendarConfigSection({ mod, screenId }: { mod: ModuleInstance; 
           <option value="month">Month Grid</option>
         </select>
       </label>
+
+      {googleAuthError && googleCalendarIds.length > 0 && (
+        <div className="rounded-md bg-amber-950/50 border border-amber-700/50 px-3 py-2 text-xs text-amber-300">
+          Google Calendar auth expired. Re-authenticate in Settings → Calendar.
+        </div>
+      )}
 
       {availableSources.length > 1 && (
         <div className="flex flex-col gap-0.5">
