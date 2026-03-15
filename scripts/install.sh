@@ -6,8 +6,8 @@ set -euo pipefail
 #
 # Usage:
 #   git clone https://github.com/agent462/home-screens.git
-#   ~/home-screens/scripts/install.sh                        # Pi OS with Desktop (latest release)
-#   ~/home-screens/scripts/install.sh --lite                 # Pi OS Lite (no desktop)
+#   ~/home-screens/scripts/install.sh                        # Pi OS Lite (default)
+#   ~/home-screens/scripts/install.sh --desktop              # Pi OS with Desktop
 #   ~/home-screens/scripts/install.sh --version v1.2.0       # Install a specific release
 
 INSTALL_BASE="/opt/home-screens"
@@ -22,11 +22,11 @@ source "$(dirname "$0")/lib/common.sh"
 setup_logging
 
 # --- Parse flags ---
-PI_VARIANT="desktop"
+PI_VARIANT="lite"
 REQUESTED_VERSION=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --lite) PI_VARIANT="lite"; shift ;;
+    --desktop) PI_VARIANT="desktop"; shift ;;
     --version)
       if [ -z "${2:-}" ]; then error "--version requires a tag (e.g. --version v1.2.0)"; fi
       REQUESTED_VERSION="$2"; shift 2 ;;
@@ -153,7 +153,7 @@ KIOSK_CONF="${APP_DIR}/data/kiosk.conf"
 : > "${KIOSK_CONF}"
 [ -n "${DISPLAY_MODE}" ] && echo "DISPLAY_MODE=\"${DISPLAY_MODE}\"" >> "${KIOSK_CONF}"
 [ -n "${WLR_TRANSFORM}" ] && echo "DISPLAY_TRANSFORM=\"${WLR_TRANSFORM}\"" >> "${KIOSK_CONF}"
-[ "${PI_VARIANT}" != "desktop" ] && echo "PI_VARIANT=\"${PI_VARIANT}\"" >> "${KIOSK_CONF}"
+echo "PI_VARIANT=\"${PI_VARIANT}\"" >> "${KIOSK_CONF}"
 if [ -n "${WLR_TRANSFORM}" ]; then
   info "Display will be rotated ${WLR_TRANSFORM}° on boot."
 fi
@@ -202,7 +202,7 @@ if (mode) {
     s.displayHeight = 1080;
   }
 }
-if (variant !== 'desktop') s.piVariant = variant;
+s.piVariant = variant;
 fs.writeFileSync(configFile, JSON.stringify(c, null, 2) + '\n');
 " "${CONFIG_FILE}" "${WLR_TRANSFORM}" "${DISPLAY_MODE}" "${PI_VARIANT}"
 info "Display settings saved to config.json."
@@ -214,8 +214,8 @@ bash "${APP_DIR}/scripts/upgrade.sh" setup-system
 # --- Done ---
 echo ""
 echo -e "${GREEN}============================================${NC}"
-if [ "${PI_VARIANT}" = "lite" ]; then
-  echo -e "${GREEN}  Installation complete! (Pi OS Lite)${NC}"
+if [ "${PI_VARIANT}" = "desktop" ]; then
+  echo -e "${GREEN}  Installation complete! (Pi OS Desktop)${NC}"
 else
   echo -e "${GREEN}  Installation complete!${NC}"
 fi

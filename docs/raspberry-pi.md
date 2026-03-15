@@ -5,13 +5,13 @@ Home Screens is designed to run as a dedicated kiosk display on a Raspberry Pi. 
 ## Requirements
 
 - Raspberry Pi 4 or 5 (2 GB+ RAM recommended)
-- Raspberry Pi OS or Raspberry Pi OS Lite (Bookworm or later)
+- [Raspberry Pi OS Lite 64-bit (Trixie)](https://www.raspberrypi.com/software/operating-systems/) recommended (Desktop also supported)
 - A display connected via HDMI
 - Network connection (Ethernet or Wi-Fi)
 
 ## Install
 
-### Raspberry Pi OS (with Desktop)
+### Raspberry Pi OS Lite (recommended)
 
 Clone the repo and run the install script:
 
@@ -20,16 +20,14 @@ git clone https://github.com/agent462/home-screens.git
 ~/home-screens/scripts/install.sh
 ```
 
-### Raspberry Pi OS Lite (no desktop)
+### Raspberry Pi OS with Desktop
 
-If you're running the headless Lite image (no desktop environment), use the Lite install script instead:
+If you're running the full Desktop image, pass the `--desktop` flag:
 
 ```bash
 git clone https://github.com/agent462/home-screens.git
-~/home-screens/scripts/install-lite.sh
+~/home-screens/scripts/install.sh --desktop
 ```
-
-This installs additional packages that Pi OS Lite lacks (fonts, D-Bus session bus, logind integration) and configures the kiosk to launch correctly without a desktop environment.
 
 ### What the installer does
 

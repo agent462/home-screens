@@ -33,6 +33,219 @@ A custom smart display system built with Next.js. Designed to run on a Raspberry
 - **Auto-hide cursor** — cursor hides after a configurable idle period on the display
 - **Pre-release update channel** — opt into the dev channel for early updates
 
+## Raspberry Pi Install
+
+Home Screens is built for [Raspberry Pi OS Lite 64-bit (Trixie)](https://www.raspberrypi.com/software/operating-systems/). Desktop variants also work, but Lite is recommended — it has a smaller footprint and the install script provides everything needed for the kiosk display.
+
+Clone the repo and run the install script:
+
+```bash
+git clone https://github.com/agent462/home-screens.git
+
+# Raspberry Pi OS Lite (default)
+~/home-screens/scripts/install.sh
+
+# Raspberry Pi OS with Desktop
+~/home-screens/scripts/install.sh --desktop
+```
+
+The script handles everything:
+- Downloads the latest pre-built release to `/opt/home-screens/`
+- Installs Node.js 22, Chromium, and system dependencies
+- Creates the systemd service and configures the kiosk
+- Configures autologin and display orientation
+
+After install, reboot to start the kiosk:
+
+```bash
+sudo reboot
+```
+
+### Manual Start
+
+To run without the systemd services:
+
+```bash
+bash scripts/start-display.sh
+```
+
+### Managing the Services
+
+```bash
+sudo systemctl start home-screens     # start the server
+sudo systemctl stop home-screens      # stop server + kiosk
+sudo systemctl status home-screens    # check status
+journalctl -u home-screens -f         # view logs
+```
+
+## Getting Started Locally
+
+```bash
+# Install dependencies
+npm install
+
+# Run development server
+npm run dev
+```
+
+Then visit:
+- `http://localhost:3000/editor` — configure your screens
+- `http://localhost:3000/display` — fullscreen display view
+
+## Environment Variables
+
+All API keys and credentials are configured through the editor UI under **Settings → Integrations**. No `.env.local` file is required for normal use.
+
+## Google Calendar Setup
+
+Google Calendar uses the **OAuth 2.0 Device Flow**, which means you can authorize from any device on your network — no redirect URI or public domain required. This is ideal for a kiosk display.
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com) → **APIs & Services → Credentials**
+2. Click **Create Credentials → OAuth Client ID**
+3. Application type: **TVs and Limited Input devices**
+4. Name it anything (e.g. "Home Screen Display")
+5. In the editor, go to **Settings → Integrations** and enter the **Client ID** and **Client Secret**
+6. Enable the **Google Calendar API** at APIs & Services → Library → search "Google Calendar API" → Enable
+7. In the editor, go to Settings → Google Calendar → **Sign in with Google**
+8. You'll see a code and a link to `google.com/device` — open that link on your phone or computer, enter the code, and grant access
+
+## User Guide
+
+### SSH Access (Pre-Built Image)
+
+If you're using the pre-built Raspberry Pi image, SSH is enabled with the following defaults:
+
+| | |
+|---|---|
+| **Hostname** | `home-screens.local` |
+| **Username** | `hs` |
+| **Password** | `screens` |
+
+```bash
+ssh hs@home-screens.local
+```
+
+Change the default password after your first login:
+
+```bash
+passwd
+```
+
+If you installed via `install.sh` on your own Raspberry Pi OS, SSH uses whatever user account you ran the installer from.
+
+### Backing Up Your Data
+
+Your configuration and credentials live in the `data/` directory (`/opt/home-screens/current/data/` on the Pi). The editor has a built-in backup system at **Settings > System > Backups** that automatically retains up to 6 config snapshots, but it only covers `config.json` and does not back up sensitive secrets. To fully protect your setup, back up the key files manually:
+
+```bash
+# On the Raspberry Pi — copy to your home directory
+cp /opt/home-screens/current/data/secrets.json ~/secrets-backup.json
+cp /opt/home-screens/current/data/config.json ~/config-backup.json
+cp /opt/home-screens/current/data/auth.json ~/auth-backup.json
+cp /opt/home-screens/current/data/google-tokens.json ~/google-tokens-backup.json
+```
+
+| File | Contents |
+|---|---|
+| `data/config.json` | Screen layouts, module settings, display configuration |
+| `data/secrets.json` | API keys (weather, Unsplash, Todoist, TomTom, etc.) |
+| `data/auth.json` | Editor password hash and session secret |
+| `data/google-tokens.json` | Google Calendar OAuth tokens |
+
+To restore from a backup, copy the files back and restart:
+
+```bash
+cp ~/secrets-backup.json /opt/home-screens/current/data/secrets.json
+cp ~/config-backup.json /opt/home-screens/current/data/config.json
+sudo systemctl restart home-screens
+```
+
+> **Tip:** These files are preserved across upgrades, but it's still good practice to back them up before major updates. You can also pull them off the Pi entirely with `scp`:
+> ```bash
+> scp hs@home-screens.local:/opt/home-screens/current/data/secrets.json ./
+> ```
+
+### Fixing Display Resolution
+
+If the display looks wrong (stretched, cropped, or rotated the wrong way), there are two ways to fix it:
+
+**From the editor (recommended):**
+
+1. Open `http://<pi-ip>:3000/editor` from another device
+2. Go to **Settings > Display**
+3. Adjust the width, height, and transform (rotation) settings
+4. Save — the display updates on the next refresh cycle
+
+**From SSH (if the editor is unusable):**
+
+Edit the kiosk config directly:
+
+```bash
+nano /opt/home-screens/current/data/kiosk.conf
+```
+
+The file looks like this:
+
+```
+DISPLAY_MODE="1920x1080"
+DISPLAY_TRANSFORM="90"
+```
+
+| Setting | Values |
+|---|---|
+| `DISPLAY_MODE` | Your display's native resolution (e.g., `1920x1080`, `2560x1440`) |
+| `DISPLAY_TRANSFORM` | `90` = portrait clockwise, `270` = portrait counter-clockwise, `180` = inverted. Remove the line entirely for landscape. |
+
+After editing, reboot for changes to take effect:
+
+```bash
+sudo reboot
+```
+
+You can also use the interactive rotation script:
+
+```bash
+bash /opt/home-screens/current/scripts/rotate-display.sh
+```
+
+### Google Calendar Token Expiration
+
+When your Google Cloud project is in **Testing** publishing status (the default), OAuth refresh tokens expire after **7 days**. This means your Google Calendar module will stop showing events weekly, and you'll need to re-authorize through the device flow in **Settings > Google Calendar > Sign in with Google**.
+
+This is a Google-imposed limitation on apps in test mode. Moving to production publishing status is out of scope for this documentation — see [Google's publishing guide](https://support.google.com/cloud/answer/10311615) for details.
+
+### Forgot Editor Password
+
+If you set a password on the editor and can't remember it, SSH into the Pi and delete the auth file:
+
+```bash
+rm /opt/home-screens/current/data/auth.json
+sudo systemctl restart home-screens
+```
+
+The editor will be unprotected again. Set a new password in **Settings > General**.
+
+### SD Card Longevity
+
+Raspberry Pis run from SD cards, which have limited write cycles. Home Screens is configured to minimize disk writes out of the box:
+
+- **Journal** — stored in RAM (volatile), capped at 16 MB, never written to disk
+- **Swap** — uses zram (compressed RAM) instead of disk-based swap
+- **Temp directories** — `/tmp` and `/var/tmp` are mounted as tmpfs (RAM-backed)
+- **Config writes** — only occur when you save changes in the editor, not on a timer
+
+No additional tuning is needed. These optimizations are applied automatically by the install script.
+
+## Documentation
+
+- [Getting Started](docs/getting-started.md) — installation and setup
+- [Editor Guide](docs/editor.md) — how to use the visual editor
+- [Modules Reference](docs/modules.md) — all 33 modules and their options
+- [API Reference](docs/api.md) — all API endpoints
+- [Configuration](docs/configuration.md) — config file schema and examples
+- [Raspberry Pi Deployment](docs/raspberry-pi.md) — kiosk setup and troubleshooting
+- [Development Guide](docs/development.md) — architecture, adding modules, and contributing
+
 ## Architecture Overview
 
 ```mermaid
@@ -79,75 +292,6 @@ graph TB
 - Zustand (editor state)
 - Framer Motion (screen transitions)
 - Vitest (testing)
-
-## Getting Started
-
-```bash
-# Install dependencies
-npm install
-
-# Run development server
-npm run dev
-```
-
-Then visit:
-- `http://localhost:3000/editor` — configure your screens
-- `http://localhost:3000/display` — fullscreen display view
-
-## Environment Variables
-
-All API keys and credentials are configured through the editor UI under **Settings → Integrations**. No `.env.local` file is required for normal use.
-
-## Google Calendar Setup
-
-Google Calendar uses the **OAuth 2.0 Device Flow**, which means you can authorize from any device on your network — no redirect URI or public domain required. This is ideal for a kiosk display.
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com) → **APIs & Services → Credentials**
-2. Click **Create Credentials → OAuth Client ID**
-3. Application type: **TVs and Limited Input devices**
-4. Name it anything (e.g. "Home Screen Display")
-5. In the editor, go to **Settings → Integrations** and enter the **Client ID** and **Client Secret**
-6. Enable the **Google Calendar API** at APIs & Services → Library → search "Google Calendar API" → Enable
-7. In the editor, go to Settings → Google Calendar → **Sign in with Google**
-8. You'll see a code and a link to `google.com/device` — open that link on your phone or computer, enter the code, and grant access
-
-## Raspberry Pi Install
-
-Clone the repo and run the install script on a fresh Raspberry Pi OS:
-
-```bash
-git clone https://github.com/agent462/home-screens.git
-~/home-screens/scripts/install.sh
-```
-
-The script handles everything:
-- Downloads the latest pre-built release to `/opt/home-screens/`
-- Installs Node.js 22, Chromium, and system dependencies
-- Creates the systemd service and configures the kiosk
-- Configures autologin and display orientation
-
-After install, reboot to start the kiosk:
-
-```bash
-sudo reboot
-```
-
-### Manual Start
-
-To run without the systemd services:
-
-```bash
-bash scripts/start-display.sh
-```
-
-### Managing the Services
-
-```bash
-sudo systemctl start home-screens     # start the server
-sudo systemctl stop home-screens      # stop server + kiosk
-sudo systemctl status home-screens    # check status
-journalctl -u home-screens -f         # view logs
-```
 
 ## Project Structure
 
@@ -212,16 +356,6 @@ graph LR
 | `/api/display/*` | GET, POST | Remote display control (wake, sleep, brightness, navigation, alerts) |
 | `/api/auth/*` | GET, POST | Authentication (password + Google OAuth) |
 | `/api/system/*` | GET, POST | System management (version, upgrade, rollback, backups, power) |
-
-## Documentation
-
-- [Getting Started](docs/getting-started.md) — installation and setup
-- [Editor Guide](docs/editor.md) — how to use the visual editor
-- [Modules Reference](docs/modules.md) — all 33 modules and their options
-- [API Reference](docs/api.md) — all API endpoints
-- [Configuration](docs/configuration.md) — config file schema and examples
-- [Raspberry Pi Deployment](docs/raspberry-pi.md) — kiosk setup and troubleshooting
-- [Development Guide](docs/development.md) — architecture, adding modules, and contributing
 
 ## Adding a Module
 
