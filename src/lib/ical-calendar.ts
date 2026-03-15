@@ -3,6 +3,7 @@ import type { VEvent } from 'node-ical';
 import type { ICalSource } from '@/types/config';
 import type { CalendarEvent } from '@/types/config';
 import { fetchWithTimeout } from '@/lib/api-utils';
+import { compareEventStarts } from '@/lib/calendar-utils';
 
 /** Extract the string value from a node-ical ParameterValue (string | {val, params}). */
 function paramValue(v: unknown): string {
@@ -119,7 +120,7 @@ export async function fetchICalEvents(
   }
 
   // Sort by start time
-  allEvents.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+  allEvents.sort((a, b) => compareEventStarts(a.start, b.start));
   return allEvents;
 }
 

@@ -1,5 +1,6 @@
 import { google } from 'googleapis';
 import { getAuthenticatedClient } from '@/lib/google-auth';
+import { compareEventStarts } from '@/lib/calendar-utils';
 import type { CalendarEvent } from '@/types/config';
 
 export async function fetchCalendarEvents(
@@ -69,5 +70,5 @@ export async function fetchCalendarEvents(
   // Merge and sort by start time
   return results
     .flat()
-    .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+    .sort((a, b) => compareEventStarts(a.start, b.start));
 }

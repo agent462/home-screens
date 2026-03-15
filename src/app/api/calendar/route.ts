@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { fetchCalendarEvents } from '@/lib/google-calendar';
 import { readConfig } from '@/lib/config';
 import { errorResponse, createTTLCache } from '@/lib/api-utils';
+import { compareEventStarts } from '@/lib/calendar-utils';
 import type { CalendarEvent } from '@/types/config';
 
 export const dynamic = 'force-dynamic';
@@ -83,7 +84,7 @@ export async function GET(request: NextRequest) {
 
   // Merge, sort, slice
   const allEvents = [...googleEvents, ...icalEvents]
-    .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
+    .sort((a, b) => compareEventStarts(a.start, b.start))
     .slice(0, maxEvents);
 
   cache.set(cacheKey, allEvents);

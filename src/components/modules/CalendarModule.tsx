@@ -2,6 +2,7 @@
 
 import { format, isSameDay, startOfDay, addDays, differenceInMinutes, startOfWeek, endOfWeek, startOfMonth, endOfMonth, getWeek, isSameMonth, isToday as isDateToday } from 'date-fns';
 import { createTZDate } from '@/lib/timezone';
+import { parseEventDate, isEventOnDay, compareEventStarts } from '@/lib/calendar-utils';
 import type { CalendarConfig, CalendarViewMode, ModuleStyle } from '@/types/config';
 import ModuleWrapper from './ModuleWrapper';
 
@@ -40,15 +41,6 @@ function formatRelativeDay(date: Date, today: Date): string {
   return format(date, 'EEEE, MMM d');
 }
 
-function isEventOnDay(ev: CalendarEvent, date: Date): boolean {
-  const evStart = new Date(ev.start);
-  if (ev.allDay || !ev.start.includes('T')) {
-    const evEnd = new Date(ev.end);
-    return evStart <= addDays(date, 1) && evEnd > date;
-  }
-  return isSameDay(evStart, date);
-}
-
 // ─── Event Card (shared across views) ───
 
 function EventCard({ event, textColor, showTime, showLocation, compact }: {
@@ -58,8 +50,8 @@ function EventCard({ event, textColor, showTime, showLocation, compact }: {
   showLocation: boolean;
   compact?: boolean;
 }) {
-  const start = new Date(event.start);
-  const end = new Date(event.end);
+  const start = parseEventDate(event.start);
+  const end = parseEventDate(event.end);
   const isAllDay = event.allDay || (!event.start.includes('T'));
 
   if (compact) {
@@ -180,13 +172,13 @@ function AgendaView({ events, config, style, today }: {
 
   // Sort events chronologically and limit
   const sorted = [...events]
-    .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
+    .sort((a, b) => compareEventStarts(a.start, b.start))
     .slice(0, maxEvents);
 
   // Group by day
   const groups: { date: Date; events: CalendarEvent[] }[] = [];
   for (const ev of sorted) {
-    const evDate = startOfDay(new Date(ev.start));
+    const evDate = startOfDay(parseEventDate(ev.start));
     const existing = groups.find((g) => isSameDay(g.date, evDate));
     if (existing) {
       existing.events.push(ev);
