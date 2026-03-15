@@ -11,7 +11,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(data);
   } catch (error) {
     if (error instanceof Response) return error;
-    return errorResponse(error, 'Failed to start device flow');
+    // Surface the actual error so the user knows what to fix.
+    // Include masked client ID so they can verify the right one is configured.
+    const message = error instanceof Error ? error.message : 'Failed to start device flow';
+    let clientIdHint: string | undefined;
+    try {
+      const { getSecret } = await import('@/lib/secrets');
+      const id = await getSecret('google_client_id');
+      if (id) clientIdHint = id.length > 32 ? id.slice(0, 8) + '…' + id.slice(-24) : id;
+    } catch { /* ignore */ }
+    return NextResponse.json({ error: message, clientIdHint }, { status: 500 });
   }
 }
 

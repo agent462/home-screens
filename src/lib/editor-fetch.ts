@@ -6,7 +6,8 @@
 export async function editorFetch(url: string, options?: RequestInit): Promise<Response> {
   const res = await fetch(url, options);
   if (res.status === 401) {
-    window.location.href = '/login';
+    const from = window.location.pathname + window.location.search;
+    window.location.href = `/login?from=${encodeURIComponent(from)}`;
     throw new Error('Session expired');
   }
   return res;

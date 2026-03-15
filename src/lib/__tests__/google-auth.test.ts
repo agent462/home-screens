@@ -212,6 +212,23 @@ describe('pollDeviceToken', () => {
     expect(writtenData.refresh_token).toBe('1//new-refresh');
   });
 
+  it('returns success with warning when no refresh_token in response', async () => {
+    setupCredentials();
+    const tokenData = {
+      access_token: 'ya29.new-token',
+      expires_in: 3600,
+      token_type: 'Bearer',
+    };
+    globalThis.fetch = mockFetchResponse(tokenData);
+    mockedWriteFile.mockResolvedValue(undefined);
+
+    const result = await pollDeviceToken('device-code');
+
+    expect(result.status).toBe('success');
+    expect(result.error).toContain('refresh token');
+    expect(mockedWriteFile).toHaveBeenCalledOnce();
+  });
+
   it('computes expiry_date from expires_in when not present', async () => {
     setupCredentials();
     const beforeCall = Date.now();
@@ -371,8 +388,15 @@ describe('isAuthenticated', () => {
     expect(result).toBe(false);
   });
 
-  it('returns false when tokens file has no refresh_token', async () => {
+  it('returns true when tokens file has access_token but no refresh_token', async () => {
     setupTokensFile({ access_token: 'ya29.something', refresh_token: null });
+
+    const result = await isAuthenticated();
+    expect(result).toBe(true);
+  });
+
+  it('returns false when access_token only and expiry_date is in the past', async () => {
+    setupTokensFile({ access_token: 'ya29.something', refresh_token: null, expiry_date: Date.now() - 60_000 });
 
     const result = await isAuthenticated();
     expect(result).toBe(false);
@@ -503,9 +527,26 @@ describe('getAuthenticatedClient', () => {
     expect(client).toBeNull();
   });
 
-  it('returns null when no refresh_token in stored tokens', async () => {
+  it('returns client using access_token when no refresh_token in stored tokens', async () => {
     setupCredentials();
     setupTokensFile({ access_token: 'ya29.something' });
+
+    const client = await getAuthenticatedClient();
+    expect(client).not.toBeNull();
+    expect(mockSetCredentials).toHaveBeenCalledWith({ access_token: 'ya29.something' });
+  });
+
+  it('returns null when access_token only and expired', async () => {
+    setupCredentials();
+    setupTokensFile({ access_token: 'ya29.expired', expiry_date: Date.now() - 60_000 });
+
+    const client = await getAuthenticatedClient();
+    expect(client).toBeNull();
+  });
+
+  it('returns null when no refresh_token and no access_token', async () => {
+    setupCredentials();
+    setupTokensFile({});
 
     const client = await getAuthenticatedClient();
     expect(client).toBeNull();

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { google } from 'googleapis';
-import { getAuthenticatedClient } from '@/lib/google-auth';
+import { getAuthenticatedClient, loadTokens } from '@/lib/google-auth';
 import { requireSession } from '@/lib/auth';
 import { errorResponse } from '@/lib/api-utils';
 
@@ -11,7 +11,17 @@ export async function GET(request: NextRequest) {
     await requireSession(request);
     const auth = await getAuthenticatedClient();
     if (!auth) {
-      return NextResponse.json({ error: 'Not authenticated with Google' }, { status: 401 });
+      // Determine why auth failed so the user gets actionable info
+      const tokens = await loadTokens();
+      let reason = 'Not authenticated with Google';
+      if (!tokens) {
+        reason = 'No Google tokens found. Please sign in with Google in Settings → Calendar.';
+      } else if (!tokens.refresh_token) {
+        reason = 'Google did not provide a refresh token. Try revoking access at myaccount.google.com/permissions, then sign in again.';
+      } else {
+        reason = 'Google token refresh failed. Your authorization may have been revoked. Please sign in again.';
+      }
+      return NextResponse.json({ error: reason }, { status: 403 });
     }
 
     const calendar = google.calendar({ version: 'v3', auth });

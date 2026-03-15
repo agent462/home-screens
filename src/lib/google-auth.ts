@@ -22,7 +22,7 @@ interface DeviceCodeResponse {
 
 /** Request a device code + user code from Google. */
 export async function requestDeviceCode(): Promise<DeviceCodeResponse> {
-  const clientId = await getSecret('google_client_id');
+  const clientId = (await getSecret('google_client_id'))?.trim();
   if (!clientId) throw new Error('Google OAuth Client ID is not configured. Add it in Settings → Integrations.');
 
   const res = await fetchWithTimeout(DEVICE_CODE_URL, {
@@ -70,6 +70,12 @@ export async function pollDeviceToken(
       data.expiry_date = Date.now() + data.expires_in * 1000;
     }
     await writeFile(TOKENS_PATH, JSON.stringify(data, null, 2));
+    if (!data.refresh_token) {
+      return {
+        status: 'success',
+        error: 'Google did not return a refresh token — calendar will stop updating when the access token expires (~1 hour). To fix: revoke access at myaccount.google.com/permissions, then sign in again.',
+      };
+    }
     return { status: 'success' };
   }
 
@@ -115,7 +121,7 @@ interface StoredTokens {
   scope?: string;
 }
 
-async function loadTokens(): Promise<StoredTokens | null> {
+export async function loadTokens(): Promise<StoredTokens | null> {
   try {
     const raw = await readFile(TOKENS_PATH, 'utf-8');
     return JSON.parse(raw);
@@ -124,9 +130,25 @@ async function loadTokens(): Promise<StoredTokens | null> {
   }
 }
 
-export async function getAuthenticatedClient() {
+export async function getAuthenticatedClient(): Promise<import('googleapis').Common.OAuth2Client | null> {
   const tokens = await loadTokens();
-  if (!tokens?.refresh_token) return null;
+  if (!tokens) {
+    console.error('[google-auth] No tokens file found at', TOKENS_PATH);
+    return null;
+  }
+  if (!tokens.refresh_token) {
+    console.error('[google-auth] Tokens file exists but has no refresh_token. Keys present:', Object.keys(tokens).join(', '));
+    // Still try to use access_token if available and not expired
+    if (!tokens.access_token) return null;
+    if (tokens.expiry_date && tokens.expiry_date < Date.now()) return null;
+    try {
+      const client = await createOAuth2Client();
+      client.setCredentials(tokens);
+      return client;
+    } catch {
+      return null;
+    }
+  }
 
   const client = await createOAuth2Client();
   client.setCredentials(tokens);
@@ -142,8 +164,8 @@ export async function getAuthenticatedClient() {
       const updated = { ...credentials, refresh_token: tokens.refresh_token };
       await writeFile(TOKENS_PATH, JSON.stringify(updated, null, 2));
       client.setCredentials(updated);
-    } catch {
-      // Refresh token is likely revoked — re-authentication required
+    } catch (err) {
+      console.error('[google-auth] Token refresh failed:', err instanceof Error ? err.message : err);
       return null;
     }
   }
@@ -153,7 +175,13 @@ export async function getAuthenticatedClient() {
 
 export async function isAuthenticated(): Promise<boolean> {
   const tokens = await loadTokens();
-  return !!tokens?.refresh_token;
+  if (tokens?.refresh_token) return true;
+  // Access-token-only (no refresh token) — valid until expired
+  if (tokens?.access_token) {
+    if (!tokens.expiry_date) return true;
+    return tokens.expiry_date > Date.now();
+  }
+  return false;
 }
 
 export async function disconnect() {

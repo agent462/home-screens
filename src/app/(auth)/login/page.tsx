@@ -6,7 +6,8 @@ import HomeScreensLogo from '@/components/brand/HomeScreensLogo';
 
 function LoginForm() {
   const searchParams = useSearchParams();
-  const from = searchParams.get('from') || '/editor';
+  const rawFrom = searchParams.get('from') || '/editor';
+  const from = rawFrom.startsWith('/') && !rawFrom.startsWith('//') ? rawFrom : '/editor';
 
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);

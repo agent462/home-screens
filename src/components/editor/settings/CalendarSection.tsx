@@ -42,9 +42,12 @@ export default function CalendarSection({ values, onChange }: Props) {
   const [userCode, setUserCode] = useState<string | null>(null);
   const [verificationUrl, setVerificationUrl] = useState<string | null>(null);
   const [deviceFlowError, setDeviceFlowError] = useState<string | null>(null);
+  const [clientIdHint, setClientIdHint] = useState<string | null>(null);
   const [deviceFlowPolling, setDeviceFlowPolling] = useState(false);
   const pollingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancelledRef = useRef(false);
+  const valuesRef = useRef(values);
+  valuesRef.current = values;
 
   // ICS feed form state
   const [showAddForm, setShowAddForm] = useState(false);
@@ -64,23 +67,30 @@ export default function CalendarSection({ values, onChange }: Props) {
     };
   }, []);
 
-  const fetchCalendars = useCallback(async () => {
+  const fetchCalendars = useCallback(async (autoSelectPrimary = false) => {
     try {
       const res = await editorFetch('/api/calendars');
       if (res.ok) {
         const cals: GoogleCalendar[] = await res.json();
         setGoogleCalendars(cals);
-        // Only auto-select primary Google calendar on first connection,
-        // not when an ICS-only user has no Google calendars selected
-        if (selectedCalendarIds.length === 0 && icalSources.length === 0 && cals.length > 0) {
+        // Auto-select primary calendar only on first-ever connection (no calendars
+        // or ICS feeds configured yet). Skipped on reconnect to preserve selections.
+        // Read current values from ref to avoid stale closures and unnecessary refetches.
+        const v = valuesRef.current;
+        if (autoSelectPrimary && v.selectedCalendarIds.length === 0 && v.icalSources.length === 0 && cals.length > 0) {
           const primary = cals.find((c) => c.primary);
           if (primary) onChange({ selectedCalendarIds: [primary.id] });
         }
+      } else if (res.status === 403) {
+        // Google tokens missing, expired, or revoked — show reconnect UI with reason
+        const errData = await res.json().catch(() => null);
+        setGoogleConnected(false);
+        setDeviceFlowError(errData?.error || 'Your Google connection has expired. Please sign in again.');
       }
     } catch {
-      // ignore
+      // ignore (editorFetch handles 401 session errors)
     }
-  }, [selectedCalendarIds.length, icalSources.length, onChange]);
+  }, [onChange]);
 
   useEffect(() => {
     async function checkAuth() {
@@ -110,16 +120,22 @@ export default function CalendarSection({ values, onChange }: Props) {
     await editorFetch('/api/auth/google/status', { method: 'DELETE' });
     setGoogleConnected(false);
     setGoogleCalendars([]);
+    setDeviceFlowError(null);
+    setClientIdHint(null);
     onChange({ selectedCalendarIds: [] });
   }
 
   async function startDeviceFlow() {
     setDeviceFlowError(null);
+    setClientIdHint(null);
     setUserCode(null);
     try {
       const res = await editorFetch('/api/auth/google/device', { method: 'POST' });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to start device flow');
+      if (!res.ok) {
+        if (data.clientIdHint) setClientIdHint(data.clientIdHint);
+        throw new Error(data.error || 'Failed to start device flow');
+      }
       setDeviceCode(data.device_code);
       setUserCode(data.user_code);
       setVerificationUrl(data.verification_url);
@@ -160,7 +176,8 @@ export default function CalendarSection({ values, onChange }: Props) {
           setUserCode(null);
           setDeviceCode(null);
           setGoogleConnected(true);
-          await fetchCalendars();
+          if (data.error) setDeviceFlowError(data.error);
+          await fetchCalendars(true);
           return;
         }
         if (data.status === 'pending') {
@@ -276,6 +293,10 @@ export default function CalendarSection({ values, onChange }: Props) {
               ) : (
                 <p className="text-xs text-neutral-500">No calendars found.</p>
               )}
+
+              {deviceFlowError && (
+                <p className="text-xs text-amber-400">{deviceFlowError}</p>
+              )}
             </>
           ) : !credentialsConfigured ? (
             <div className="space-y-2">
@@ -332,7 +353,33 @@ export default function CalendarSection({ values, onChange }: Props) {
                 </Button>
               )}
               {deviceFlowError && (
-                <p className="text-xs text-red-400">{deviceFlowError}</p>
+                <div className="space-y-1.5">
+                  <p className="text-xs text-red-400">{deviceFlowError}</p>
+                  {clientIdHint && (
+                    <p className="text-xs text-neutral-500">
+                      Using Client ID: <code className="text-neutral-400">{clientIdHint}</code>
+                    </p>
+                  )}
+                  <p className="text-xs text-neutral-500">
+                    Verify your credentials in{' '}
+                    <a
+                      href="/editor/settings?tab=integrations"
+                      className="text-blue-400 hover:text-blue-300 underline"
+                    >
+                      Settings &rarr; Integrations
+                    </a>
+                    {', or check your '}
+                    <a
+                      href="https://console.cloud.google.com/apis/credentials"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-400 hover:text-blue-300 underline"
+                    >
+                      Google Cloud Console
+                    </a>
+                    .
+                  </p>
+                </div>
               )}
               <p className="text-xs text-neutral-500">
                 Sign in to automatically see your calendars. Requires a Google OAuth client

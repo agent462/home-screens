@@ -120,9 +120,10 @@ export function proxy(request: NextRequest) {
     return Response.json({ error: 'Authentication required' }, { status: 401 });
   }
 
-  // Page route — redirect to login
+  // Page route — redirect to login (preserve query string so ?tab= survives)
   const loginUrl = new URL('/login', request.url);
-  loginUrl.searchParams.set('from', pathname);
+  const from = pathname + request.nextUrl.search;
+  loginUrl.searchParams.set('from', from);
   return NextResponse.redirect(loginUrl);
 }
 

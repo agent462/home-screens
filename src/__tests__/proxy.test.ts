@@ -25,10 +25,11 @@ type ProxyFn = (request: unknown) => unknown;
 /** Create a minimal request object matching what proxy expects from NextRequest */
 function makeRequest(
   pathname: string,
-  opts?: { method?: string; cookie?: string },
+  opts?: { method?: string; cookie?: string; search?: string },
 ) {
   const method = opts?.method ?? 'GET';
-  const url = `http://localhost:3000${pathname}`;
+  const search = opts?.search ?? '';
+  const url = `http://localhost:3000${pathname}${search}`;
   const cookieHeader = opts?.cookie ?? null;
 
   // Build a cookie store from the header
@@ -47,7 +48,8 @@ function makeRequest(
     url,
     nextUrl: {
       pathname,
-      searchParams: new URLSearchParams(),
+      search,
+      searchParams: new URLSearchParams(search),
     },
     cookies: {
       get(name: string) {
@@ -299,6 +301,13 @@ describe('proxy — auth enabled: editor pages require authentication', () => {
     const redirect = isRedirect(result);
     expect(redirect).not.toBeNull();
     expect(redirect!.from).toBe('/editor/settings');
+  });
+
+  it('redirects GET /editor/settings?tab=calendar and preserves the query string in from', () => {
+    const result = proxy(makeRequest('/editor/settings', { search: '?tab=calendar' }));
+    const redirect = isRedirect(result);
+    expect(redirect).not.toBeNull();
+    expect(redirect!.from).toBe('/editor/settings?tab=calendar');
   });
 
   it('redirects GET /editor/screens/abc/modules (deep path)', () => {
