@@ -67,8 +67,12 @@ body {
 }
 
 ::view-transition-old(sleep-overlay),
-::view-transition-new(sleep-overlay),
+::view-transition-new(sleep-overlay) {
+  animation: none;
+}
+
 ::view-transition-group(sleep-overlay) {
   animation: none;
+  z-index: 9997;
 }
 

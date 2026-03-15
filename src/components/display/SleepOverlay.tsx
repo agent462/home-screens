@@ -27,24 +27,29 @@ export default function SleepOverlay({
   const showScreensaver = displayState === 'dimmed' && screensaverMode !== 'off';
 
   return (
-    <div style={{ viewTransitionName: 'sleep-overlay' } as React.CSSProperties}>
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9997,
+        pointerEvents: 'none',
+        viewTransitionName: 'sleep-overlay',
+      } as React.CSSProperties}
+    >
       {/* Black overlay — opacity controls dimming level */}
       <div
         style={{
-          position: 'fixed',
+          position: 'absolute',
           inset: 0,
           backgroundColor: '#000',
           opacity: dimOpacity,
-          zIndex: 9997,
           transition: 'opacity 1s ease-in-out',
-          // Allow clicks through to trigger wake via the activity listener
-          pointerEvents: 'none',
         }}
       />
 
       {/* Screensaver content (above the dim overlay) */}
       {showScreensaver && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9998, pointerEvents: 'none' }}>
+        <div style={{ position: 'absolute', inset: 0, zIndex: 1 }}>
           <Screensaver mode={screensaverMode} timezone={timezone} />
         </div>
       )}
