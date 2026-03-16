@@ -6,6 +6,7 @@ import type { Screen, GlobalSettings, ScreenConfiguration, Profile } from '@/typ
 import ScreenRenderer, { resolveProvider } from './ScreenRenderer';
 import type { SharedDisplayData } from './ScreenRenderer';
 import SleepOverlay from './SleepOverlay';
+import AlertOverlay from './AlertOverlay';
 import { useDisplayControl } from './useDisplayControl';
 import { useFetchData } from '@/hooks/useFetchData';
 import { useTZClock } from '@/hooks/useTZClock';
@@ -423,6 +424,8 @@ export default function ScreenRotator({ screens: initialScreens, settings: initi
           ))}
         </div>
       )}
+
+      <AlertOverlay alertSettings={settings.alerts} displayState={displayState} scale={scale} />
 
       <SleepOverlay
         displayState={displayState}

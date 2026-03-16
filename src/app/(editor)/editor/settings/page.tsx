@@ -17,6 +17,7 @@ import {
   Shield,
   Layers,
   Activity,
+  Bell,
 } from 'lucide-react';
 
 import HomeScreensLogo from '@/components/brand/HomeScreensLogo';
@@ -31,6 +32,7 @@ import ProfilesSection from '@/components/editor/settings/ProfilesSection';
 import SystemSection from '@/components/editor/settings/SystemSection';
 import SecuritySection from '@/components/editor/settings/SecuritySection';
 import StatsSection from '@/components/editor/settings/StatsSection';
+import AlertSection from '@/components/editor/settings/AlertSection';
 import DataSection from '@/components/editor/settings/DataSection';
 import OrientationChangeModal from '@/components/editor/settings/OrientationChangeModal';
 import UpgradeModal from '@/components/editor/UpgradeModal';
@@ -42,6 +44,7 @@ const TABS = [
   { id: 'display', label: 'Display', icon: Monitor },
   { id: 'profiles', label: 'Profiles', icon: Layers },
   { id: 'sleep', label: 'Sleep', icon: Moon },
+  { id: 'alerts', label: 'Alerts', icon: Bell },
   { id: 'location', label: 'Location', icon: MapPin },
   { id: 'weather', label: 'Weather', icon: CloudSun },
   { id: 'calendar', label: 'Calendar', icon: Calendar },
@@ -86,6 +89,10 @@ interface SettingsState {
   transitionEffect: string;
   transitionDuration: number;
   holidayCountry: string;
+  alertsEnabled: boolean;
+  alertsPosition: string;
+  alertsMaxVisible: number;
+  alertsDefaultDuration: number;
 }
 
 function initSettings(settings: GlobalSettings | undefined): SettingsState {
@@ -121,6 +128,10 @@ function initSettings(settings: GlobalSettings | undefined): SettingsState {
     cursorHideSeconds: settings?.cursorHideSeconds ?? 3,
     transitionEffect: settings?.transitionEffect ?? 'fade',
     transitionDuration: settings?.transitionDuration ?? 0.6,
+    alertsEnabled: settings?.alerts?.enabled ?? true,
+    alertsPosition: settings?.alerts?.position ?? 'top',
+    alertsMaxVisible: settings?.alerts?.maxVisible ?? 3,
+    alertsDefaultDuration: (settings?.alerts?.defaultDuration ?? 0) / 1000,
   };
 }
 
@@ -261,6 +272,12 @@ export default function SettingsPage() {
         cursorHideSeconds: state.cursorHideSeconds,
         transitionEffect: state.transitionEffect as GlobalSettings['transitionEffect'],
         transitionDuration: state.transitionDuration,
+        alerts: {
+          enabled: state.alertsEnabled,
+          position: state.alertsPosition as 'top' | 'bottom',
+          maxVisible: state.alertsMaxVisible,
+          defaultDuration: state.alertsDefaultDuration * 1000,
+        },
       });
       await saveConfig();
       setSaveMessage('Saved');
@@ -399,6 +416,18 @@ export default function SettingsPage() {
                   sleepStartTime: state.sleepStartTime,
                   sleepEndTime: state.sleepEndTime,
                   screensaverMode: state.screensaverMode,
+                }}
+                onChange={update}
+              />
+            )}
+
+            {activeTab === 'alerts' && (
+              <AlertSection
+                values={{
+                  alertsEnabled: state.alertsEnabled,
+                  alertsPosition: state.alertsPosition,
+                  alertsMaxVisible: state.alertsMaxVisible,
+                  alertsDefaultDuration: state.alertsDefaultDuration,
                 }}
                 onChange={update}
               />

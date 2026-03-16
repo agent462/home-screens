@@ -19,6 +19,7 @@ const SIMPLE_COMMANDS = new Set<DisplayCommandType>([
   'next-screen',
   'prev-screen',
   'reload',
+  'clear-alerts',
 ]);
 
 type RouteContext = { params: Promise<{ action: string }> };
@@ -120,11 +121,15 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
           { status: 400 },
         );
       }
+      const VALID_ALERT_TYPES = new Set(['info', 'warning', 'urgent']);
+      const alertType = VALID_ALERT_TYPES.has(body.type as string) ? body.type : 'info';
       enqueueCommand('alert', {
-        type: body.type ?? 'info',
+        type: alertType,
         title: body.title ?? '',
         message: body.message ?? '',
         duration: body.duration,
+        icon: body.icon,
+        dismissible: body.dismissible,
       });
       return NextResponse.json({ ok: true, command: 'alert' });
     }

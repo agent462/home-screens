@@ -3,6 +3,8 @@
 import { useEffect, useRef } from 'react';
 import type { DisplayCommand } from '@/lib/display-commands';
 import { displayCache } from '@/lib/display-cache';
+import { useAlertStore } from '@/stores/alert-store';
+import type { AlertType } from '@/types/config';
 
 export interface CommandHandlers {
   wake: () => void;
@@ -60,7 +62,23 @@ export function useDisplayCommands(handlers: CommandHandlers) {
             case 'reload':
               handlersRef.current.reload();
               break;
-            // 'alert' — no-op until alert overlay (3.1) is implemented
+            case 'clear-alerts':
+              useAlertStore.getState().clearAlerts();
+              break;
+            case 'alert': {
+              const p = cmd.payload;
+              if (p && (p.title || p.message)) {
+                useAlertStore.getState().showAlert({
+                  type: (p.type as AlertType) ?? 'info',
+                  title: (p.title as string) ?? '',
+                  message: (p.message as string) ?? '',
+                  duration: typeof p.duration === 'number' ? p.duration : undefined,
+                  icon: typeof p.icon === 'string' ? p.icon : undefined,
+                  dismissible: typeof p.dismissible === 'boolean' ? p.dismissible : undefined,
+                });
+              }
+              break;
+            }
           }
         }
       } catch {

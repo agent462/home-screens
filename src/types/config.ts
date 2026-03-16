@@ -150,6 +150,15 @@ export type TransitionEffect =
   | 'fade' | 'slide' | 'slide-up' | 'zoom'
   | 'flip' | 'blur' | 'crossfade' | 'none';
 
+export type AlertType = 'info' | 'warning' | 'urgent';
+
+export interface AlertSettings {
+  enabled: boolean;
+  position: 'top' | 'bottom';
+  maxVisible: number;
+  defaultDuration: number; // ms — 0 means use per-type defaults
+}
+
 export interface GlobalSettings {
   rotationIntervalMs: number;
   displayWidth: number;
@@ -168,6 +177,7 @@ export interface GlobalSettings {
   transitionEffect?: TransitionEffect;
   transitionDuration?: number;
   updateChannel?: 'stable' | 'dev';
+  alerts?: AlertSettings;
 }
 
 export interface Profile {

@@ -97,7 +97,7 @@ describe('GET /api/display/status', () => {
 });
 
 describe('GET simple commands (bookmarkable)', () => {
-  for (const action of ['wake', 'sleep', 'next-screen', 'prev-screen', 'reload']) {
+  for (const action of ['wake', 'sleep', 'next-screen', 'prev-screen', 'reload', 'clear-alerts']) {
     it(`GET /${action} enqueues command`, async () => {
       const res = await GET(makeRequest(), makeParams(action));
       const json = await res.json();
@@ -269,6 +269,22 @@ describe('POST /api/display/alert', () => {
   it('defaults to type info when not specified', async () => {
     await POST(makeRequest({ title: 'Test' }), makeParams('alert'));
     expect(enqueueCommand).toHaveBeenCalledWith('alert', expect.objectContaining({ type: 'info' }));
+  });
+
+  it('falls back to info for invalid alert type', async () => {
+    await POST(makeRequest({ title: 'Bad', type: 'bogus' }), makeParams('alert'));
+    expect(enqueueCommand).toHaveBeenCalledWith('alert', expect.objectContaining({ type: 'info' }));
+  });
+
+  it('forwards icon and dismissible fields', async () => {
+    await POST(
+      makeRequest({ title: 'Alert', icon: '🔔', dismissible: false }),
+      makeParams('alert'),
+    );
+    expect(enqueueCommand).toHaveBeenCalledWith('alert', expect.objectContaining({
+      icon: '🔔',
+      dismissible: false,
+    }));
   });
 });
 

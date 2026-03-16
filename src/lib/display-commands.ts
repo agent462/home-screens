@@ -17,7 +17,8 @@ export type DisplayCommandType =
   | 'prev-screen'
   | 'brightness'
   | 'reload'
-  | 'alert';
+  | 'alert'
+  | 'clear-alerts';
 
 export interface DisplayCommand {
   type: DisplayCommandType;
