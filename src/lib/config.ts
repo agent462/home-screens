@@ -27,7 +27,7 @@ const DEFAULT_CONFIG: ScreenConfiguration = {
       googleCalendarId: '',
       googleCalendarIds: [],
       icalSources: [],
-      maxEvents: 10,
+      maxEvents: 50,
       daysAhead: 7,
     },
   },

@@ -85,6 +85,7 @@ interface SettingsState {
   cursorHideSeconds: number;
   transitionEffect: string;
   transitionDuration: number;
+  holidayCountry: string;
 }
 
 function initSettings(settings: GlobalSettings | undefined): SettingsState {
@@ -100,6 +101,7 @@ function initSettings(settings: GlobalSettings | undefined): SettingsState {
     icalSources: settings?.calendar.icalSources ?? [],
     maxEvents: settings?.calendar.maxEvents ?? 10,
     daysAhead: settings?.calendar.daysAhead ?? 7,
+    holidayCountry: settings?.calendar.holidayCountry ?? '',
     rotationInterval: (settings?.rotationIntervalMs ?? 30000) / 1000,
     displayWidth: settings?.displayWidth ?? 1080,
     displayHeight: settings?.displayHeight ?? 1920,
@@ -243,6 +245,7 @@ export default function SettingsPage() {
           icalSources: state.icalSources,
           maxEvents: state.maxEvents,
           daysAhead: state.daysAhead,
+          ...(state.holidayCountry ? { holidayCountry: state.holidayCountry } : {}),
         },
         sleep: {
           enabled: state.sleepEnabled,
@@ -432,6 +435,7 @@ export default function SettingsPage() {
                   icalSources: state.icalSources,
                   maxEvents: state.maxEvents,
                   daysAhead: state.daysAhead,
+                  holidayCountry: state.holidayCountry || undefined,
                 }}
                 onChange={update}
               />

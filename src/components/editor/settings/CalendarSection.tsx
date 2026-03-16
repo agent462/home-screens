@@ -18,6 +18,7 @@ interface CalendarSettings {
   icalSources: ICalSource[];
   maxEvents: number;
   daysAhead: number;
+  holidayCountry?: string;
 }
 
 interface Props {
@@ -30,13 +31,19 @@ const ICAL_COLOR_PALETTE = [
   '#10b981', '#f59e0b', '#ec4899', '#06b6d4',
 ];
 
+interface HolidayCountry {
+  countryCode: string;
+  name: string;
+}
+
 export default function CalendarSection({ values, onChange }: Props) {
-  const { selectedCalendarIds, icalSources, maxEvents, daysAhead } = values;
+  const { selectedCalendarIds, icalSources, maxEvents, daysAhead, holidayCountry } = values;
 
   const [credentialsConfigured, setCredentialsConfigured] = useState(false);
   const [googleConnected, setGoogleConnected] = useState(false);
   const [googleCalendars, setGoogleCalendars] = useState<GoogleCalendar[]>([]);
   const [googleLoading, setGoogleLoading] = useState(true);
+  const [availableCountries, setAvailableCountries] = useState<HolidayCountry[]>([]);
 
   const [, setDeviceCode] = useState<string | null>(null);
   const [userCode, setUserCode] = useState<string | null>(null);
@@ -65,6 +72,17 @@ export default function CalendarSection({ values, onChange }: Props) {
       cancelledRef.current = true;
       if (pollingTimerRef.current) clearTimeout(pollingTimerRef.current);
     };
+  }, []);
+
+  // Fetch available countries for holiday picker
+  useEffect(() => {
+    async function fetchCountries() {
+      try {
+        const res = await editorFetch('/api/holidays?countries');
+        if (res.ok) setAvailableCountries(await res.json());
+      } catch { /* ignore */ }
+    }
+    fetchCountries();
   }, []);
 
   const fetchCalendars = useCallback(async (autoSelectPrimary = false) => {
@@ -516,6 +534,30 @@ export default function CalendarSection({ values, onChange }: Props) {
         </div>
       </section>
 
+      {/* Public Holidays section */}
+      <section>
+        <h3 className="text-sm font-medium text-neutral-300 mb-3 uppercase tracking-wider">
+          Public Holidays
+        </h3>
+        <div className="space-y-2">
+          <select
+            value={holidayCountry ?? ''}
+            onChange={(e) => onChange({ holidayCountry: e.target.value || undefined })}
+            className="w-full rounded-md bg-neutral-800 border border-neutral-600 px-2.5 py-1.5 text-sm text-neutral-200 focus:border-blue-500 focus:outline-none"
+          >
+            <option value="">None</option>
+            {availableCountries.map((c) => (
+              <option key={c.countryCode} value={c.countryCode}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-neutral-500">
+            Show public holidays on calendar widgets. Data from Nager.Date.
+          </p>
+        </div>
+      </section>
+
       {/* Shared settings */}
       <section>
         <div className="grid grid-cols-2 gap-3">
@@ -524,7 +566,7 @@ export default function CalendarSection({ values, onChange }: Props) {
               label="Max Events"
               value={maxEvents}
               min={1}
-              max={20}
+              max={100}
               onChange={(v) => onChange({ maxEvents: v })}
             />
           </div>
@@ -533,7 +575,7 @@ export default function CalendarSection({ values, onChange }: Props) {
               label="Days Ahead"
               value={daysAhead}
               min={1}
-              max={30}
+              max={90}
               onChange={(v) => onChange({ daysAhead: v })}
             />
           </div>

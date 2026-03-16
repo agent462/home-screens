@@ -160,7 +160,8 @@ function useSharedDisplayData(screens: Screen[], settings: GlobalSettings): Shar
     ? settings.calendar.googleCalendarIds
     : settings.calendar.googleCalendarId ? [settings.calendar.googleCalendarId] : [];
   const hasIcalSources = settings.calendar.icalSources?.some(s => s.enabled);
-  const calendarUrl = (calendarIdList.length || hasIcalSources)
+  const hasHolidays = !!settings.calendar.holidayCountry;
+  const calendarUrl = (calendarIdList.length || hasIcalSources || hasHolidays)
     ? calendarIdList.length
       ? `/api/calendar?calendarIds=${encodeURIComponent(calendarIdList.join(','))}`
       : '/api/calendar'

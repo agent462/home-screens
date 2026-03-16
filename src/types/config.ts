@@ -122,6 +122,7 @@ export interface CalendarSettings {
   icalSources: ICalSource[];
   maxEvents: number;
   daysAhead: number;
+  holidayCountry?: string; // ISO 3166-1 alpha-2 country code (e.g. 'US')
 }
 
 export interface SleepSettings {

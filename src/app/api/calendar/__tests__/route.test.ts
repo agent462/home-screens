@@ -604,7 +604,7 @@ describe('time parameters', () => {
     expect(diff).toBe(7 * 86400000);
   });
 
-  it('defaults maxEvents to 50 when not configured', async () => {
+  it('defaults maxEvents to 100 when not configured', async () => {
     const config = makeConfig({
       googleCalendarIds: ['primary'],
       icalSources: [
@@ -614,11 +614,11 @@ describe('time parameters', () => {
     delete (config.settings.calendar as unknown as Record<string, unknown>).maxEvents;
     mockReadConfig.mockResolvedValue(config);
 
-    // Create 60 events to verify the 50-event cap
-    const googleEvents = Array.from({ length: 30 }, (_, i) =>
+    // Create 120 events to verify the 100-event cap
+    const googleEvents = Array.from({ length: 60 }, (_, i) =>
       makeEvent(`g${i}`, `2026-03-13T${String(i).padStart(2, '0')}:00:00Z`),
     );
-    const icalEvents = Array.from({ length: 30 }, (_, i) =>
+    const icalEvents = Array.from({ length: 60 }, (_, i) =>
       makeEvent(`i${i}`, `2026-03-14T${String(i).padStart(2, '0')}:00:00Z`),
     );
     mockFetchGoogle.mockResolvedValue(googleEvents);
@@ -628,7 +628,7 @@ describe('time parameters', () => {
     const res = await GET(req);
     const json = await res.json();
 
-    expect(json).toHaveLength(50);
+    expect(json).toHaveLength(100);
   });
 });
 

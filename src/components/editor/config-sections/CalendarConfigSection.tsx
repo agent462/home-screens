@@ -37,6 +37,7 @@ export function CalendarConfigSection({ mod, screenId }: { mod: ModuleInstance; 
   // Build list of available sources from global settings + Google API
   const googleCalendarIds = useEditorStore((s) => s.config?.settings?.calendar?.googleCalendarIds ?? []);
   const icalSources = useEditorStore((s) => s.config?.settings?.calendar?.icalSources ?? []);
+  const holidayCountry = useEditorStore((s) => s.config?.settings?.calendar?.holidayCountry);
   const [googleCalendars, setGoogleCalendars] = useState<GoogleCalendar[]>([]);
   const [googleAuthError, setGoogleAuthError] = useState(false);
 
@@ -81,6 +82,9 @@ export function CalendarConfigSection({ mod, screenId }: { mod: ModuleInstance; 
     if (src.enabled) {
       availableSources.push({ id: src.id, name: src.name, color: src.color });
     }
+  }
+  if (holidayCountry) {
+    availableSources.push({ id: 'holidays', name: 'Public Holidays', color: '#10b981' });
   }
 
   const allSelected = sourceFilter.length === 0;
@@ -177,7 +181,7 @@ export function CalendarConfigSection({ mod, screenId }: { mod: ModuleInstance; 
           <input
             type="number"
             min={1}
-            max={50}
+            max={100}
             value={c.maxEvents ?? 20}
             onChange={(e) => set({ maxEvents: Number(e.target.value) })}
             className={INPUT_CLASS}
