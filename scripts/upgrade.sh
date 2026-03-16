@@ -306,14 +306,14 @@ case "${action}" in
             --disable-session-crashed-bubble --disable-translate \
             --check-for-update-interval=31536000 --password-store=basic \
             --ozone-platform=wayland --remote-debugging-port=9222 \
-            http://localhost:3000/display > /dev/null 2>&1 &
+            http://localhost:${PORT}/display > /dev/null 2>&1 &
       else
         WAYLAND_DISPLAY="${WAYLAND_DISPLAY}" XDG_RUNTIME_DIR="/run/user/$(id -u)" \
           nohup chromium --kiosk --noerrdialogs --disable-infobars --no-first-run \
             --disable-session-crashed-bubble --disable-translate \
             --check-for-update-interval=31536000 --password-store=basic \
             --ozone-platform=wayland --remote-debugging-port=9222 \
-            http://localhost:3000/display > /dev/null 2>&1 &
+            http://localhost:${PORT}/display > /dev/null 2>&1 &
       fi
       echo "{\"ok\":true,\"method\":\"relaunch\"}"
     fi
@@ -350,7 +350,7 @@ case "${action}" in
     ;;
 
   health-check)
-    port="${1:-3000}"
+    port="${1:-${PORT}}"
     max_attempts=30
     attempt=0
     while [ $attempt -lt $max_attempts ]; do
@@ -499,7 +499,7 @@ ExecStart=${EXEC_START}
 Restart=on-failure
 RestartSec=5
 Environment=NODE_ENV=production
-Environment=PORT=3000
+Environment=PORT=${PORT}
 
 [Install]
 WantedBy=multi-user.target"
@@ -581,6 +581,13 @@ DISPLAY_TRANSFORM=""
 DISPLAY_MODE=""
 [ -f "${KIOSK_CONF}" ] && source "${KIOSK_CONF}"
 
+# Load port (default 3000)
+PORT=3000
+if [ -f "${APP_DIR}/data/port.conf" ]; then
+  _p=$(tr -d "[:space:]" < "${APP_DIR}/data/port.conf")
+  [[ "${_p}" =~ ^[0-9]+$ ]] && PORT="${_p}"
+fi
+
 # Apply resolution and rotation in the background
 if [ -n "${DISPLAY_MODE}" ] || [ -n "${DISPLAY_TRANSFORM}" ]; then
   OUTPUT=$(wlr-randr 2>/dev/null | head -1 | awk '"'"'{print $1}'"'"' || echo '"'"'HDMI-A-1'"'"')
@@ -596,7 +603,7 @@ fi
 # Wait for the Next.js server before launching Chromium (defense in depth —
 # on first boot the server may be delayed by firstboot tasks).
 for _i in $(seq 1 120); do
-  (echo > /dev/tcp/localhost/3000) 2>/dev/null && break
+  (echo > /dev/tcp/localhost/${PORT}) 2>/dev/null && break
   sleep 1
 done
 
@@ -620,7 +627,7 @@ exec chromium --kiosk \
   --enable-oop-rasterization \
   --force-gpu-mem-available-mb=256 \
   --enable-features=CanvasOopRasterization \
-  http://localhost:3000/display'
+  http://localhost:${PORT}/display'
 
     if [ ! -f "${LAUNCHER}" ] || [ "$(cat "${LAUNCHER}")" != "${DESIRED_LAUNCHER}" ]; then
       echo "${DESIRED_LAUNCHER}" > "${LAUNCHER}"

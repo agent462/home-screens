@@ -100,7 +100,8 @@ function getRedirectUri(requestUrl?: string) {
     const url = new URL(requestUrl);
     return `${url.protocol}//${url.host}/api/auth/google/callback`;
   }
-  const base = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+  const port = process.env.PORT || '3000';
+  const base = process.env.NEXTAUTH_URL || `http://localhost:${port}`;
   return `${base}/api/auth/google/callback`;
 }
 

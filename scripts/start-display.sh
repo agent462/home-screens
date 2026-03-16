@@ -5,6 +5,10 @@ set -euo pipefail
 # Usage: ./start-display.sh [project-dir]
 
 APP_DIR="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
+
+# --- Shared functions ---
+source "$(dirname "$0")/lib/common.sh"
+
 SERVER_PID=""
 BROWSER_PID=""
 
@@ -23,13 +27,13 @@ cd "${APP_DIR}"
 echo "Building project..."
 npm run build
 
-echo "Starting Next.js server..."
-npm start &
+echo "Starting Next.js server on port ${PORT}..."
+PORT="${PORT}" npm start &
 SERVER_PID=$!
 
 echo "Waiting for server to be ready..."
 for i in $(seq 1 30); do
-  if curl -sf http://localhost:3000 > /dev/null 2>&1; then
+  if curl -sf http://localhost:${PORT} > /dev/null 2>&1; then
     echo "Server is ready."
     break
   fi
@@ -55,7 +59,7 @@ chromium-browser \
   --enable-oop-rasterization \
   --force-gpu-mem-available-mb=256 \
   --enable-features=CanvasOopRasterization \
-  http://localhost:3000/display &
+  http://localhost:${PORT}/display &
 BROWSER_PID=$!
 
 echo "Display running. Press Ctrl+C to stop."

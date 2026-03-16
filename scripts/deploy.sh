@@ -70,6 +70,7 @@ rsync -azP --delete \
   --exclude 'data/backups' \
   --exclude 'data/background-cache.json' \
   --exclude 'data/kiosk.conf' \
+  --exclude 'data/port.conf' \
   --exclude 'public/backgrounds/*.jpg' \
   --exclude 'public/backgrounds/*.jpeg' \
   --exclude 'public/backgrounds/*.png' \
@@ -107,9 +108,10 @@ info "Kiosk browser will auto-reload when it detects the new build."
 if ssh "$HOST" "systemctl is-active --quiet home-screens"; then
   echo ""
   REMOTE_IP="${HOST#*@}"
+  REMOTE_PORT=$(ssh "$HOST" "cat ${REMOTE_DIR}/data/port.conf 2>/dev/null || echo 3000" | tr -d '[:space:]')
   info "Deploy complete!"
-  echo -e "  ${DIM}Display:${NC}  http://${REMOTE_IP}:3000/display"
-  echo -e "  ${DIM}Editor:${NC}   http://${REMOTE_IP}:3000/editor"
+  echo -e "  ${DIM}Display:${NC}  http://${REMOTE_IP}:${REMOTE_PORT}/display"
+  echo -e "  ${DIM}Editor:${NC}   http://${REMOTE_IP}:${REMOTE_PORT}/editor"
   echo ""
 else
   warn "Service may not have started correctly."

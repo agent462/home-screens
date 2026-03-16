@@ -10,6 +10,18 @@ YELLOW='\033[1;33m'
 DIM='\033[2m'
 NC='\033[0m'
 
+# --- Port ---
+# Precedence: PORT env var > data/port.conf > 3000
+if [ -z "${PORT:-}" ]; then
+  if [ -n "${APP_DIR:-}" ] && [ -f "${APP_DIR}/data/port.conf" ]; then
+    _conf_port=$(tr -d '[:space:]' < "${APP_DIR}/data/port.conf")
+    if [[ "${_conf_port}" =~ ^[0-9]+$ ]]; then
+      PORT="${_conf_port}"
+    fi
+  fi
+  PORT="${PORT:-3000}"
+fi
+
 # --- Logging ---
 info()  { echo -e "${GREEN}[*]${NC} $1"; }
 warn()  { echo -e "${YELLOW}[!]${NC} $1"; }

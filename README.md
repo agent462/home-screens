@@ -47,6 +47,9 @@ git clone https://github.com/agent462/home-screens.git
 
 # Raspberry Pi OS with Desktop
 ~/home-screens/scripts/install.sh --desktop
+
+# Custom port (default is 3000)
+~/home-screens/scripts/install.sh --port 8080
 ```
 
 The script handles everything:
@@ -165,13 +168,52 @@ sudo systemctl restart home-screens
 > scp hs@home-screens.local:/opt/home-screens/current/data/secrets.json ./
 > ```
 
+### Custom Port
+
+The server runs on port **3000** by default. You can set a custom port during install or change it any time afterward.
+
+**During install:**
+
+```bash
+~/home-screens/scripts/install.sh --port 8080
+```
+
+**Checking the current port:**
+
+```bash
+cat /opt/home-screens/current/data/port.conf   # shows custom port, or "No such file" = default 3000
+```
+
+**Changing the port after install:**
+
+```bash
+# Set a new port (replace 8080 with your desired port)
+echo 8080 > /opt/home-screens/current/data/port.conf
+
+# Regenerate the systemd service and kiosk launcher
+bash /opt/home-screens/current/scripts/upgrade.sh setup-system
+
+# Restart to apply
+sudo reboot
+```
+
+**Resetting to the default port (3000):**
+
+```bash
+rm /opt/home-screens/current/data/port.conf
+bash /opt/home-screens/current/scripts/upgrade.sh setup-system
+sudo reboot
+```
+
+The port is resolved in order of priority: `PORT` environment variable > `data/port.conf` > default (3000). The `data/port.conf` file is preserved across upgrades.
+
 ### Fixing Display Resolution
 
 If the display looks wrong (stretched, cropped, or rotated the wrong way), there are two ways to fix it:
 
 **From the editor (recommended):**
 
-1. Open `http://<pi-ip>:3000/editor` from another device
+1. Open `http://<pi-ip>:<port>/editor` from another device (default port is 3000)
 2. Go to **Settings > Display**
 3. Adjust the width, height, and transform (rotation) settings
 4. Save — the display updates on the next refresh cycle
@@ -381,3 +423,7 @@ flowchart LR
 ```
 
 See the [Development Guide](docs/development.md) for a detailed walkthrough.
+
+## License
+
+[MIT](LICENSE)

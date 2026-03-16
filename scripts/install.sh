@@ -24,12 +24,17 @@ setup_logging
 # --- Parse flags ---
 PI_VARIANT="lite"
 REQUESTED_VERSION=""
+REQUESTED_PORT=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --desktop) PI_VARIANT="desktop"; shift ;;
     --version)
       if [ -z "${2:-}" ]; then error "--version requires a tag (e.g. --version v1.2.0)"; fi
       REQUESTED_VERSION="$2"; shift 2 ;;
+    --port)
+      if [ -z "${2:-}" ]; then error "--port requires a number (e.g. --port 8080)"; fi
+      if ! [[ "${2}" =~ ^[0-9]+$ ]]; then error "--port must be a number (e.g. --port 8080)"; fi
+      REQUESTED_PORT="$2"; shift 2 ;;
     *)      error "Unknown option: $1" ;;
   esac
 done
@@ -109,6 +114,13 @@ cd "${APP_DIR}"
 
 # --- Step 4: Create data directory ---
 mkdir -p data
+
+# --- Step 4b: Port configuration ---
+if [ -n "${REQUESTED_PORT}" ]; then
+  echo "${REQUESTED_PORT}" > data/port.conf
+  PORT="${REQUESTED_PORT}"
+  info "Server port set to ${PORT}."
+fi
 
 # --- Step 5: Display configuration ---
 echo ""
@@ -221,8 +233,8 @@ else
 fi
 echo -e "${GREEN}============================================${NC}"
 echo ""
-echo "  Display URL:  http://$(hostname -I | awk '{print $1}'):3000/display"
-echo "  Editor URL:   http://$(hostname -I | awk '{print $1}'):3000/editor"
+echo "  Display URL:  http://$(hostname -I | awk '{print $1}'):${PORT}/display"
+echo "  Editor URL:   http://$(hostname -I | awk '{print $1}'):${PORT}/editor"
 echo ""
 echo "  Service:      home-screens (Next.js server)"
 echo "  Kiosk:        cage (launches automatically on TTY1)"
