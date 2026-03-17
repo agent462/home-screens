@@ -21,12 +21,16 @@ export default function LocalBackgrounds({ selectedScreenId }: Props) {
   const currentScreen = config?.screens.find((s) => s.id === selectedScreenId);
 
   useEffect(() => {
-    editorFetch('/api/backgrounds')
-      .then((res) => res.json())
-      .then((data) => {
+    async function fetchBackgrounds() {
+      try {
+        const res = await editorFetch('/api/backgrounds');
+        const data = await res.json();
         if (Array.isArray(data)) setLocalBackgrounds(data);
-      })
-      .catch(() => {});
+      } catch {
+        // ignore
+      }
+    }
+    fetchBackgrounds();
   }, []);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {

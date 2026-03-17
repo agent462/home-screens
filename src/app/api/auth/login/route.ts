@@ -81,14 +81,10 @@ export async function POST(request: NextRequest) {
     const token = createSessionCookie(state.cookieSecret);
     const cookie = buildSessionCookie(token, request);
 
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Set-Cookie': cookie,
-      },
+    return NextResponse.json({ success: true }, {
+      headers: { 'Set-Cookie': cookie },
     });
-  } catch (err) {
-    return errorResponse(err, 'Login failed');
+  } catch (error) {
+    return errorResponse(error, 'Login failed');
   }
 }

@@ -10,7 +10,7 @@ export function createRefreshOnlySection(defaultMs: number) {
 
     return (
       <Slider
-        label="Refresh Interval (seconds)"
+        label="Refresh (seconds)"
         value={(c.refreshIntervalMs ?? defaultMs) / 1000}
         min={30}
         max={3600}

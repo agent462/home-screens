@@ -120,7 +120,7 @@ export function NewsConfigSection({ mod, screenId }: { mod: ModuleInstance; scre
         />
       )}
       <Slider
-        label="Refresh Feed (seconds)"
+        label="Refresh (seconds)"
         value={(c.refreshIntervalMs ?? 300000) / 1000}
         min={60}
         max={3600}

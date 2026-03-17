@@ -42,12 +42,8 @@ export async function POST(request: NextRequest) {
       await clearPassword();
       clearAuthCache();
       const cookie = buildClearCookie(request);
-      return new Response(JSON.stringify({ success: true, authEnabled: false }), {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Set-Cookie': cookie,
-        },
+      return NextResponse.json({ success: true, authEnabled: false }, {
+        headers: { 'Set-Cookie': cookie },
       });
     }
 
@@ -77,19 +73,12 @@ export async function POST(request: NextRequest) {
     clearAuthCache();
     const cookie = buildSessionCookie(token, request);
 
-    return new Response(
-      JSON.stringify({ success: true, authEnabled: true }),
-      {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Set-Cookie': cookie,
-        },
-      },
-    );
-  } catch (err) {
+    return NextResponse.json({ success: true, authEnabled: true }, {
+      headers: { 'Set-Cookie': cookie },
+    });
+  } catch (error) {
     // requireSession throws a Response on 401
-    if (err instanceof Response) return err;
-    return errorResponse(err, 'Password operation failed');
+    if (error instanceof Response) return error;
+    return errorResponse(error, 'Password operation failed');
   }
 }

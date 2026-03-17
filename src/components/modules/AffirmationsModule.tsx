@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useTypewriter } from '@/hooks/useTypewriter';
-import type { AffirmationsConfig, AffirmationsCategory, ModuleStyle } from '@/types/config';
+import type { AffirmationsConfig, AffirmationsCategory, AffirmationsView, ModuleStyle } from '@/types/config';
 import { useTZClock } from '@/hooks/useTZClock';
 import ModuleWrapper from './ModuleWrapper';
 import { BUILT_IN, type AffirmationEntry as Entry } from './affirmations-data';
@@ -183,7 +183,7 @@ function CardView({ entry, accentColor, showCategory }: { entry: Entry; accentCo
   );
 }
 
-function MinimalView({ entry, showCategory }: { entry: Entry; showCategory: boolean }) {
+function MinimalView({ entry, showCategory }: { entry: Entry; accentColor?: string; showCategory: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center h-full gap-2 px-4">
       {showCategory && (
@@ -238,6 +238,19 @@ function TypewriterView({ entry, accentColor, showCategory }: { entry: Entry; ac
 }
 
 // ---------------------------------------------------------------------------
+// View component map
+// ---------------------------------------------------------------------------
+
+type ViewProps = { entry: Entry; accentColor: string; showCategory: boolean };
+
+const VIEW_COMPONENTS: Record<AffirmationsView, React.ComponentType<ViewProps>> = {
+  elegant: ElegantView,
+  card: CardView,
+  minimal: MinimalView,
+  typewriter: TypewriterView,
+};
+
+// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
@@ -278,22 +291,7 @@ export default function AffirmationsModule({ config, style, timezone, latitude }
   }
 
   const { entry, key } = result;
-
-  let viewContent: React.ReactNode;
-  switch (view) {
-    case 'card':
-      viewContent = <CardView entry={entry} accentColor={accentColor} showCategory={showCategory} />;
-      break;
-    case 'minimal':
-      viewContent = <MinimalView entry={entry} showCategory={showCategory} />;
-      break;
-    case 'typewriter':
-      viewContent = <TypewriterView entry={entry} accentColor={accentColor} showCategory={showCategory} />;
-      break;
-    case 'elegant':
-    default:
-      viewContent = <ElegantView entry={entry} accentColor={accentColor} showCategory={showCategory} />;
-  }
+  const ViewComponent = VIEW_COMPONENTS[view] ?? VIEW_COMPONENTS.elegant;
 
   return (
     <ModuleWrapper style={style}>
@@ -306,7 +304,7 @@ export default function AffirmationsModule({ config, style, timezone, latitude }
           transition={{ duration: 0.6, ease: 'easeInOut' }}
           className="h-full"
         >
-          {viewContent}
+          <ViewComponent entry={entry} accentColor={accentColor} showCategory={showCategory} />
         </motion.div>
       </AnimatePresence>
     </ModuleWrapper>

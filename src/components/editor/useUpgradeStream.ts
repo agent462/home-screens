@@ -236,13 +236,14 @@ export function useUpgradeStream(
     };
 
     // Trigger the upgrade/rollback
-    const endpoint = isRollback ? '/api/system/rollback' : '/api/system/upgrade';
-    editorFetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tag: targetTag }),
-    })
-      .then(async (res) => {
+    async function triggerUpgrade() {
+      const endpoint = isRollback ? '/api/system/rollback' : '/api/system/upgrade';
+      try {
+        const res = await editorFetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tag: targetTag }),
+        });
         if (!res.ok) {
           const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
           es.close();
@@ -254,8 +255,7 @@ export function useUpgradeStream(
             error: body.error || `Server returned ${res.status}`,
           });
         }
-      })
-      .catch(() => {
+      } catch {
         es.close();
         setFailed(true);
         setProgress({
@@ -264,7 +264,9 @@ export function useUpgradeStream(
           message: 'Failed to start upgrade',
           error: 'Could not connect to server',
         });
-      });
+      }
+    }
+    triggerUpgrade();
 
     return () => {
       es.close();

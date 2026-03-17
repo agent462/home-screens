@@ -30,14 +30,18 @@ export default function LocationSection({ values, onChange }: Props) {
   }, []);
 
   useEffect(() => {
-    const fetchedAt = Date.now();
-    fetch('/api/time')
-      .then((r) => r.json())
-      .then((data) => {
+    async function fetchServerTime() {
+      const fetchedAt = Date.now();
+      try {
+        const res = await fetch('/api/time');
+        const data = await res.json();
         const serverMs = new Date(data.iso).getTime();
         setServerInfo({ offsetMs: serverMs - fetchedAt, timezone: data.timezone });
-      })
-      .catch(() => {});
+      } catch {
+        // ignore
+      }
+    }
+    fetchServerTime();
   }, []);
 
   async function lookupLocation() {
