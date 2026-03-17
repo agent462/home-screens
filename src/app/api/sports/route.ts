@@ -1,5 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { errorResponse, createTTLCache, fetchWithTimeout } from '@/lib/api-utils';
+import { cachedProxyRoute, fetchWithTimeout } from '@/lib/api-utils';
 import { LEAGUE_MAP } from '@/lib/espn';
 
 export const dynamic = 'force-dynamic';
@@ -26,9 +25,6 @@ interface GameResult {
   startTime: string;
   broadcast: string;
 }
-
-/** @internal */
-export const cache = createTTLCache<unknown>(60 * 1000); // 1 minute
 
 async function fetchLeague(league: string): Promise<GameResult[]> {
   const path = LEAGUE_MAP[league.toLowerCase()];
@@ -86,24 +82,22 @@ async function fetchLeague(league: string): Promise<GameResult[]> {
   });
 }
 
-export async function GET(request: NextRequest) {
-  try {
-    const leaguesParam = request.nextUrl.searchParams.get('leagues') || 'nfl,nba';
+const { GET, cache } = cachedProxyRoute<{ games: GameResult[] }>({
+  ttlMs: 60 * 1000, // 1 minute
+  cacheKey: (req) => {
+    const leaguesParam = req.nextUrl.searchParams.get('leagues') || 'nfl,nba';
+    return leaguesParam.split(',').map((l) => l.trim()).filter(Boolean).sort().join(',');
+  },
+  execute: async (req) => {
+    const leaguesParam = req.nextUrl.searchParams.get('leagues') || 'nfl,nba';
     const leagues = leaguesParam.split(',').map((l) => l.trim()).filter(Boolean);
-
-    const cacheKey = [...leagues].sort().join(',');
-    const cached = cache.get(cacheKey);
-    if (cached) {
-      return NextResponse.json(cached);
-    }
 
     const results = await Promise.all(leagues.map(fetchLeague));
     const games = results.flat();
-    const response = { games };
+    return { games };
+  },
+  errorMessage: 'Failed to fetch sports scores',
+});
 
-    cache.set(cacheKey, response);
-    return NextResponse.json(response);
-  } catch (error) {
-    return errorResponse(error, 'Failed to fetch sports scores');
-  }
-}
+/** @internal */
+export { GET, cache };

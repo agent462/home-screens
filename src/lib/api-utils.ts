@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readConfig } from '@/lib/config';
+import { requireSession } from '@/lib/auth';
 
 /**
  * Standardized error response for API routes.
@@ -99,7 +100,57 @@ export function createTTLCache<T>(ttlMs: number) {
   };
 }
 
-export type TTLCache<T> = ReturnType<typeof createTTLCache<T>>;
+type TTLCache<T> = ReturnType<typeof createTTLCache<T>>;
+
+/**
+ * Validates a Todoist API token by making a lightweight request to the
+ * Todoist projects endpoint. Returns `true` if the token is valid, or an
+ * object with the HTTP status code if it is not.
+ */
+export async function validateTodoistToken(
+  token: string,
+): Promise<{ valid: true } | { valid: false; status: number }> {
+  const res = await fetchWithTimeout('https://api.todoist.com/api/v1/projects', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return { valid: false, status: res.status };
+  return { valid: true };
+}
+
+/**
+ * Wraps an authenticated API route handler with the standard
+ * requireSession + error-handling boilerplate.
+ *
+ * Before:
+ *   export async function GET(request: NextRequest) {
+ *     try {
+ *       await requireSession(request);
+ *       // …handler logic…
+ *     } catch (error) {
+ *       if (error instanceof Response) return error;
+ *       return errorResponse(error, 'Failed to …');
+ *     }
+ *   }
+ *
+ * After:
+ *   export const GET = withAuth(async (request) => {
+ *     // …handler logic…
+ *   }, 'Failed to …');
+ */
+export function withAuth(
+  handler: (request: NextRequest) => Promise<Response>,
+  errorMsg: string,
+) {
+  return async (request: NextRequest): Promise<Response> => {
+    try {
+      await requireSession(request);
+      return await handler(request);
+    } catch (error) {
+      if (error instanceof Response) return error;
+      return errorResponse(error, errorMsg);
+    }
+  };
+}
 
 interface CachedProxyRouteOptions<T> {
   ttlMs: number;
@@ -127,7 +178,7 @@ export function cachedProxyRoute<T>(config: CachedProxyRouteConfig<T>) {
   const cache = createTTLCache<T>(config.ttlMs);
   const keyFn = config.cacheKey ?? (() => '_');
 
-  const GET = async (request: NextRequest = new NextRequest('http://localhost')) => {
+  const GET = async (request: NextRequest) => {
     try {
       const key = keyFn(request);
       const cached = cache.get(key);

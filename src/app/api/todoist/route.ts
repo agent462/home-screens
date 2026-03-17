@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { errorResponse, createTTLCache, fetchWithTimeout } from '@/lib/api-utils';
+import { errorResponse, createTTLCache, fetchWithTimeout, validateTodoistToken } from '@/lib/api-utils';
 import { requireSession } from '@/lib/auth';
 import { getSecret, setSecret } from '@/lib/secrets';
 
@@ -98,11 +98,9 @@ export async function PUT(request: NextRequest) {
     }
 
     // Validate the token by making a quick API call
-    const res = await fetchWithTimeout(`${TODOIST_API}/projects`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) {
-      return NextResponse.json({ error: 'Invalid token — Todoist returned ' + res.status }, { status: 401 });
+    const result = await validateTodoistToken(token);
+    if (!result.valid) {
+      return NextResponse.json({ error: 'Invalid token — Todoist returned ' + result.status }, { status: 401 });
     }
 
     await setSecret('todoist_token', token);

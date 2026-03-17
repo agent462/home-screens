@@ -12,12 +12,22 @@ vi.mock('@/lib/auth', () => ({
   requireSession: vi.fn(),
 }));
 
-vi.mock('@/lib/api-utils', () => ({
-  errorResponse: vi.fn((_err: unknown, msg: string, status = 500) => {
-    return Response.json({ error: msg }, { status });
-  }),
-  fetchWithTimeout: vi.fn((...args: unknown[]) => (globalThis.fetch as (...a: unknown[]) => unknown)(...args)),
-}));
+vi.mock('@/lib/api-utils', () => {
+  const fetchWithTimeout = vi.fn((...args: unknown[]) => (globalThis.fetch as (...a: unknown[]) => unknown)(...args));
+  return {
+    errorResponse: vi.fn((_err: unknown, msg: string, status = 500) => {
+      return Response.json({ error: msg }, { status });
+    }),
+    fetchWithTimeout,
+    validateTodoistToken: vi.fn(async (token: string) => {
+      const res = await fetchWithTimeout('https://api.todoist.com/api/v1/projects', {
+        headers: { Authorization: `Bearer ${token}` },
+      }) as Response;
+      if (!res.ok) return { valid: false, status: (res as Response).status };
+      return { valid: true };
+    }),
+  };
+});
 
 import { getSecretStatus, setSecret, deleteSecret, isValidSecretKey } from '@/lib/secrets';
 import { requireSession } from '@/lib/auth';

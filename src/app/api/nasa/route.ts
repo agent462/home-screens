@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { NASA_APOD_API, NASA_IMAGE_API, getNasaApiKey } from '@/lib/nasa';
-import { requireSession } from '@/lib/auth';
-import { errorResponse, fetchWithTimeout } from '@/lib/api-utils';
+import { fetchWithTimeout, withAuth } from '@/lib/api-utils';
 import { downloadAndSaveBackground } from '@/lib/background-download';
 
 export const dynamic = 'force-dynamic';
@@ -13,21 +12,15 @@ export const dynamic = 'force-dynamic';
  * type=search  — NASA Image and Video Library (no API key needed)
  * type=apod    — Astronomy Picture of the Day (uses NASA API key)
  */
-export async function GET(request: NextRequest) {
-  try {
-    await requireSession(request);
-    const { searchParams } = request.nextUrl;
-    const type = searchParams.get('type') || 'search';
+export const GET = withAuth(async (request: NextRequest) => {
+  const { searchParams } = request.nextUrl;
+  const type = searchParams.get('type') || 'search';
 
-    if (type === 'apod') {
-      return handleApod(searchParams);
-    }
-    return handleSearch(searchParams);
-  } catch (error) {
-    if (error instanceof Response) return error;
-    return errorResponse(error, 'Failed to fetch NASA images');
+  if (type === 'apod') {
+    return handleApod(searchParams);
   }
-}
+  return handleSearch(searchParams);
+}, 'Failed to fetch NASA images');
 
 /**
  * Reject URLs that point at private/internal networks (SSRF prevention).
@@ -57,32 +50,26 @@ function isSafeExternalUrl(url: string): boolean {
   }
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    await requireSession(request);
-    const body = await request.json();
-    const { imageUrl, filename } = body as { imageUrl?: string; filename?: string };
+export const POST = withAuth(async (request: NextRequest) => {
+  const body = await request.json();
+  const { imageUrl, filename } = body as { imageUrl?: string; filename?: string };
 
-    if (!imageUrl) {
-      return NextResponse.json({ error: 'Missing imageUrl' }, { status: 400 });
-    }
-
-    if (!isSafeExternalUrl(imageUrl)) {
-      return NextResponse.json({ error: 'Invalid image URL' }, { status: 400 });
-    }
-
-    const result = await downloadAndSaveBackground(
-      imageUrl,
-      filename || `nasa-${Date.now()}`,
-      { convertNonWeb: true, validateImage: true },
-    );
-
-    return NextResponse.json(result, { status: 201 });
-  } catch (error) {
-    if (error instanceof Response) return error;
-    return errorResponse(error, 'Failed to download NASA image');
+  if (!imageUrl) {
+    return NextResponse.json({ error: 'Missing imageUrl' }, { status: 400 });
   }
-}
+
+  if (!isSafeExternalUrl(imageUrl)) {
+    return NextResponse.json({ error: 'Invalid image URL' }, { status: 400 });
+  }
+
+  const result = await downloadAndSaveBackground(
+    imageUrl,
+    filename || `nasa-${Date.now()}`,
+    { convertNonWeb: true, validateImage: true },
+  );
+
+  return NextResponse.json(result, { status: 201 });
+}, 'Failed to download NASA image');
 
 async function handleApod(params: URLSearchParams) {
   const apiKey = await getNasaApiKey();

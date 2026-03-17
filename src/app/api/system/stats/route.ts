@@ -1,9 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import os from 'os';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { requireSession } from '@/lib/auth';
-import { errorResponse } from '@/lib/api-utils';
+import { withAuth } from '@/lib/api-utils';
 import { readConfig } from '@/lib/config';
 import { getSecretStatus } from '@/lib/secrets';
 import { BACKGROUNDS_DIR } from '@/lib/constants';
@@ -40,91 +39,80 @@ async function fileSize(filePath: string): Promise<number> {
   }
 }
 
-export async function GET(request: NextRequest) {
-  try {
-    await requireSession(request);
-  } catch (error) {
-    if (error instanceof Response) return error;
-    return errorResponse(error, 'Unauthorized');
-  }
+export const GET = withAuth(async () => {
+  const cwd = process.cwd();
+  const dataDir = path.join(cwd, 'data');
+  const backgroundsDir = path.join(cwd, BACKGROUNDS_DIR);
 
-  try {
-    const cwd = process.cwd();
-    const dataDir = path.join(cwd, 'data');
-    const backgroundsDir = path.join(cwd, BACKGROUNDS_DIR);
+  // Gather all stats in parallel
+  const [
+    configSize,
+    backupsSize,
+    backgroundsSize,
+    diskStats,
+    config,
+    secretStatus,
+  ] = await Promise.all([
+    fileSize(path.join(dataDir, 'config.json')),
+    dirSize(path.join(dataDir, 'backups')),
+    dirSize(backgroundsDir),
+    getDiskStats(cwd),
+    readConfig().catch(() => null),
+    getSecretStatus().catch(() => ({} as Record<string, boolean>)),
+  ]);
 
-    // Gather all stats in parallel
-    const [
-      configSize,
-      backupsSize,
-      backgroundsSize,
-      diskStats,
-      config,
-      secretStatus,
-    ] = await Promise.all([
-      fileSize(path.join(dataDir, 'config.json')),
-      dirSize(path.join(dataDir, 'backups')),
-      dirSize(backgroundsDir),
-      getDiskStats(cwd),
-      readConfig().catch(() => null),
-      getSecretStatus().catch(() => ({} as Record<string, boolean>)),
-    ]);
-
-    // Count modules across all screens
-    const screens = config?.screens ?? [];
-    const moduleTypeCounts: Record<string, number> = {};
-    let totalModules = 0;
-    for (const screen of screens) {
-      for (const mod of screen.modules) {
-        totalModules++;
-        moduleTypeCounts[mod.type] = (moduleTypeCounts[mod.type] ?? 0) + 1;
-      }
+  // Count modules across all screens
+  const screens = config?.screens ?? [];
+  const moduleTypeCounts: Record<string, number> = {};
+  let totalModules = 0;
+  for (const screen of screens) {
+    for (const mod of screen.modules) {
+      totalModules++;
+      moduleTypeCounts[mod.type] = (moduleTypeCounts[mod.type] ?? 0) + 1;
     }
-
-    // Determine configured integrations
-    const configuredSecrets = Object.entries(secretStatus)
-      .filter(([, configured]) => configured)
-      .map(([key]) => key);
-
-    const dataDirTotal = configSize + backupsSize + backgroundsSize;
-
-    return NextResponse.json({
-      disk: {
-        total: diskStats.total,
-        used: diskStats.used,
-        free: diskStats.free,
-        dataDir: {
-          config: configSize,
-          backups: backupsSize,
-          backgrounds: backgroundsSize,
-          total: dataDirTotal,
-        },
-      },
-      os: {
-        hostname: os.hostname(),
-        platform: os.platform(),
-        arch: os.arch(),
-        uptime: os.uptime(),
-        nodeVersion: process.version,
-      },
-      memory: {
-        total: os.totalmem(),
-        free: os.freemem(),
-        used: os.totalmem() - os.freemem(),
-      },
-      app: {
-        screens: screens.length,
-        modules: totalModules,
-        moduleTypes: moduleTypeCounts,
-        profiles: config?.profiles?.length ?? 0,
-        configuredSecrets,
-        configSize,
-      },
-    });
-  } catch (error) {
-    return errorResponse(error, 'Failed to gather system stats');
   }
-}
+
+  // Determine configured integrations
+  const configuredSecrets = Object.entries(secretStatus)
+    .filter(([, configured]) => configured)
+    .map(([key]) => key);
+
+  const dataDirTotal = configSize + backupsSize + backgroundsSize;
+
+  return NextResponse.json({
+    disk: {
+      total: diskStats.total,
+      used: diskStats.used,
+      free: diskStats.free,
+      dataDir: {
+        config: configSize,
+        backups: backupsSize,
+        backgrounds: backgroundsSize,
+        total: dataDirTotal,
+      },
+    },
+    os: {
+      hostname: os.hostname(),
+      platform: os.platform(),
+      arch: os.arch(),
+      uptime: os.uptime(),
+      nodeVersion: process.version,
+    },
+    memory: {
+      total: os.totalmem(),
+      free: os.freemem(),
+      used: os.totalmem() - os.freemem(),
+    },
+    app: {
+      screens: screens.length,
+      modules: totalModules,
+      moduleTypes: moduleTypeCounts,
+      profiles: config?.profiles?.length ?? 0,
+      configuredSecrets,
+      configSize,
+    },
+  });
+}, 'Failed to gather system stats');
 
 /** Get filesystem stats using Node's fs.statfs */
 async function getDiskStats(dir: string): Promise<{ total: number; used: number; free: number }> {

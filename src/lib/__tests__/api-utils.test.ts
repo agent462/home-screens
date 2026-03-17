@@ -1,12 +1,20 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { errorResponse, createTTLCache, getLocationFromConfig, fetchWithTimeout } from '@/lib/api-utils';
+import { NextRequest, NextResponse } from 'next/server';
+import { errorResponse, createTTLCache, getLocationFromConfig, fetchWithTimeout, withAuth, cachedProxyRoute } from '@/lib/api-utils';
 
 vi.mock('@/lib/config', () => ({
   readConfig: vi.fn(),
 }));
 
+vi.mock('@/lib/auth', () => ({
+  requireSession: vi.fn(),
+}));
+
 import { readConfig } from '@/lib/config';
 const mockReadConfig = vi.mocked(readConfig);
+
+import { requireSession } from '@/lib/auth';
+const mockRequireSession = vi.mocked(requireSession);
 
 describe('errorResponse', () => {
   beforeEach(() => {
@@ -405,5 +413,261 @@ describe('getLocationFromConfig', () => {
     const result = await getLocationFromConfig(undefined, existingConfig);
     expect(result).toEqual({ lat: '34.05', lon: '-118.24' });
     expect(mockReadConfig).not.toHaveBeenCalled();
+  });
+});
+
+describe('withAuth', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  it('calls requireSession and returns handler result on success', async () => {
+    mockRequireSession.mockResolvedValue(undefined);
+    const handler = vi.fn().mockResolvedValue(NextResponse.json({ ok: true }));
+    const wrapped = withAuth(handler, 'Failed to do thing');
+    const request = new NextRequest('http://localhost/api/test');
+
+    const response = await wrapped(request);
+    const json = await response.json();
+
+    expect(mockRequireSession).toHaveBeenCalledWith(request);
+    expect(handler).toHaveBeenCalledWith(request);
+    expect(json).toEqual({ ok: true });
+  });
+
+  it('returns the Response directly when handler throws a Response (auth failure passthrough)', async () => {
+    const authResponse = new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+    mockRequireSession.mockRejectedValue(authResponse);
+    const handler = vi.fn();
+    const wrapped = withAuth(handler, 'Failed to do thing');
+    const request = new NextRequest('http://localhost/api/test');
+
+    const response = await wrapped(request);
+
+    expect(response).toBe(authResponse);
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('returns errorResponse when handler throws a non-Response error', async () => {
+    mockRequireSession.mockResolvedValue(undefined);
+    const handler = vi.fn().mockRejectedValue(new Error('something broke'));
+    const wrapped = withAuth(handler, 'Custom error message');
+    const request = new NextRequest('http://localhost/api/test');
+
+    const response = await wrapped(request);
+    const json = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(json).toEqual({ error: 'Custom error message' });
+  });
+
+  it('passes the request object through to the handler', async () => {
+    mockRequireSession.mockResolvedValue(undefined);
+    const handler = vi.fn().mockResolvedValue(NextResponse.json({ result: 'ok' }));
+    const wrapped = withAuth(handler, 'Failed');
+    const request = new NextRequest('http://localhost/api/test?foo=bar');
+
+    await wrapped(request);
+
+    expect(handler).toHaveBeenCalledWith(request);
+    const passedRequest = handler.mock.calls[0][0] as NextRequest;
+    expect(passedRequest.nextUrl.searchParams.get('foo')).toBe('bar');
+  });
+
+  it('uses the provided error message in the errorResponse', async () => {
+    mockRequireSession.mockResolvedValue(undefined);
+    const handler = vi.fn().mockRejectedValue(new TypeError('null ref'));
+    const wrapped = withAuth(handler, 'Failed to fetch data');
+    const request = new NextRequest('http://localhost/api/test');
+
+    const response = await wrapped(request);
+    const json = await response.json();
+
+    expect(json.error).toBe('Failed to fetch data');
+  });
+});
+
+describe('cachedProxyRoute', () => {
+  let fetchSpy: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    vi.useFakeTimers();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('fetches URL, transforms response, and caches result', async () => {
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify({ raw: 'data' }), { status: 200 }));
+    const transform = vi.fn().mockReturnValue({ transformed: true });
+
+    const { GET } = cachedProxyRoute({
+      ttlMs: 60_000,
+      url: 'https://api.example.com/data',
+      transform,
+      errorMessage: 'Failed to fetch',
+    });
+
+    const request = new NextRequest('http://localhost/api/test');
+    const response = await GET(request);
+    const json = await response.json();
+
+    expect(fetchSpy).toHaveBeenCalledOnce();
+    expect(transform).toHaveBeenCalledWith({ raw: 'data' }, request);
+    expect(json).toEqual({ transformed: true });
+  });
+
+  it('calls execute function in custom mode and caches result', async () => {
+    const execute = vi.fn().mockResolvedValue({ custom: 'result' });
+
+    const { GET } = cachedProxyRoute({
+      ttlMs: 60_000,
+      execute,
+      errorMessage: 'Failed',
+    });
+
+    const request = new NextRequest('http://localhost/api/test');
+    const response = await GET(request);
+    const json = await response.json();
+
+    expect(execute).toHaveBeenCalledWith(request);
+    expect(json).toEqual({ custom: 'result' });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('returns cached data without re-fetching on cache hit', async () => {
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify({ raw: 'data' }), { status: 200 }));
+    const transform = vi.fn().mockReturnValue({ transformed: true });
+
+    const { GET } = cachedProxyRoute({
+      ttlMs: 60_000,
+      url: 'https://api.example.com/data',
+      transform,
+      errorMessage: 'Failed',
+    });
+
+    const request = new NextRequest('http://localhost/api/test');
+    await GET(request);
+    const response2 = await GET(request);
+    const json2 = await response2.json();
+
+    expect(fetchSpy).toHaveBeenCalledOnce();
+    expect(transform).toHaveBeenCalledOnce();
+    expect(json2).toEqual({ transformed: true });
+  });
+
+  it('re-fetches after TTL expires', async () => {
+    fetchSpy
+      .mockResolvedValueOnce(new Response(JSON.stringify({ v: 1 }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ v: 2 }), { status: 200 }));
+    const transform = vi.fn()
+      .mockReturnValueOnce({ version: 1 })
+      .mockReturnValueOnce({ version: 2 });
+
+    const { GET } = cachedProxyRoute({
+      ttlMs: 5000,
+      url: 'https://api.example.com/data',
+      transform,
+      errorMessage: 'Failed',
+    });
+
+    const request = new NextRequest('http://localhost/api/test');
+    const res1 = await GET(request);
+    expect(await res1.json()).toEqual({ version: 1 });
+
+    vi.advanceTimersByTime(5001);
+
+    const res2 = await GET(request);
+    expect(await res2.json()).toEqual({ version: 2 });
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('uses the cacheKey function correctly', async () => {
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify({}), { status: 200 }));
+    const transform = vi.fn()
+      .mockReturnValueOnce({ key: 'a' })
+      .mockReturnValueOnce({ key: 'b' });
+
+    const { GET } = cachedProxyRoute({
+      ttlMs: 60_000,
+      url: 'https://api.example.com/data',
+      transform,
+      cacheKey: (req) => req.nextUrl.searchParams.get('id') ?? '_',
+      errorMessage: 'Failed',
+    });
+
+    const reqA = new NextRequest('http://localhost/api/test?id=a');
+    const reqB = new NextRequest('http://localhost/api/test?id=b');
+    await GET(reqA);
+    await GET(reqB);
+
+    // Both should fetch — different cache keys
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+
+    // Hitting reqA again should use cache
+    const res = await GET(reqA);
+    expect(await res.json()).toEqual({ key: 'a' });
+    expect(fetchSpy).toHaveBeenCalledTimes(2); // no additional fetch
+  });
+
+  it('returns NextResponse from execute without caching', async () => {
+    const customResponse = NextResponse.json({ special: true }, { status: 201 });
+    const execute = vi.fn().mockResolvedValue(customResponse);
+
+    const { GET } = cachedProxyRoute({
+      ttlMs: 60_000,
+      execute,
+      errorMessage: 'Failed',
+    });
+
+    const request = new NextRequest('http://localhost/api/test');
+    const response = await GET(request);
+    expect(response).toBe(customResponse);
+
+    // Second call should re-execute since NextResponse was not cached
+    await GET(request);
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns 502 when upstream fetch fails', async () => {
+    fetchSpy.mockResolvedValue(new Response('Not Found', { status: 404 }));
+
+    const { GET } = cachedProxyRoute({
+      ttlMs: 60_000,
+      url: 'https://api.example.com/data',
+      transform: (d) => d,
+      errorMessage: 'Upstream failed',
+    });
+
+    const request = new NextRequest('http://localhost/api/test');
+    const response = await GET(request);
+    const json = await response.json();
+
+    expect(response.status).toBe(502);
+    expect(json).toEqual({ error: 'Upstream failed' });
+  });
+
+  it('returns errorResponse on exception', async () => {
+    fetchSpy.mockRejectedValue(new Error('Network error'));
+
+    const { GET } = cachedProxyRoute({
+      ttlMs: 60_000,
+      url: 'https://api.example.com/data',
+      transform: (d) => d,
+      errorMessage: 'Something went wrong',
+    });
+
+    const request = new NextRequest('http://localhost/api/test');
+    const response = await GET(request);
+    const json = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(json).toEqual({ error: 'Something went wrong' });
   });
 });

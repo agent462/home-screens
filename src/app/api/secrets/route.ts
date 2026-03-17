@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSecretStatus, setSecret, deleteSecret, isValidSecretKey } from '@/lib/secrets';
 import { requireSession } from '@/lib/auth';
-import { errorResponse, fetchWithTimeout } from '@/lib/api-utils';
+import { errorResponse, validateTodoistToken } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,12 +38,10 @@ export async function PUT(request: NextRequest) {
 
     // Validate Todoist token before saving
     if (key === 'todoist_token') {
-      const res = await fetchWithTimeout('https://api.todoist.com/api/v1/projects', {
-        headers: { Authorization: `Bearer ${value}` },
-      });
-      if (!res.ok) {
+      const result = await validateTodoistToken(value);
+      if (!result.valid) {
         return NextResponse.json(
-          { error: 'Invalid Todoist token — API returned ' + res.status },
+          { error: 'Invalid Todoist token — API returned ' + result.status },
           { status: 401 },
         );
       }

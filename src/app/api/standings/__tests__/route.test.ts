@@ -5,14 +5,13 @@ import { NextRequest } from 'next/server';
 // Mocks — must be declared before importing the route handler
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/api-utils', () => ({
-  errorResponse: vi.fn((_err: unknown, msg: string, status = 500) => {
-    const { NextResponse } = require('next/server');
-    return NextResponse.json({ error: msg }, { status });
-  }),
-  createTTLCache: vi.fn(() => ({ get: vi.fn(() => null), set: vi.fn() })),
-  fetchWithTimeout: vi.fn((...args: unknown[]) => (globalThis.fetch as (...a: unknown[]) => unknown)(...args)),
-}));
+vi.mock('@/lib/api-utils', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api-utils')>();
+  return {
+    ...actual,
+    fetchWithTimeout: vi.fn((...args: unknown[]) => (globalThis.fetch as (...a: unknown[]) => unknown)(...args)),
+  };
+});
 
 vi.mock('@/lib/espn', () => ({
   LEAGUE_MAP: {
@@ -31,7 +30,7 @@ vi.mock('@/lib/espn', () => ({
   },
 }));
 
-const { GET } = await import('@/app/api/standings/route');
+const { GET, cache, colorCache } = await import('@/app/api/standings/route');
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -183,6 +182,8 @@ function mockFetchCalls(
 
 beforeEach(() => {
   vi.restoreAllMocks();
+  cache.clear();
+  colorCache.clear();
 });
 
 describe('GET /api/standings', () => {

@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { BACKGROUNDS_DIR } from '@/lib/constants';
-import { requireSession } from '@/lib/auth';
-import { errorResponse } from '@/lib/api-utils';
+import { errorResponse, withAuth } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,90 +57,78 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    await requireSession(request);
-    const formData = await request.formData();
-    const directory = (formData.get('directory') as string) || '';
+export const POST = withAuth(async (request: NextRequest) => {
+  const formData = await request.formData();
+  const directory = (formData.get('directory') as string) || '';
 
-    let dir: string;
-    if (directory) {
-      const resolved = safePath(directory);
-      if (!resolved) {
-        return NextResponse.json({ error: 'Invalid directory' }, { status: 400 });
-      }
-      dir = resolved;
-    } else {
-      dir = BGS;
+  let dir: string;
+  if (directory) {
+    const resolved = safePath(directory);
+    if (!resolved) {
+      return NextResponse.json({ error: 'Invalid directory' }, { status: 400 });
     }
-
-    const files = formData.getAll('file') as File[];
-
-    if (files.length === 0 || !files[0]?.name) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
-    }
-
-    const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
-    const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'];
-
-    // Validate all files first
-    for (const file of files) {
-      if (file.size > MAX_SIZE) {
-        return NextResponse.json({ error: `File too large: ${file.name} (max 10 MB)` }, { status: 413 });
-      }
-      if (!ALLOWED_TYPES.includes(file.type)) {
-        return NextResponse.json({ error: `Invalid file type: ${file.name}` }, { status: 400 });
-      }
-    }
-
-    await fs.mkdir(dir, { recursive: true });
-
-    const uploadedPaths: string[] = [];
-
-    for (const file of files) {
-      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-      const filePath = path.join(dir, safeName);
-      const buffer = Buffer.from(await file.arrayBuffer());
-      await fs.writeFile(filePath, buffer);
-      uploadedPaths.push(serveUrl(safeName, directory || undefined));
-    }
-
-    if (files.length === 1) {
-      return NextResponse.json({ path: uploadedPaths[0] }, { status: 201 });
-    }
-
-    return NextResponse.json({ paths: uploadedPaths }, { status: 201 });
-  } catch (error) {
-    if (error instanceof Response) return error;
-    return errorResponse(error, 'Failed to upload background');
+    dir = resolved;
+  } else {
+    dir = BGS;
   }
-}
 
-export async function DELETE(request: NextRequest) {
-  try {
-    await requireSession(request);
-    const { file, directory } = await request.json();
-    if (!file || typeof file !== 'string') {
-      return NextResponse.json({ error: 'file parameter required' }, { status: 400 });
-    }
+  const files = formData.getAll('file') as File[];
 
-    // Resolve file within optional directory
-    const relativePath = directory ? `${directory}/${path.basename(file)}` : path.basename(file);
-    const filePath = safePath(relativePath);
-    if (!filePath) {
-      return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
-    }
-
-    try {
-      await fs.access(filePath);
-    } catch {
-      return NextResponse.json({ error: 'File not found' }, { status: 404 });
-    }
-
-    await fs.unlink(filePath);
-    return NextResponse.json({ deleted: path.basename(file) });
-  } catch (error) {
-    if (error instanceof Response) return error;
-    return errorResponse(error, 'Failed to delete background');
+  if (files.length === 0 || !files[0]?.name) {
+    return NextResponse.json({ error: 'No file provided' }, { status: 400 });
   }
-}
+
+  const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
+  const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'];
+
+  // Validate all files first
+  for (const file of files) {
+    if (file.size > MAX_SIZE) {
+      return NextResponse.json({ error: `File too large: ${file.name} (max 10 MB)` }, { status: 413 });
+    }
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      return NextResponse.json({ error: `Invalid file type: ${file.name}` }, { status: 400 });
+    }
+  }
+
+  await fs.mkdir(dir, { recursive: true });
+
+  const uploadedPaths: string[] = [];
+
+  for (const file of files) {
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const filePath = path.join(dir, safeName);
+    const buffer = Buffer.from(await file.arrayBuffer());
+    await fs.writeFile(filePath, buffer);
+    uploadedPaths.push(serveUrl(safeName, directory || undefined));
+  }
+
+  if (files.length === 1) {
+    return NextResponse.json({ path: uploadedPaths[0] }, { status: 201 });
+  }
+
+  return NextResponse.json({ paths: uploadedPaths }, { status: 201 });
+}, 'Failed to upload background');
+
+export const DELETE = withAuth(async (request: NextRequest) => {
+  const { file, directory } = await request.json();
+  if (!file || typeof file !== 'string') {
+    return NextResponse.json({ error: 'file parameter required' }, { status: 400 });
+  }
+
+  // Resolve file within optional directory
+  const relativePath = directory ? `${directory}/${path.basename(file)}` : path.basename(file);
+  const filePath = safePath(relativePath);
+  if (!filePath) {
+    return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
+  }
+
+  try {
+    await fs.access(filePath);
+  } catch {
+    return NextResponse.json({ error: 'File not found' }, { status: 404 });
+  }
+
+  await fs.unlink(filePath);
+  return NextResponse.json({ deleted: path.basename(file) });
+}, 'Failed to delete background');

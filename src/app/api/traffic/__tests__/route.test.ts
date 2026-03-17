@@ -5,20 +5,17 @@ vi.mock('@/lib/secrets', () => ({
   getSecret: vi.fn(),
 }));
 
-vi.mock('@/lib/api-utils', () => ({
-  errorResponse: vi.fn((_err: unknown, msg: string, status = 500) => {
-    return Response.json({ error: msg }, { status });
-  }),
-  createTTLCache: vi.fn(() => ({
-    get: vi.fn(() => null),
-    set: vi.fn(),
-  })),
-  fetchWithTimeout: vi.fn((...args: unknown[]) => (globalThis.fetch as (...a: unknown[]) => unknown)(...args)),
-}));
+vi.mock('@/lib/api-utils', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api-utils')>();
+  return {
+    ...actual,
+    fetchWithTimeout: vi.fn((...args: unknown[]) => (globalThis.fetch as (...a: unknown[]) => unknown)(...args)),
+  };
+});
 
 import { getSecret } from '@/lib/secrets';
 
-const { GET } = await import('@/app/api/traffic/route');
+const { GET, cache, geocodeCache } = await import('@/app/api/traffic/route');
 
 // ─── Helpers ───
 
@@ -64,6 +61,8 @@ const sampleRoutes = [
 
 beforeEach(() => {
   vi.restoreAllMocks();
+  cache.clear();
+  geocodeCache.clear();
 });
 
 // ─── Input Validation ───

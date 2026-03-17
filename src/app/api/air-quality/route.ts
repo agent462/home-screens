@@ -1,36 +1,37 @@
 import { NextResponse } from 'next/server';
 import { getSecret } from '@/lib/secrets';
-import { errorResponse, getLocationFromConfig, createTTLCache, fetchWithTimeout } from '@/lib/api-utils';
+import { createTTLCache, getLocationFromConfig, fetchWithTimeout, errorResponse } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
 
-/** @internal exported for test cleanup */
-export const cache = createTTLCache<unknown>(5 * 60 * 1000); // 5 minutes
+/** @internal */
+export const cache = createTTLCache<Record<string, unknown>>(5 * 60 * 1000); // 5 minutes
 
 export async function GET() {
-  const location = await getLocationFromConfig();
-  const apiKey = await getSecret('openweathermap_key');
-
-  if (!location) {
-    return NextResponse.json(
-      { error: 'Missing latitude/longitude in weather settings' },
-      { status: 400 },
-    );
-  }
-
-  const { lat, lon } = location;
-
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: 'Missing OpenWeatherMap API key — add it in Settings > Integrations' },
-      { status: 400 },
-    );
-  }
-
   try {
+    const location = await getLocationFromConfig();
+    const apiKey = await getSecret('openweathermap_key');
+
+    if (!location) {
+      return NextResponse.json(
+        { error: 'Missing latitude/longitude in weather settings' },
+        { status: 400 },
+      );
+    }
+
+    const { lat, lon } = location;
+
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: 'Missing OpenWeatherMap API key — add it in Settings > Integrations' },
+        { status: 400 },
+      );
+    }
+
     const cacheKey = `${lat}:${lon}`;
     const cached = cache.get(cacheKey);
     if (cached) return NextResponse.json(cached);
+
     const [airRes, uvRes] = await Promise.all([
       fetchWithTimeout(
         `https://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lon}&appid=${apiKey}`,
@@ -78,6 +79,7 @@ export async function GET() {
       no2: components.no2 ?? 0,
       uv,
     };
+
     cache.set(cacheKey, result);
     return NextResponse.json(result);
   } catch (error) {

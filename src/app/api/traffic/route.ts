@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { errorResponse, createTTLCache, fetchWithTimeout } from '@/lib/api-utils';
+import { NextResponse } from 'next/server';
+import { cachedProxyRoute, fetchWithTimeout, createTTLCache } from '@/lib/api-utils';
 import { getSecret } from '@/lib/secrets';
 
 export const dynamic = 'force-dynamic';
@@ -10,9 +10,8 @@ interface RouteInput {
   destination: string;
 }
 
-/** @internal */
-export const cache = createTTLCache<unknown>(5 * 60 * 1000); // 5 minutes
-const geocodeCache = createTTLCache<string>(60 * 60 * 1000); // 1 hour
+/** @internal exported for test cleanup */
+export const geocodeCache = createTTLCache<string>(60 * 60 * 1000); // 1 hour
 
 async function fetchGoogle(routes: RouteInput[], apiKey: string) {
   const results = await Promise.all(
@@ -128,9 +127,11 @@ function mockData(routes: RouteInput[]) {
   });
 }
 
-export async function GET(request: NextRequest) {
-  try {
-    const routesParam = request.nextUrl.searchParams.get('routes');
+const { GET, cache } = cachedProxyRoute<Record<string, unknown>>({
+  ttlMs: 5 * 60 * 1000, // 5 minutes
+  cacheKey: (req) => req.nextUrl.searchParams.get('routes') || '',
+  execute: async (req) => {
+    const routesParam = req.nextUrl.searchParams.get('routes');
     if (!routesParam) {
       return NextResponse.json({ error: 'Missing routes parameter' }, { status: 400 });
     }
@@ -146,35 +147,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Routes must be a non-empty array' }, { status: 400 });
     }
 
-    // Check cache
-    const cacheKey = routesParam;
-    const cached = cache.get(cacheKey);
-    if (cached) {
-      return NextResponse.json(cached);
-    }
-
     const googleKey = await getSecret('google_maps_key');
     const tomtomKey = await getSecret('tomtom_key');
 
-    let result;
-
     if (googleKey) {
-      result = { routes: await fetchGoogle(routes, googleKey) };
+      return { routes: await fetchGoogle(routes, googleKey) };
     } else if (tomtomKey) {
-      result = { routes: await fetchTomTom(routes, tomtomKey) };
-    } else {
-      result = {
-        routes: mockData(routes),
-        mock: true,
-        note: 'Add a Google Maps or TomTom API key in Settings > Integrations for real traffic data',
-      };
+      return { routes: await fetchTomTom(routes, tomtomKey) };
     }
 
-    if (!result.mock) {
-      cache.set(cacheKey, result);
-    }
-    return NextResponse.json(result);
-  } catch (error) {
-    return errorResponse(error, 'Failed to fetch traffic data');
-  }
-}
+    // Mock data — return as NextResponse to bypass caching
+    return NextResponse.json({
+      routes: mockData(routes),
+      mock: true,
+      note: 'Add a Google Maps or TomTom API key in Settings > Integrations for real traffic data',
+    });
+  },
+  errorMessage: 'Failed to fetch traffic data',
+});
+
+/** @internal */
+export { GET, cache };
