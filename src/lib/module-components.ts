@@ -39,4 +39,5 @@ export const moduleComponents = {
   date: dynamic(() => import('@/components/modules/date/DateModule')),
   'meal-planner': dynamic(() => import('@/components/modules/meal-planner/MealPlannerModule')),
   iframe: dynamic(() => import('@/components/modules/IframeModule')),
+  'flag-status': dynamic(() => import('@/components/modules/FlagStatusModule')),
 } as unknown as Record<ModuleType, ComponentType<Record<string, unknown>>>;

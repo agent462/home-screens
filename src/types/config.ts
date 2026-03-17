@@ -31,7 +31,8 @@ export type ModuleType =
   | 'affirmations'
   | 'date'
   | 'meal-planner'
-  | 'iframe';
+  | 'iframe'
+  | 'flag-status';
 
 export interface ModuleStyle {
   opacity: number;
@@ -635,6 +636,12 @@ export interface IframeConfig {
   sandboxEnabled: boolean;
   sandbox: string;
   title: string;
+}
+
+// Flag status module config
+export interface FlagStatusConfig {
+  showReason: boolean;
+  refreshIntervalMs: number;
 }
 
 // Date module config

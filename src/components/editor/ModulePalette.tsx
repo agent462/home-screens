@@ -6,6 +6,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Search, ChevronRight } from 'lucide-react';
 import { getModulesByCategory } from '@/lib/module-registry';
 import type { ModuleDefinition, ModuleCategory } from '@/lib/module-registry';
+import { useEditorStore } from '@/stores/editor-store';
+import { isUSTimezone } from '@/lib/timezone-us';
 
 function PaletteItem({ definition }: { definition: ModuleDefinition }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -80,7 +82,17 @@ function CategoryGroup({
 export default function ModulePalette() {
   const [search, setSearch] = useState('');
   const [collapsed, setCollapsed] = useState<Set<ModuleCategory>>(new Set());
-  const grouped = useMemo(() => getModulesByCategory(), []);
+  const configTimezone = useEditorStore((s) => s.config?.settings.timezone);
+  const isUS = isUSTimezone(configTimezone);
+  const grouped = useMemo(() => {
+    const all = getModulesByCategory();
+    if (isUS) return all;
+    // Filter out US-only modules when not in a US timezone
+    for (const [cat, modules] of all) {
+      all.set(cat, modules.filter((m) => m.type !== 'flag-status'));
+    }
+    return all;
+  }, [isUS]);
 
   const query = search.toLowerCase().trim();
 
