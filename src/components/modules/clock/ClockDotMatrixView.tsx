@@ -1,8 +1,9 @@
 'use client';
 
 import { memo } from 'react';
-import { format, getWeek, getDayOfYear } from 'date-fns';
+import { format } from 'date-fns';
 import { isDotActive, DOT_COLS, DOT_ROWS } from './dot-matrix-font';
+import { parseClockTime, buildInfoParts } from '@/lib/date-info';
 import type { ClockViewProps } from './types';
 
 const DotCharacter = memo(function DotCharacter({
@@ -50,14 +51,9 @@ const DotCharacter = memo(function DotCharacter({
 });
 
 export default function ClockDotMatrixView({ config, now, scaledFontSize, containerRef }: ClockViewProps) {
-  const hours = now.getHours();
-  const minutes = now.getMinutes();
-  const seconds = now.getSeconds();
-
-  const h = config.format24h ? hours : hours % 12 || 12;
+  const { h, mStr, sStr } = parseClockTime(config.format24h, now);
+  // Dot-matrix needs space-padded hours in 12h mode for consistent grid layout
   const hStr = config.format24h ? String(h).padStart(2, '0') : String(h).padStart(2, ' ');
-  const mStr = String(minutes).padStart(2, '0');
-  const sStr = String(seconds).padStart(2, '0');
 
   const timeChars = config.showSeconds
     ? [...hStr, ':', ...mStr, ':', ...sStr]
@@ -71,11 +67,7 @@ export default function ClockDotMatrixView({ config, now, scaledFontSize, contai
 
   const dateStr = config.showDate ? format(now, config.dateFormat || 'EEEE, MMMM d') : null;
 
-  const weekNumber = getWeek(now);
-  const dayOfYear = getDayOfYear(now);
-  const infoParts: string[] = [];
-  if (config.showWeekNumber) infoParts.push(`Week ${weekNumber}`);
-  if (config.showDayOfYear) infoParts.push(`Day ${dayOfYear}`);
+  const infoParts = buildInfoParts(config, now);
   const infoStr = infoParts.length > 0 ? infoParts.join(' \u00b7 ') : null;
 
   return (

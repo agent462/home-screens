@@ -1,6 +1,7 @@
 'use client';
 
-import { format, getWeek, getDayOfYear } from 'date-fns';
+import { format } from 'date-fns';
+import { buildInfoParts } from '@/lib/date-info';
 import type { DateViewProps } from './types';
 
 export default function DateFullView({ config, now, scaledFontSize, containerRef }: DateViewProps) {
@@ -9,9 +10,7 @@ export default function DateFullView({ config, now, scaledFontSize, containerRef
   const dayName = format(now, 'EEEE');
   const year = format(now, 'yyyy');
 
-  const infoParts: string[] = [];
-  if (config.showWeekNumber) infoParts.push(`Week ${getWeek(now)}`);
-  if (config.showDayOfYear) infoParts.push(`Day ${getDayOfYear(now)}`);
+  const infoParts = buildInfoParts(config, now);
 
   return (
     <div

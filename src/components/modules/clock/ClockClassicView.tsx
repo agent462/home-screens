@@ -1,26 +1,15 @@
 'use client';
 
-import { format, getWeek, getDayOfYear } from 'date-fns';
+import { format } from 'date-fns';
+import { parseClockTime, buildInfoParts } from '@/lib/date-info';
 import type { ClockViewProps } from './types';
 
 export default function ClockClassicView({ config, now, scaledFontSize, containerRef }: ClockViewProps) {
-  const hours = now.getHours();
-  const minutes = now.getMinutes();
-  const seconds = now.getSeconds();
-
-  const h = config.format24h ? hours : hours % 12 || 12;
-  const hStr = config.format24h ? String(h).padStart(2, '0') : String(h);
-  const mStr = String(minutes).padStart(2, '0');
-  const sStr = String(seconds).padStart(2, '0');
-  const ampm = config.format24h ? '' : hours >= 12 ? ' PM' : ' AM';
+  const { hStr, mStr, sStr, period: ampm } = parseClockTime(config.format24h, now);
 
   const dateStr = config.showDate ? format(now, config.dateFormat || 'EEEE, MMMM d') : null;
 
-  const weekNumber = getWeek(now);
-  const dayOfYear = getDayOfYear(now);
-  const infoParts: string[] = [];
-  if (config.showWeekNumber) infoParts.push(`Week ${weekNumber}`);
-  if (config.showDayOfYear) infoParts.push(`Day ${dayOfYear}`);
+  const infoParts = buildInfoParts(config, now);
   const infoStr = infoParts.length > 0 ? infoParts.join(' \u00b7 ') : null;
 
   return (

@@ -1,6 +1,7 @@
 'use client';
 
-import { format, getWeek, getDayOfYear } from 'date-fns';
+import { format } from 'date-fns';
+import { getDateInfoValues } from '@/lib/date-info';
 import type { DateViewProps } from './types';
 
 export default function DateBannerView({ config, now, scaledFontSize, containerRef }: DateViewProps) {
@@ -14,9 +15,10 @@ export default function DateBannerView({ config, now, scaledFontSize, containerR
   parts.push(`${monthName.toUpperCase()} ${dayNumber}`);
   if (config.showYear) parts.push(year);
 
+  const { weekNumber, dayOfYear } = getDateInfoValues(now);
   const infoParts: string[] = [];
-  if (config.showWeekNumber) infoParts.push(`WK ${getWeek(now)}`);
-  if (config.showDayOfYear) infoParts.push(`DAY ${getDayOfYear(now)}`);
+  if (config.showWeekNumber) infoParts.push(`WK ${weekNumber}`);
+  if (config.showDayOfYear) infoParts.push(`DAY ${dayOfYear}`);
 
   return (
     <div

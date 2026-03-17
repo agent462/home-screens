@@ -1,6 +1,7 @@
 'use client';
 
-import { format, getWeek, getDayOfYear } from 'date-fns';
+import { format } from 'date-fns';
+import { buildInfoParts } from '@/lib/date-info';
 import type { DateViewProps } from './types';
 
 export default function DateMinimalView({ config, now, scaledFontSize, containerRef }: DateViewProps) {
@@ -12,9 +13,7 @@ export default function DateMinimalView({ config, now, scaledFontSize, container
     dateStr = format(now, 'MMMM d');
   }
 
-  const infoParts: string[] = [];
-  if (config.showWeekNumber) infoParts.push(`Week ${getWeek(now)}`);
-  if (config.showDayOfYear) infoParts.push(`Day ${getDayOfYear(now)}`);
+  const infoParts = buildInfoParts(config, now);
 
   return (
     <div
