@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import type { TodoistConfig, ModuleStyle } from '@/types/config';
 import ModuleWrapper from './ModuleWrapper';
+import { ModuleLoadingState } from './ModuleStates';
 import { useFetchData } from '@/hooks/useFetchData';
 import { todoistUrl } from '@/lib/fetch-keys';
 import type { TodoistData } from './todoist/todoist-utils';
@@ -34,6 +35,10 @@ export default function TodoistModule({ config, style }: TodoistModuleProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const now = useMemo(() => new Date(), [data]);
 
+  if (!data) {
+    return <ModuleLoadingState style={style} message="Loading tasks…" error={error} />;
+  }
+
   return (
     <ModuleWrapper style={style}>
       <div className="flex flex-col h-full">
@@ -42,39 +47,20 @@ export default function TodoistModule({ config, style }: TodoistModuleProps) {
           <h2 className="font-semibold" style={{ fontSize: '1.1em' }}>
             {title}
           </h2>
-          {data && (
-            <span className="opacity-40" style={{ fontSize: '0.7em' }}>
-              {totalCount} task{totalCount !== 1 ? 's' : ''}
-            </span>
-          )}
+          <span className="opacity-40" style={{ fontSize: '0.7em' }}>
+            {totalCount} task{totalCount !== 1 ? 's' : ''}
+          </span>
         </div>
 
         {/* Subtle divider under header */}
-        {data && viewMode !== 'focus' && (
+        {viewMode !== 'focus' && (
           <div className="mb-3">
             <div className="w-full h-px" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }} />
           </div>
         )}
 
         {/* Content */}
-        {!data ? (
-          <div className="flex-1 flex items-center justify-center">
-            {error ? (
-              <div className="text-center px-4">
-                <p className="opacity-60 mb-1" style={{ fontSize: '0.8em', color: '#ef4444' }}>
-                  Error
-                </p>
-                <p className="opacity-40" style={{ fontSize: '0.65em' }}>
-                  {error}
-                </p>
-              </div>
-            ) : (
-              <p className="opacity-30" style={{ fontSize: '0.8em' }}>
-                Loading...
-              </p>
-            )}
-          </div>
-        ) : tasks.length === 0 ? (
+        {tasks.length === 0 ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
               <span className="block opacity-20" style={{ fontSize: '2em' }}>
