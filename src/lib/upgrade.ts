@@ -222,6 +222,43 @@ async function runPipeline(steps: PipelineStep[]): Promise<void> {
 
 // ─── Step Factories ───
 
+function preflightStep(
+  progress: number,
+  onResult?: (result: Record<string, unknown>) => void,
+): PipelineStep {
+  return {
+    step: 'preflight',
+    progress,
+    message: 'Running pre-flight checks...',
+    run: async () => {
+      const preflightOut = await runUpgradeScript('preflight', [], streamTo('preflight'));
+      const preflight = parseResult(preflightOut);
+      if (!preflight.ok) {
+        throw new Error(preflight.error as string);
+      }
+      if (preflight.warning) {
+        emitOutput('preflight', `Warning: ${preflight.warning}`);
+      }
+      onResult?.(preflight);
+    },
+  };
+}
+
+function backupStep(progress: number): PipelineStep {
+  return {
+    step: 'backup',
+    progress,
+    message: 'Backing up configuration...',
+    run: async () => {
+      const backupOut = await runUpgradeScript('backup', [], streamTo('backup'));
+      const backup = parseResult(backupOut);
+      if (!backup.ok) {
+        throw new Error(`Backup failed: ${backup.error}`);
+      }
+    },
+  };
+}
+
 function migrateStep(progress: number): PipelineStep {
   return {
     step: 'migrate',
@@ -413,33 +450,8 @@ async function runTarballUpgrade(targetTag: string): Promise<void> {
   await recoverFromInterruptedDeploy();
 
   const steps: PipelineStep[] = [
-    {
-      step: 'preflight',
-      progress: 5,
-      message: 'Running pre-flight checks...',
-      run: async () => {
-        const preflightOut = await runUpgradeScript('preflight', [], streamTo('preflight'));
-        const preflight = parseResult(preflightOut);
-        if (!preflight.ok) {
-          throw new Error(preflight.error as string);
-        }
-        if (preflight.warning) {
-          emitOutput('preflight', `Warning: ${preflight.warning}`);
-        }
-      },
-    },
-    {
-      step: 'backup',
-      progress: 10,
-      message: 'Backing up configuration...',
-      run: async () => {
-        const backupOut = await runUpgradeScript('backup', [], streamTo('backup'));
-        const backup = parseResult(backupOut);
-        if (!backup.ok) {
-          throw new Error(`Backup failed: ${backup.error}`);
-        }
-      },
-    },
+    preflightStep(5),
+    backupStep(10),
     {
       step: 'download',
       progress: 20,
@@ -507,34 +519,10 @@ async function runGitUpgrade(targetTag: string): Promise<void> {
   let isDirty = false;
 
   const steps: PipelineStep[] = [
-    {
-      step: 'preflight',
-      progress: 5,
-      message: 'Running pre-flight checks...',
-      run: async () => {
-        const preflightOut = await runUpgradeScript('preflight', [], streamTo('preflight'));
-        const preflight = parseResult(preflightOut);
-        if (!preflight.ok) {
-          throw new Error(preflight.error as string);
-        }
-        if (preflight.warning) {
-          emitOutput('preflight', `Warning: ${preflight.warning}`);
-        }
-        isDirty = preflight.dirty as boolean;
-      },
-    },
-    {
-      step: 'backup',
-      progress: 10,
-      message: 'Backing up configuration...',
-      run: async () => {
-        const backupOut = await runUpgradeScript('backup', [], streamTo('backup'));
-        const backup = parseResult(backupOut);
-        if (!backup.ok) {
-          throw new Error(`Backup failed: ${backup.error}`);
-        }
-      },
-    },
+    preflightStep(5, (result) => {
+      isDirty = result.dirty as boolean;
+    }),
+    backupStep(10),
     {
       step: 'fetch',
       progress: 20,

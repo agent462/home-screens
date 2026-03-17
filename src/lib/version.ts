@@ -155,8 +155,8 @@ export async function fetchGitHubReleases(options?: {
   }
 }
 
-/** Convert GitHub releases to TagInfo array, sorted by semver descending */
-function releasesToTags(releases: GitHubRelease[]): TagInfo[] {
+/** @internal Convert GitHub releases to TagInfo array, sorted by semver descending */
+export function releasesToTags(releases: GitHubRelease[]): TagInfo[] {
   const tags: TagInfo[] = releases.map((r) => ({
     tag: r.tag_name,
     version: r.tag_name.replace(/^v/, ''),
@@ -272,6 +272,28 @@ async function detectInstallMethod(): Promise<'git' | 'tarball' | 'unknown'> {
   }
 }
 
+/** @internal Assemble a VersionInfo result from resolved tags and metadata */
+export function buildVersionInfo(
+  tags: TagInfo[],
+  current: string,
+  commit: string,
+  installedVia: 'git' | 'tarball' | 'unknown',
+  branch: string,
+): VersionInfo {
+  const latest = tags.length > 0 ? tags[0] : null;
+  const updateAvailable = latest !== null && compareSemver(latest.version, current) > 0;
+
+  return {
+    current,
+    currentCommit: commit,
+    latest: latest?.version ?? null,
+    latestCommit: latest?.commit ?? null,
+    updateAvailable,
+    installedVia,
+    channel: branch,
+  };
+}
+
 /** Get full version info */
 export async function getVersionInfo(options?: {
   includePrerelease?: boolean;
@@ -288,19 +310,8 @@ export async function getVersionInfo(options?: {
     const releases = await fetchGitHubReleases({ includePrerelease });
     if (releases.length > 0) {
       const tags = releasesToTags(releases);
-      const latest = tags.length > 0 ? tags[0] : null;
-      const updateAvailable = latest !== null && compareSemver(latest.version, current) > 0;
       const branch = installedVia === 'git' ? await getCurrentBranch() : 'release';
-
-      return {
-        current,
-        currentCommit: commit,
-        latest: latest?.version ?? null,
-        latestCommit: latest?.commit ?? null,
-        updateAvailable,
-        installedVia,
-        channel: branch,
-      };
+      return buildVersionInfo(tags, current, commit, installedVia, branch);
     }
   } catch {
     // GitHub API unavailable, fall through
@@ -314,29 +325,10 @@ export async function getVersionInfo(options?: {
       tags = tags.filter((t) => !isPrerelease(t.version));
     }
     const branch = await getCurrentBranch();
-    const latest = tags.length > 0 ? tags[0] : null;
-    const updateAvailable = latest !== null && compareSemver(latest.version, current) > 0;
-
-    return {
-      current,
-      currentCommit: commit,
-      latest: latest?.version ?? null,
-      latestCommit: latest?.commit ?? null,
-      updateAvailable,
-      installedVia,
-      channel: branch,
-    };
+    return buildVersionInfo(tags, current, commit, installedVia, branch);
   }
 
-  return {
-    current,
-    currentCommit: commit,
-    latest: null,
-    latestCommit: null,
-    updateAvailable: false,
-    installedVia,
-    channel: 'unknown',
-  };
+  return buildVersionInfo([], current, commit, installedVia, 'unknown');
 }
 
 /** Split "1.2.3-rc.1" into ["1.2.3", "rc.1"] */

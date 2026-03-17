@@ -128,89 +128,92 @@ export default function SystemSection({ onUpgrade, onRollback }: Props) {
     }
   }
 
+  /** Prompt a confirmation dialog and, if confirmed, execute an async action */
+  async function confirmAndRun(
+    dialogOptions: Parameters<ReturnType<typeof useConfirmStore.getState>['confirm']>[0],
+    action: () => Promise<void>,
+  ) {
+    if (!(await useConfirmStore.getState().confirm(dialogOptions))) return;
+    await action();
+  }
+
   async function handleRestoreBackup(name: string) {
-    if (!(await useConfirmStore.getState().confirm({
-      title: 'Restore Backup',
-      message: `Restore configuration from ${name}? Current config will be overwritten.`,
-      confirmLabel: 'Restore',
-    }))) return;
-    setRestoreStatus('Restoring...');
-    try {
-      const res = await editorFetch('/api/system/backups', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
-      });
-      if (res.ok) {
-        setRestoreStatus('Restored! Reload the editor to see changes.');
-      } else {
-        const data = await res.json();
-        setRestoreStatus(`Error: ${data.error}`);
-      }
-    } catch {
-      setRestoreStatus('Failed to restore backup');
-    }
+    await confirmAndRun(
+      { title: 'Restore Backup', message: `Restore configuration from ${name}? Current config will be overwritten.`, confirmLabel: 'Restore' },
+      async () => {
+        setRestoreStatus('Restoring...');
+        try {
+          const res = await editorFetch('/api/system/backups', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name }),
+          });
+          if (res.ok) {
+            setRestoreStatus('Restored! Reload the editor to see changes.');
+          } else {
+            const data = await res.json();
+            setRestoreStatus(`Error: ${data.error}`);
+          }
+        } catch {
+          setRestoreStatus('Failed to restore backup');
+        }
+      },
+    );
   }
 
   async function handleUpgrade(tag: string) {
-    if (!(await useConfirmStore.getState().confirm({
-      title: 'Upgrade',
-      message: `Upgrade to ${tag}? The server will restart and you may briefly lose connection.`,
-      confirmLabel: 'Upgrade',
-      variant: 'primary',
-    }))) return;
-    onUpgrade(tag);
+    await confirmAndRun(
+      { title: 'Upgrade', message: `Upgrade to ${tag}? The server will restart and you may briefly lose connection.`, confirmLabel: 'Upgrade', variant: 'primary' },
+      async () => { onUpgrade(tag); },
+    );
   }
 
   async function handleRollback(tag: string) {
-    if (!(await useConfirmStore.getState().confirm({
-      title: 'Rollback',
-      message: `Roll back to ${tag}? The server will restart.`,
-      confirmLabel: 'Roll Back',
-    }))) return;
-    onRollback(tag);
+    await confirmAndRun(
+      { title: 'Rollback', message: `Roll back to ${tag}? The server will restart.`, confirmLabel: 'Roll Back' },
+      async () => { onRollback(tag); },
+    );
   }
 
   async function handlePowerAction(action: 'reboot' | 'restart-service') {
     const label = action === 'reboot' ? 'reboot the system' : 'restart the service';
-    if (!(await useConfirmStore.getState().confirm({
-      title: action === 'reboot' ? 'Reboot System' : 'Restart Service',
-      message: `Are you sure you want to ${label}? You may briefly lose connection.`,
-      confirmLabel: action === 'reboot' ? 'Reboot' : 'Restart',
-    }))) return;
-
-    setPowerState({ status: 'pending', action });
-    try {
-      const res = await editorFetch('/api/system/power', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action }),
-      });
-      if (res.ok) {
-        setPowerState({ status: 'ok', action });
-      } else {
-        const data = await res.json();
-        setPowerState({ status: 'error', message: data.error || 'Unknown error' });
-      }
-    } catch {
-      setPowerState({ status: 'error', message: 'Failed to reach server' });
-    }
+    await confirmAndRun(
+      { title: action === 'reboot' ? 'Reboot System' : 'Restart Service', message: `Are you sure you want to ${label}? You may briefly lose connection.`, confirmLabel: action === 'reboot' ? 'Reboot' : 'Restart' },
+      async () => {
+        setPowerState({ status: 'pending', action });
+        try {
+          const res = await editorFetch('/api/system/power', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action }),
+          });
+          if (res.ok) {
+            setPowerState({ status: 'ok', action });
+          } else {
+            const data = await res.json();
+            setPowerState({ status: 'error', message: data.error || 'Unknown error' });
+          }
+        } catch {
+          setPowerState({ status: 'error', message: 'Failed to reach server' });
+        }
+      },
+    );
   }
 
   async function handleCancelUpgrade() {
-    if (!(await useConfirmStore.getState().confirm({
-      title: 'Cancel Upgrade',
-      message: 'Are you sure? The running upgrade will be killed. You may need to retry afterwards.',
-      confirmLabel: 'Cancel Upgrade',
-    }))) return;
-    try {
-      const res = await editorFetch('/api/system/upgrade', { method: 'DELETE' });
-      if (res.ok) {
-        fetchAll();
-      }
-    } catch {
-      // ignore
-    }
+    await confirmAndRun(
+      { title: 'Cancel Upgrade', message: 'Are you sure? The running upgrade will be killed. You may need to retry afterwards.', confirmLabel: 'Cancel Upgrade' },
+      async () => {
+        try {
+          const res = await editorFetch('/api/system/upgrade', { method: 'DELETE' });
+          if (res.ok) {
+            fetchAll();
+          }
+        } catch {
+          // ignore
+        }
+      },
+    );
   }
 
   if (loading) {

@@ -1,12 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { errorResponse, createTTLCache, fetchWithTimeout } from '@/lib/api-utils';
+import { NextResponse } from 'next/server';
+import { cachedProxyRoute, createTTLCache, fetchWithTimeout } from '@/lib/api-utils';
 import { LEAGUE_MAP } from '@/lib/espn';
 
 export const dynamic = 'force-dynamic';
 
-/** @internal */
-export const cache = createTTLCache<unknown>(5 * 60 * 1000); // 5 minutes
-const colorCache = createTTLCache<Map<string, string>>(60 * 60 * 1000); // 1 hour
+/** @internal exported for test cleanup */
+export const colorCache = createTTLCache<Map<string, string>>(60 * 60 * 1000); // 1 hour
 
 // Static division mappings for leagues where ESPN doesn't provide division-level data
 const DIVISION_MAP: Record<string, Record<string, string[]>> = {
@@ -329,20 +328,86 @@ async function fetchTeamColors(path: string, league: string): Promise<Map<string
   }
 }
 
-export async function GET(request: NextRequest) {
-  try {
-    const league = request.nextUrl.searchParams.get('league') || 'nfl';
-    const grouping = request.nextUrl.searchParams.get('grouping') || 'division';
+/** Merge divisions into conferences */
+function groupByConference(
+  groups: ParsedGroup[],
+  data: Record<string, unknown>,
+  league: string,
+): ParsedGroup[] {
+  const confMap = new Map<string, ParsedGroup>();
+  const children = data.children as Record<string, unknown>[] | undefined;
+
+  if (children && children.length > 0) {
+    for (const conf of children) {
+      const confName = (conf.name as string) ?? 'Conference';
+      const confChildren = conf.children as Record<string, unknown>[] | undefined;
+
+      if (confChildren && confChildren.length > 0) {
+        // Has divisions — merge them into one conference group
+        const allEntries: ParsedEntry[] = [];
+        for (const div of confChildren) {
+          const standings = div.standings as Record<string, unknown> | undefined;
+          const entries = (standings?.entries as Record<string, unknown>[]) ?? [];
+          allEntries.push(...entries.map((e, i) => parseEntry(e, i + 1, league)));
+        }
+        // Re-sort and re-rank
+        sortAndRank(allEntries);
+        confMap.set(confName, { name: confName, league: league.toUpperCase(), entries: allEntries });
+      } else {
+        // Already conference level
+        const existing = groups.find((g) => g.name === confName);
+        if (existing) confMap.set(confName, existing);
+      }
+    }
+    return Array.from(confMap.values());
+  }
+
+  // If no children structure, groups stay as-is
+  return groups;
+}
+
+/** Merge everything into one flat list */
+function groupByLeague(groups: ParsedGroup[], league: string): ParsedGroup[] {
+  const allEntries = groups.flatMap((g) => g.entries);
+  sortAndRank(allEntries);
+  return [{ name: league.toUpperCase(), league: league.toUpperCase(), entries: allEntries }];
+}
+
+/** Use static division mapping to split conference groups into divisions */
+function groupByDivision(groups: ParsedGroup[], league: string): ParsedGroup[] {
+  const divMap = DIVISION_MAP[league.toLowerCase()];
+  if (!divMap) {
+    // No division map available — groups stay as-is (conference level)
+    return groups;
+  }
+
+  const allEntries = groups.flatMap((g) => g.entries);
+  const divGroups: ParsedGroup[] = [];
+  for (const [divName, teamAbbrs] of Object.entries(divMap)) {
+    const divEntries = allEntries.filter((e) => teamAbbrs.includes(e.teamAbbr));
+    sortAndRank(divEntries);
+    if (divEntries.length > 0) {
+      divGroups.push({ name: divName, league: league.toUpperCase(), entries: divEntries });
+    }
+  }
+
+  return divGroups.length > 0 ? divGroups : groups;
+}
+
+const { GET, cache } = cachedProxyRoute<{ groups: ParsedGroup[] }>({
+  ttlMs: 5 * 60 * 1000, // 5 minutes
+  cacheKey: (req) => {
+    const league = req.nextUrl.searchParams.get('league') || 'nfl';
+    const grouping = req.nextUrl.searchParams.get('grouping') || 'division';
+    return `${league}:${grouping}`;
+  },
+  execute: async (req) => {
+    const league = req.nextUrl.searchParams.get('league') || 'nfl';
+    const grouping = req.nextUrl.searchParams.get('grouping') || 'division';
 
     const path = LEAGUE_MAP[league.toLowerCase()];
     if (!path) {
       return NextResponse.json({ error: `Unknown league: ${league}` }, { status: 400 });
-    }
-
-    const cacheKey = `${league}:${grouping}`;
-    const cached = cache.get(cacheKey);
-    if (cached) {
-      return NextResponse.json(cached);
     }
 
     const url = `https://site.api.espn.com/apis/v2/sports/${path}/standings`;
@@ -362,57 +427,11 @@ export async function GET(request: NextRequest) {
 
     // Apply grouping
     if (grouping === 'conference') {
-      // Merge divisions into conferences
-      const confMap = new Map<string, ParsedGroup>();
-      const children = data.children as Record<string, unknown>[] | undefined;
-
-      if (children && children.length > 0) {
-        for (const conf of children) {
-          const confName = (conf.name as string) ?? 'Conference';
-          const confChildren = conf.children as Record<string, unknown>[] | undefined;
-
-          if (confChildren && confChildren.length > 0) {
-            // Has divisions — merge them into one conference group
-            const allEntries: ParsedEntry[] = [];
-            for (const div of confChildren) {
-              const standings = div.standings as Record<string, unknown> | undefined;
-              const entries = (standings?.entries as Record<string, unknown>[]) ?? [];
-              allEntries.push(...entries.map((e, i) => parseEntry(e, i + 1, league)));
-            }
-            // Re-sort and re-rank
-            sortAndRank(allEntries);
-            confMap.set(confName, { name: confName, league: league.toUpperCase(), entries: allEntries });
-          } else {
-            // Already conference level
-            const existing = allGroups.find((g) => g.name === confName);
-            if (existing) confMap.set(confName, existing);
-          }
-        }
-        allGroups = Array.from(confMap.values());
-      }
-      // If no children structure, allGroups stays as-is
+      allGroups = groupByConference(allGroups, data, league);
     } else if (grouping === 'league') {
-      // Merge everything into one flat list
-      const allEntries = allGroups.flatMap((g) => g.entries);
-      sortAndRank(allEntries);
-      allGroups = [{ name: league.toUpperCase(), league: league.toUpperCase(), entries: allEntries }];
+      allGroups = groupByLeague(allGroups, league);
     } else if (grouping === 'division') {
-      // Use static division mapping to split conference groups into divisions
-      const divMap = DIVISION_MAP[league.toLowerCase()];
-      if (divMap) {
-        const allEntries = allGroups.flatMap((g) => g.entries);
-        const divGroups: ParsedGroup[] = [];
-        for (const [divName, teamAbbrs] of Object.entries(divMap)) {
-          const divEntries = allEntries
-            .filter((e) => teamAbbrs.includes(e.teamAbbr));
-          sortAndRank(divEntries);
-          if (divEntries.length > 0) {
-            divGroups.push({ name: divName, league: league.toUpperCase(), entries: divEntries });
-          }
-        }
-        if (divGroups.length > 0) allGroups = divGroups;
-      }
-      // No division map available — allGroups stays as-is (conference level)
+      allGroups = groupByDivision(allGroups, league);
     }
 
     // Merge team colors from teams API (standings API doesn't include them)
@@ -425,10 +444,10 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const response = { groups: allGroups };
-    cache.set(cacheKey, response);
-    return NextResponse.json(response);
-  } catch (error) {
-    return errorResponse(error, 'Failed to fetch standings');
-  }
-}
+    return { groups: allGroups };
+  },
+  errorMessage: 'Failed to fetch standings',
+});
+
+/** @internal */
+export { GET, cache };
