@@ -1,5 +1,6 @@
 'use client';
 import type { WordOfDayConfig, ModuleStyle } from '@/types/config';
+import { getDayOfYear } from 'date-fns';
 import ModuleWrapper from './ModuleWrapper';
 
 interface WordOfDayModuleProps {
@@ -40,16 +41,8 @@ const WORDS = [
   { word: "Iridescent", definition: "Showing luminous colors that change when seen from different angles" },
 ];
 
-function getDayOfYear(): number {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), 0, 0);
-  const diff = now.getTime() - start.getTime();
-  const oneDay = 1000 * 60 * 60 * 24;
-  return Math.floor(diff / oneDay);
-}
-
 export default function WordOfDayModule({ config: _config, style }: WordOfDayModuleProps) {
-  const dayOfYear = getDayOfYear();
+  const dayOfYear = getDayOfYear(new Date());
   const entry = WORDS[dayOfYear % WORDS.length];
 
   return (

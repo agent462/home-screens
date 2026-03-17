@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { execFile } from 'child_process';
 import { readFile } from 'fs/promises';
 import path from 'path';
-import { requireSession } from '@/lib/auth';
-import { errorResponse } from '@/lib/api-utils';
+import { withAuth } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,66 +24,54 @@ function run(action: string, args: string[] = []): Promise<string> {
   });
 }
 
-export async function GET(request: NextRequest) {
-  try {
-    await requireSession(request);
-    const download = request.nextUrl.searchParams.get('download');
+export const GET = withAuth(async (request: NextRequest) => {
+  const download = request.nextUrl.searchParams.get('download');
 
-    if (download) {
-      if (!BACKUP_NAME_RE.test(download)) {
-        return NextResponse.json({ error: 'Invalid backup filename' }, { status: 400 });
-      }
-      try {
-        const filePath = path.join(BACKUP_DIR, download);
-        const content = await readFile(filePath);
-        return new NextResponse(content, {
-          headers: {
-            'Content-Type': 'application/json',
-            'Content-Disposition': `attachment; filename="${download}"`,
-          },
-        });
-      } catch {
-        return NextResponse.json({ error: 'Backup not found' }, { status: 404 });
-      }
-    }
-
-    const output = await run('list-backups');
-    const backups = JSON.parse(output);
-    return NextResponse.json({ backups });
-  } catch (error) {
-    if (error instanceof Response) return error;
-    return NextResponse.json({ backups: [] });
-  }
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    await requireSession(request);
-    let body: { name?: string };
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-    }
-
-    const name = body.name;
-    if (!name || typeof name !== 'string') {
-      return NextResponse.json({ error: 'Missing "name"' }, { status: 400 });
-    }
-
-    // Validate filename to prevent path traversal
-    if (!BACKUP_NAME_RE.test(name)) {
+  if (download) {
+    if (!BACKUP_NAME_RE.test(download)) {
       return NextResponse.json({ error: 'Invalid backup filename' }, { status: 400 });
     }
-
-    const output = await run('restore-backup', [name]);
-    const result = JSON.parse(output);
-    if (!result.ok) {
-      return NextResponse.json({ error: result.error }, { status: 400 });
+    try {
+      const filePath = path.join(BACKUP_DIR, download);
+      const content = await readFile(filePath);
+      return new NextResponse(content, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Disposition': `attachment; filename="${download}"`,
+        },
+      });
+    } catch {
+      return NextResponse.json({ error: 'Backup not found' }, { status: 404 });
     }
-    return NextResponse.json(result);
-  } catch (error) {
-    if (error instanceof Response) return error;
-    return errorResponse(error, 'Restore failed');
   }
-}
+
+  const output = await run('list-backups');
+  const backups = JSON.parse(output);
+  return NextResponse.json({ backups });
+}, 'Failed to list backups');
+
+export const POST = withAuth(async (request: NextRequest) => {
+  let body: { name?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
+
+  const name = body.name;
+  if (!name || typeof name !== 'string') {
+    return NextResponse.json({ error: 'Missing "name"' }, { status: 400 });
+  }
+
+  // Validate filename to prevent path traversal
+  if (!BACKUP_NAME_RE.test(name)) {
+    return NextResponse.json({ error: 'Invalid backup filename' }, { status: 400 });
+  }
+
+  const output = await run('restore-backup', [name]);
+  const result = JSON.parse(output);
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error }, { status: 400 });
+  }
+  return NextResponse.json(result);
+}, 'Restore failed');

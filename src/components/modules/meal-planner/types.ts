@@ -37,7 +37,7 @@ export function resolveMeal(
 }
 
 /** Slot time windows — [start, end) in hours */
-export const SLOT_WINDOWS: Record<MealSlotType, { start: number; end: number }> = {
+const SLOT_WINDOWS: Record<MealSlotType, { start: number; end: number }> = {
   breakfast: { start: 5, end: 10 },
   lunch:     { start: 10, end: 14 },
   snack:     { start: 14, end: 17 },
