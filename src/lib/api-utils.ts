@@ -100,8 +100,6 @@ export function createTTLCache<T>(ttlMs: number) {
   };
 }
 
-type TTLCache<T> = ReturnType<typeof createTTLCache<T>>;
-
 /**
  * Validates a Todoist API token by making a lightweight request to the
  * Todoist projects endpoint. Returns `true` if the token is valid, or an

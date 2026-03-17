@@ -1,4 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { NextRequest } from 'next/server';
+
+const dummyRequest = new NextRequest('http://localhost/api/history');
 
 function makeHistoryEvent(year: string, text: string) {
   return { year, text, links: [{ title: 'Wikipedia', link: `https://en.wikipedia.org/wiki/${text}` }] };
@@ -74,7 +77,7 @@ describe('GET /api/history', () => {
     mockFetchSuccess(events);
 
     const GET = await importGET();
-    const response = await GET();
+    const response = await GET(dummyRequest);
     const json = await response.json();
 
     expect(response.status).toBe(200);
@@ -92,7 +95,7 @@ describe('GET /api/history', () => {
     mockFetchSuccess(events);
 
     const GET = await importGET();
-    const response = await GET();
+    const response = await GET(dummyRequest);
     const json = await response.json();
 
     expect(json.events).toHaveLength(10);
@@ -104,7 +107,7 @@ describe('GET /api/history', () => {
     mockFetchSuccess([{ year: '2000', text: 'Something happened' }]);
 
     const GET = await importGET();
-    const response = await GET();
+    const response = await GET(dummyRequest);
     const json = await response.json();
 
     const event = json.events[0];
@@ -123,7 +126,7 @@ describe('GET /api/history', () => {
     );
 
     const GET = await importGET();
-    const response = await GET();
+    const response = await GET(dummyRequest);
     const json = await response.json();
 
     expect(response.status).toBe(200);
@@ -134,7 +137,7 @@ describe('GET /api/history', () => {
     mockFetchUpstreamFailure(503);
 
     const GET = await importGET();
-    const response = await GET();
+    const response = await GET(dummyRequest);
     const json = await response.json();
 
     expect(response.status).toBe(502);
@@ -145,7 +148,7 @@ describe('GET /api/history', () => {
     mockFetchNetworkError('ECONNREFUSED');
 
     const GET = await importGET();
-    const response = await GET();
+    const response = await GET(dummyRequest);
     const json = await response.json();
 
     expect(response.status).toBe(500);
@@ -156,7 +159,7 @@ describe('GET /api/history', () => {
     mockFetchSuccess([{ year: '2020', text: 'Test' }]);
 
     const GET = await importGET();
-    await GET();
+    await GET(dummyRequest);
 
     expect(fetch).toHaveBeenCalledWith('https://history.muffinlabs.com/date', expect.objectContaining({
       headers: { Accept: 'application/json' },
@@ -169,13 +172,13 @@ describe('GET /api/history', () => {
     const GET = await importGET();
 
     // First call fetches from upstream
-    const response1 = await GET();
+    const response1 = await GET(dummyRequest);
     const json1 = await response1.json();
     expect(json1.events).toHaveLength(1);
     expect(fetch).toHaveBeenCalledTimes(1);
 
     // Second call should use cache
-    const response2 = await GET();
+    const response2 = await GET(dummyRequest);
     const json2 = await response2.json();
     expect(json2.events).toEqual([{ year: '1999', text: 'Cached event' }]);
     expect(fetch).toHaveBeenCalledTimes(1); // not called again

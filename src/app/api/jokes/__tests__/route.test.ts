@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { NextRequest } from 'next/server';
 import { GET, cache } from '@/app/api/jokes/route';
+
+const dummyRequest = new NextRequest('http://localhost/api/jokes');
 
 function mockFetchSuccess(joke: string) {
   vi.stubGlobal(
@@ -42,7 +45,7 @@ describe('GET /api/jokes', () => {
   it('returns a joke on successful upstream response', async () => {
     mockFetchSuccess('Why did the scarecrow win an award? He was outstanding in his field.');
 
-    const response = await GET();
+    const response = await GET(dummyRequest);
     const json = await response.json();
 
     expect(response.status).toBe(200);
@@ -52,7 +55,7 @@ describe('GET /api/jokes', () => {
   it('returns only the joke field, stripping other upstream data', async () => {
     mockFetchSuccess('Test joke');
 
-    const response = await GET();
+    const response = await GET(dummyRequest);
     const json = await response.json();
 
     // Should not include id, status, or other fields from the upstream API
@@ -62,7 +65,7 @@ describe('GET /api/jokes', () => {
   it('sends correct URL and Accept header to upstream API', async () => {
     mockFetchSuccess('A joke');
 
-    await GET();
+    await GET(dummyRequest);
 
     expect(fetch).toHaveBeenCalledWith('https://icanhazdadjoke.com', expect.objectContaining({
       headers: { Accept: 'application/json' },
@@ -72,7 +75,7 @@ describe('GET /api/jokes', () => {
   it('returns 502 when upstream API returns non-ok response', async () => {
     mockFetchUpstreamFailure(503);
 
-    const response = await GET();
+    const response = await GET(dummyRequest);
     const json = await response.json();
 
     expect(response.status).toBe(502);
@@ -82,7 +85,7 @@ describe('GET /api/jokes', () => {
   it('returns 502 when upstream returns 429 (rate limited)', async () => {
     mockFetchUpstreamFailure(429);
 
-    const response = await GET();
+    const response = await GET(dummyRequest);
     const json = await response.json();
 
     expect(response.status).toBe(502);
@@ -92,7 +95,7 @@ describe('GET /api/jokes', () => {
   it('returns 500 with error message when network request fails', async () => {
     mockFetchNetworkError('DNS resolution failed');
 
-    const response = await GET();
+    const response = await GET(dummyRequest);
     const json = await response.json();
 
     expect(response.status).toBe(500);
@@ -105,7 +108,7 @@ describe('GET /api/jokes', () => {
       vi.fn(() => Promise.reject('string error')),
     );
 
-    const response = await GET();
+    const response = await GET(dummyRequest);
     const json = await response.json();
 
     expect(response.status).toBe(500);

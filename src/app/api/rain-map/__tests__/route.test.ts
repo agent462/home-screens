@@ -1,4 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { NextRequest } from 'next/server';
+
+const dummyRequest = new NextRequest('http://localhost/api/rain-map');
 
 function makeRainViewerResponse() {
   return {
@@ -70,7 +73,7 @@ describe('GET /api/rain-map', () => {
     mockFetchSuccess(expected);
 
     const GET = await importGET();
-    const response = await GET();
+    const response = await GET(dummyRequest);
     const json = await response.json();
 
     expect(response.status).toBe(200);
@@ -81,7 +84,7 @@ describe('GET /api/rain-map', () => {
     mockFetchSuccess();
 
     const GET = await importGET();
-    const response = await GET();
+    const response = await GET(dummyRequest);
     const json = await response.json();
 
     expect(json.radar.past).toHaveLength(2);
@@ -95,7 +98,7 @@ describe('GET /api/rain-map', () => {
     mockFetchSuccess();
 
     const GET = await importGET();
-    await GET();
+    await GET(dummyRequest);
 
     expect(fetch).toHaveBeenCalledWith('https://api.rainviewer.com/public/weather-maps.json', expect.anything());
   });
@@ -104,7 +107,7 @@ describe('GET /api/rain-map', () => {
     mockFetchUpstreamFailure(503);
 
     const GET = await importGET();
-    const response = await GET();
+    const response = await GET(dummyRequest);
     const json = await response.json();
 
     expect(response.status).toBe(502);
@@ -115,7 +118,7 @@ describe('GET /api/rain-map', () => {
     mockFetchUpstreamFailure(429);
 
     const GET = await importGET();
-    const response = await GET();
+    const response = await GET(dummyRequest);
     const json = await response.json();
 
     expect(json.error).toBe('RainViewer API returned 429');
@@ -125,7 +128,7 @@ describe('GET /api/rain-map', () => {
     mockFetchNetworkError('ETIMEDOUT');
 
     const GET = await importGET();
-    const response = await GET();
+    const response = await GET(dummyRequest);
     const json = await response.json();
 
     expect(response.status).toBe(500);
@@ -137,11 +140,11 @@ describe('GET /api/rain-map', () => {
 
     const GET = await importGET();
 
-    const response1 = await GET();
+    const response1 = await GET(dummyRequest);
     expect(response1.status).toBe(200);
     expect(fetch).toHaveBeenCalledTimes(1);
 
-    const response2 = await GET();
+    const response2 = await GET(dummyRequest);
     const json2 = await response2.json();
     expect(json2.version).toBe('2.0');
     expect(fetch).toHaveBeenCalledTimes(1); // cache hit, no second fetch
