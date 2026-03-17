@@ -2,208 +2,26 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { flushSync } from 'react-dom';
-import type { Screen, GlobalSettings, ScreenConfiguration, Profile } from '@/types/config';
-import ScreenRenderer, { resolveProvider } from './ScreenRenderer';
-import type { SharedDisplayData } from './ScreenRenderer';
+import type { Screen, GlobalSettings, Profile } from '@/types/config';
+import ScreenRenderer from './ScreenRenderer';
 import SleepOverlay from './SleepOverlay';
 import AlertOverlay from './AlertOverlay';
 import { useDisplayControl } from './useDisplayControl';
-import { useFetchData } from '@/hooks/useFetchData';
+import { useBackgroundRotation } from './useBackgroundRotation';
+import { useLiveConfig } from './useLiveConfig';
+import { useSharedDisplayData } from './useSharedDisplayData';
+import { usePrefetchNextScreen } from './usePrefetchNextScreen';
 import { useTZClock } from '@/hooks/useTZClock';
 import { resolveProfileScreens } from '@/lib/schedule';
 import { getTransitionConfig, getViewTransitionKeyframes } from '@/lib/transitions';
-import { WEATHER_REFRESH_MS, CALENDAR_REFRESH_MS, DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT } from '@/lib/constants';
-import { displayCache } from '@/lib/display-cache';
-import { prefetchScreen } from '@/lib/prefetch';
+import { DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT } from '@/lib/constants';
 import { useIdleCursor } from '@/hooks/useIdleCursor';
 import type { TransitionEffect } from '@/types/config';
-
-/** How often the display polls for config changes (ms) */
-const CONFIG_POLL_MS = 3_000;
 
 interface ScreenRotatorProps {
   screens: Screen[];
   settings: GlobalSettings;
   profiles?: Profile[];
-}
-
-/** How often the client polls the server-side rotation cache (ms) */
-const BG_POLL_MS = 60_000;
-
-function useBackgroundRotation(screens: Screen[]) {
-  // Persist rotating backgrounds across screen mounts, keyed by screen id
-  const [backgrounds, setBackgrounds] = useState<Record<string, string>>({});
-
-  // Build a stable key from only the rotation-relevant config so we don't
-  // restart polling when unrelated screen fields change.
-  const rotationKey = screens
-    .filter((s) => s.backgroundRotation?.enabled)
-    .map((s) => `${s.id}:${s.backgroundRotation!.source || 'unsplash'}:${s.backgroundRotation!.query}:${s.backgroundRotation!.intervalMinutes}`)
-    .join('|');
-
-  useEffect(() => {
-    if (!rotationKey) return;
-
-    const screensWithRotation = screens.filter((s) => s.backgroundRotation?.enabled);
-
-    async function pollBackgrounds() {
-      for (const screen of screensWithRotation) {
-        try {
-          const res = await fetch(`/api/backgrounds/rotate?screenId=${encodeURIComponent(screen.id)}`);
-          if (res.ok) {
-            const data = await res.json();
-            if (data.path) {
-              setBackgrounds((prev) => {
-                if (prev[screen.id] === data.path) return prev;
-                return { ...prev, [screen.id]: data.path };
-              });
-            }
-          }
-        } catch {
-          // keep current background on failure
-        }
-      }
-    }
-
-    pollBackgrounds();
-    const id = setInterval(pollBackgrounds, BG_POLL_MS);
-    return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rotationKey]);
-
-  return backgrounds;
-}
-
-/**
- * Poll /api/config and return live screens + settings + profiles,
- * falling back to the server-rendered props until the first successful fetch.
- */
-function useLiveConfig(initialScreens: Screen[], initialSettings: GlobalSettings, initialProfiles?: Profile[]) {
-  const [screens, setScreens] = useState(initialScreens);
-  const [settings, setSettings] = useState(initialSettings);
-  const [profiles, setProfiles] = useState(initialProfiles);
-  const configJsonRef = useRef<string>('');
-  const buildIdRef = useRef<string>('');
-
-  useEffect(() => {
-    let mounted = true;
-
-    async function poll() {
-      try {
-        // Check for new build — reload the page if the server was redeployed
-        const buildRes = await fetch('/api/system/build-id');
-        if (buildRes.ok && mounted) {
-          const newBuildId = await buildRes.text();
-          if (buildIdRef.current && newBuildId !== buildIdRef.current) {
-            window.location.reload();
-            return;
-          }
-          buildIdRef.current = newBuildId;
-        }
-
-        const res = await fetch('/api/config');
-        if (!res.ok || !mounted) return;
-        const text = await res.text();
-        // Only update state when the JSON actually changed
-        if (text !== configJsonRef.current) {
-          configJsonRef.current = text;
-          displayCache.clear(); // invalidate client cache on config change
-          const cfg: ScreenConfiguration = JSON.parse(text);
-          if (cfg.screens && cfg.settings) {
-            setScreens(cfg.screens);
-            setSettings(cfg.settings);
-            setProfiles(cfg.profiles);
-          }
-        }
-      } catch {
-        // keep current config on failure
-      }
-    }
-
-    poll();
-    const id = setInterval(poll, CONFIG_POLL_MS);
-    return () => {
-      mounted = false;
-      clearInterval(id);
-    };
-  }, []);
-
-  return { screens, settings, profiles };
-}
-
-/** Fetch weather + calendar data once, shared across all screen rotations. */
-function useSharedDisplayData(screens: Screen[], settings: GlobalSettings): SharedDisplayData {
-  const globalProvider = settings.weather.provider;
-  const lat = settings.latitude ?? settings.weather.latitude;
-  const lon = settings.longitude ?? settings.weather.longitude;
-  const baseParams = `lat=${lat}&lon=${lon}&units=${settings.weather.units}`;
-
-  const neededProviders = useMemo(() => {
-    const needed = new Set<string>();
-    for (const screen of screens) {
-      for (const mod of screen.modules) {
-        if (mod.type === 'weather') needed.add(resolveProvider(mod, globalProvider));
-      }
-    }
-    return needed;
-  }, [screens, globalProvider]);
-
-  const weatherUrl = (provider: string) =>
-    neededProviders.has(provider) ? `/api/weather?${baseParams}&provider=${provider}` : '';
-
-  const [owmData] = useFetchData(weatherUrl('openweathermap'), WEATHER_REFRESH_MS);
-  const [wapiData] = useFetchData(weatherUrl('weatherapi'), WEATHER_REFRESH_MS);
-  const [pirateData] = useFetchData(weatherUrl('pirateweather'), WEATHER_REFRESH_MS);
-  const [noaaData] = useFetchData(weatherUrl('noaa'), WEATHER_REFRESH_MS);
-  const [openMeteoData] = useFetchData(weatherUrl('open-meteo'), WEATHER_REFRESH_MS);
-
-  const calendarIdList = settings.calendar.googleCalendarIds?.length
-    ? settings.calendar.googleCalendarIds
-    : settings.calendar.googleCalendarId ? [settings.calendar.googleCalendarId] : [];
-  const hasIcalSources = settings.calendar.icalSources?.some(s => s.enabled);
-  const hasHolidays = !!settings.calendar.holidayCountry;
-  const calendarUrl = (calendarIdList.length || hasIcalSources || hasHolidays)
-    ? calendarIdList.length
-      ? `/api/calendar?calendarIds=${encodeURIComponent(calendarIdList.join(','))}`
-      : '/api/calendar'
-    : '';
-  const [calendarData] = useFetchData(calendarUrl, CALENDAR_REFRESH_MS);
-
-  return { owmData, wapiData, pirateData, noaaData, openMeteoData, calendarData };
-}
-
-/** Prefetch next screen's module data ~5s before rotation fires.
- *  Uses screenKey (stable string) instead of screens array to avoid
- *  restarting the timer every time useMemo returns a new array reference.
- */
-function usePrefetchNextScreen(
-  screens: Screen[],
-  screenKey: string,
-  currentIndex: number,
-  rotationIntervalMs: number,
-  displayState: string,
-) {
-  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const screensRef = useRef(screens);
-
-  useEffect(() => {
-    screensRef.current = screens;
-  }, [screens]);
-
-  useEffect(() => {
-    if (displayState === 'asleep' || screensRef.current.length <= 1) return;
-
-    const nextIndex = (currentIndex + 1) % screensRef.current.length;
-    const delay = Math.max(rotationIntervalMs - 5000, 0);
-
-    timerRef.current = setTimeout(() => {
-      prefetchScreen(screensRef.current[nextIndex], new Date());
-    }, delay);
-
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, [screenKey, currentIndex, rotationIntervalMs, displayState]);
 }
 
 // ---- View Transitions API integration ----
