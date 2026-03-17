@@ -588,16 +588,16 @@ if [ -f "${APP_DIR}/data/port.conf" ]; then
   [[ "${_p}" =~ ^[0-9]+$ ]] && PORT="${_p}"
 fi
 
-# Apply resolution and rotation in the background
-if [ -n "${DISPLAY_MODE}" ] || [ -n "${DISPLAY_TRANSFORM}" ]; then
+# Apply rotation and resolution in the background (split into separate calls
+# so a mode failure does not prevent the transform from applying).
+if [ -n "${DISPLAY_TRANSFORM}" ] || [ -n "${DISPLAY_MODE}" ]; then
   OUTPUT=$(wlr-randr 2>/dev/null | head -1 | awk '"'"'{print $1}'"'"' || echo '"'"'HDMI-A-1'"'"')
-  (
-    sleep 1
-    WLR_ARGS="--output ${OUTPUT}"
-    [ -n "${DISPLAY_MODE}" ] && WLR_ARGS="${WLR_ARGS} --mode ${DISPLAY_MODE}"
-    [ -n "${DISPLAY_TRANSFORM}" ] && WLR_ARGS="${WLR_ARGS} --transform ${DISPLAY_TRANSFORM}"
-    wlr-randr ${WLR_ARGS}
-  ) &
+  [ -n "${DISPLAY_TRANSFORM}" ] && \
+    (sleep 1 && wlr-randr --output "${OUTPUT}" --transform "${DISPLAY_TRANSFORM}") &
+  [ -n "${DISPLAY_MODE}" ] && \
+    (sleep 2 && wlr-randr --output "${OUTPUT}" --mode "${DISPLAY_MODE}" 2>/dev/null \
+      || wlr-randr --output "${OUTPUT}" --custom-mode "${DISPLAY_MODE}" 2>/dev/null \
+      || true) &
 fi
 
 # Wait for the Next.js server before launching Chromium (defense in depth —
