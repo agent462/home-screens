@@ -417,7 +417,10 @@ export interface MoonPhaseConfig {
 }
 
 // Sunrise / Sunset module config
+export type SunriseSunsetView = 'default' | 'arc';
+
 export interface SunriseSunsetConfig {
+  view: SunriseSunsetView;
   showDayLength: boolean;
   showGoldenHour: boolean;
 }

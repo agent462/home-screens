@@ -317,6 +317,7 @@ registerModule({
   icon: Sunrise,
   category: 'Weather & Environment',
   defaultConfig: {
+    view: 'default',
     showDayLength: true,
     showGoldenHour: false,
   },
