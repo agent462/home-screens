@@ -6,7 +6,7 @@ import {
   Newspaper, TrendingUp, Bitcoin, BookOpen, History,
   Moon, Sunrise, Image, QrCode, BarChart3, Car, Trophy, Wind,
   ListChecks, CloudRain, CalendarRange, Trash2, Medal, Sparkles,
-  Calendar, Globe, UtensilsCrossed, Flag,
+  Calendar, Globe, UtensilsCrossed, Flag, ClipboardList,
 } from 'lucide-react';
 import { DEFAULT_MODULE_SIZES } from './constants';
 
@@ -581,6 +581,26 @@ registerModule({
     refreshIntervalMs: 1_800_000,
   },
   defaultSize: DEFAULT_MODULE_SIZES['flag-status'],
+});
+
+registerModule({
+  type: 'chore-chart',
+  label: 'Chore Chart',
+  icon: ClipboardList,
+  category: 'Personal',
+  defaultConfig: {
+    view: 'board',
+    members: [],
+    chores: [],
+    weekStartDay: 'monday',
+    showPoints: true,
+    showStreaks: true,
+    showTimeOfDay: true,
+    allowDisplayComplete: true,
+    accentColor: '#f59e0b',
+  },
+  defaultSize: DEFAULT_MODULE_SIZES['chore-chart'],
+  defaultStyle: { fontSize: 24 },
 });
 
 registerModule({

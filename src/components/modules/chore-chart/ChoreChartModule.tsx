@@ -1,0 +1,62 @@
+'use client';
+
+import type { ChoreChartConfig, ModuleStyle } from '@/types/config';
+import ModuleWrapper from '../ModuleWrapper';
+import { useChoreData } from './useChoreData';
+import { BoardView } from './views/BoardView';
+import { StarChartView } from './views/StarChartView';
+import { TodayView } from './views/TodayView';
+import { ProgressView } from './views/ProgressView';
+import { CompactView } from './views/CompactView';
+
+interface ChoreChartModuleProps {
+  config: ChoreChartConfig;
+  style: ModuleStyle;
+}
+
+export default function ChoreChartModule({ config, style }: ChoreChartModuleProps) {
+  const view = config.view ?? 'board';
+  const data = useChoreData(config);
+
+  // Empty state — no members
+  if ((config.members?.length ?? 0) === 0) {
+    return (
+      <ModuleWrapper style={style}>
+        <div className="flex flex-col items-center justify-center h-full gap-2 opacity-40">
+          <span style={{ fontSize: '2em' }}>&#128203;</span>
+          <p style={{ fontSize: '0.75em' }}>Add family members to get started</p>
+          <p style={{ fontSize: '0.55em', opacity: 0.6 }}>
+            Open the editor to set up your chore chart
+          </p>
+        </div>
+      </ModuleWrapper>
+    );
+  }
+
+  // Empty state — no chores
+  if ((config.chores?.length ?? 0) === 0) {
+    return (
+      <ModuleWrapper style={style}>
+        <div className="flex flex-col items-center justify-center h-full gap-2 opacity-40">
+          <span style={{ fontSize: '2em' }}>&#128203;</span>
+          <p style={{ fontSize: '0.75em' }}>No chores configured</p>
+          <p style={{ fontSize: '0.55em', opacity: 0.6 }}>
+            Add some chores in the editor
+          </p>
+        </div>
+      </ModuleWrapper>
+    );
+  }
+
+  const viewProps = { config, data };
+
+  return (
+    <ModuleWrapper style={style}>
+      {view === 'board' && <BoardView {...viewProps} />}
+      {view === 'star-chart' && <StarChartView {...viewProps} />}
+      {view === 'today' && <TodayView {...viewProps} />}
+      {view === 'progress' && <ProgressView {...viewProps} />}
+      {view === 'compact' && <CompactView {...viewProps} />}
+    </ModuleWrapper>
+  );
+}

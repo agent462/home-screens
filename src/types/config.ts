@@ -32,7 +32,8 @@ export type ModuleType =
   | 'date'
   | 'meal-planner'
   | 'iframe'
-  | 'flag-status';
+  | 'flag-status'
+  | 'chore-chart';
 
 export interface ModuleStyle {
   opacity: number;
@@ -657,6 +658,50 @@ export interface DateConfig {
   showYear: boolean;
   showWeekNumber: boolean;
   showDayOfYear: boolean;
+  accentColor: string;
+}
+
+// Chore chart module config
+export type ChoreChartView = 'board' | 'star-chart' | 'today' | 'progress' | 'compact';
+export type ChoreTimeOfDay = 'morning' | 'afternoon' | 'evening' | 'anytime';
+export type ChoreRotation = 'fixed' | 'rotate-daily' | 'rotate-weekly';
+export type ChoreResetFrequency = 'daily' | 'weekly' | 'biweekly';
+
+export interface ChoreMember {
+  id: string;
+  name: string;
+  emoji: string;
+  color: string;
+}
+
+export interface ChoreDefinition {
+  id: string;
+  name: string;
+  emoji: string;
+  points: number;
+  frequency: ChoreResetFrequency;
+  daysOfWeek: number[];
+  timeOfDay: ChoreTimeOfDay;
+  assigneeIds: string[];
+  rotation: ChoreRotation;
+}
+
+export interface ChoreCompletion {
+  choreId: string;
+  memberId: string;
+  date: string;
+  completedAt: string;
+}
+
+export interface ChoreChartConfig {
+  view: ChoreChartView;
+  members: ChoreMember[];
+  chores: ChoreDefinition[];
+  weekStartDay: 'sunday' | 'monday';
+  showPoints: boolean;
+  showStreaks: boolean;
+  showTimeOfDay: boolean;
+  allowDisplayComplete: boolean;
   accentColor: string;
 }
 

@@ -46,6 +46,7 @@ import {
   MealPlannerConfigSection,
   IframeConfigSection,
   FlagStatusConfigSection,
+  ChoreChartConfigSection,
 } from '@/components/editor/config-sections';
 
 // Shared constants — exported for use by config section components
@@ -200,6 +201,7 @@ const CONFIG_SECTIONS: Record<string, React.FC<{ mod: ModuleInstance; screenId: 
   'meal-planner': MealPlannerConfigSection,
   iframe: IframeConfigSection,
   'flag-status': FlagStatusConfigSection,
+  'chore-chart': ChoreChartConfigSection,
 };
 
 export default function PropertyPanel() {

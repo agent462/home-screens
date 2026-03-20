@@ -1,0 +1,136 @@
+'use client';
+
+import type { ChoreChartConfig } from '@/types/config';
+import type { ResolvedAssignment, MemberStats } from '../types';
+import { sortChores } from '../types';
+import ChoreIcon from '../ChoreIcon';
+
+interface BoardViewProps {
+  config: ChoreChartConfig;
+  data: {
+    todayAssignments: ResolvedAssignment[];
+    completionSet: Set<string>;
+    memberStats: Map<string, MemberStats>;
+    toggleComplete: (choreId: string, memberId: string) => Promise<void>;
+  };
+}
+
+export function BoardView({ config, data }: BoardViewProps) {
+  const { todayAssignments, memberStats, toggleComplete } = data;
+  const members = config.members ?? [];
+  const allowTouch = config.allowDisplayComplete;
+
+  return (
+    <div className="flex flex-col h-full" style={{ fontSize: 'inherit' }}>
+      {/* Title */}
+      <div className="text-center mb-2" style={{ fontSize: '0.85em', fontWeight: 600, opacity: 0.7 }}>
+        Family Chores
+      </div>
+
+      {/* Columns */}
+      <div className="flex-1 flex gap-2 min-h-0 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+        {members.map((member) => {
+          const myAssignments = todayAssignments.filter((a) => a.memberId === member.id);
+          const sorted = sortChores(myAssignments, config.showTimeOfDay);
+          const stats = memberStats.get(member.id);
+          const pct = stats?.percentage ?? 0;
+
+          if (myAssignments.length === 0) {
+            return (
+              <div key={member.id} className="flex-1 min-w-0 flex flex-col">
+                {/* Header */}
+                <div
+                  className="text-center rounded-t-md py-1.5 mb-1"
+                  style={{ backgroundColor: `${member.color}18` }}
+                >
+                  <div style={{ fontSize: '1.3em' }} className="flex justify-center">
+                    {member.emoji ? <ChoreIcon value={member.emoji} size={28} color={member.color} /> : <span style={{ color: member.color }}>{member.name[0]}</span>}
+                  </div>
+                  <div style={{ fontSize: '0.7em', fontWeight: 600, color: member.color }}>
+                    {member.name}
+                  </div>
+                </div>
+                <div className="flex-1 flex items-center justify-center" style={{ fontSize: '0.65em', opacity: 0.4 }}>
+                  Day off! &#127796;
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <div key={member.id} className="flex-1 min-w-0 flex flex-col">
+              {/* Header */}
+              <div
+                className="text-center rounded-t-md py-1.5 mb-1"
+                style={{ backgroundColor: `${member.color}18` }}
+              >
+                <div style={{ fontSize: '1.3em' }} className="flex justify-center">
+                  {member.emoji ? <ChoreIcon value={member.emoji} size={28} color={member.color} /> : <span style={{ color: member.color }}>{member.name[0]}</span>}
+                </div>
+                <div style={{ fontSize: '0.7em', fontWeight: 600, color: member.color }}>
+                  {member.name}
+                </div>
+              </div>
+
+              {/* Chore cards */}
+              <div className="flex-1 overflow-y-auto space-y-1" style={{ scrollbarWidth: 'none' }}>
+                {sorted.map((assignment) => {
+                  const { chore, isCompleted } = assignment;
+                  return (
+                    <button
+                      key={chore.id}
+                      type="button"
+                      onClick={allowTouch ? () => toggleComplete(chore.id, member.id) : undefined}
+                      disabled={!allowTouch}
+                      className="w-full text-left rounded-md transition-all"
+                      style={{
+                        padding: '0.4em 0.5em',
+                        fontSize: '1em',
+                        opacity: isCompleted ? 0.45 : 1,
+                        textDecoration: isCompleted ? 'line-through' : 'none',
+                        backgroundColor: isCompleted ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.06)',
+                        cursor: allowTouch ? 'pointer' : 'default',
+                        border: 'none',
+                        color: 'inherit',
+                      }}
+                    >
+                      <span style={{ fontSize: '1.2em' }}>{isCompleted ? '\u2705' : '\u2610'}</span>{' '}
+                      {chore.emoji && <ChoreIcon value={chore.emoji} size={18} color="currentColor" />}{' '}
+                      <span>{chore.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Progress bar */}
+              <div className="mt-1.5">
+                <div
+                  className="rounded-full overflow-hidden"
+                  style={{ height: '0.35em', backgroundColor: 'rgba(255,255,255,0.08)' }}
+                >
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${pct}%`,
+                      backgroundColor: member.color,
+                    }}
+                  />
+                </div>
+                <div className="text-center mt-0.5" style={{ fontSize: '0.6em', opacity: 0.5 }}>
+                  {stats?.completed ?? 0}/{stats?.total ?? 0}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* All complete celebration */}
+      {members.length > 0 && todayAssignments.length > 0 && todayAssignments.every((a) => a.isCompleted) && (
+        <div className="text-center mt-2" style={{ fontSize: '0.75em', opacity: 0.7 }}>
+          All done! &#127881;
+        </div>
+      )}
+    </div>
+  );
+}
