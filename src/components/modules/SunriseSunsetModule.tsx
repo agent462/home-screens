@@ -98,8 +98,8 @@ function SunArcView({
   const goldenProgress = sunProgress(times.goldenHour, sunrise, sunset);
 
   // Sun glow radius and opacity based on altitude
-  const glowRadius = isDaytime ? 18 : 10;
-  const sunRadius = 6;
+  const glowRadius = isDaytime ? 32 : 18;
+  const sunRadius = 12;
 
   return (
     <div className="flex flex-col items-center justify-center h-full" style={{ gap: '0.3em' }}>
@@ -132,7 +132,7 @@ function SunArcView({
           fill="none"
           stroke="currentColor"
           strokeOpacity="0.15"
-          strokeWidth="1"
+          strokeWidth="3"
           strokeDasharray="4 4"
         />
 
@@ -143,7 +143,7 @@ function SunArcView({
             fill="none"
             stroke={isDaytime ? '#fbbf24' : '#f97316'}
             strokeOpacity="0.4"
-            strokeWidth="1.5"
+            strokeWidth="4"
           />
         )}
 
