@@ -1,6 +1,15 @@
 import type { ComponentType } from 'react';
 import type { ModuleStyle } from '@/types/config';
 
+/** Declaration for a secret a plugin requires (e.g. an API key) */
+export interface PluginSecretDeclaration {
+  key: string;            // identifier, e.g. "api_key"
+  label: string;          // display name, e.g. "Spotify API Key"
+  description?: string;   // help text
+  required: boolean;      // show warning if not configured
+  placeholder?: string;   // input hint
+}
+
 /** Schema for a plugin's manifest.json */
 export interface PluginManifest {
   id: string;
@@ -23,6 +32,8 @@ export interface PluginManifest {
   };
   dataRequirements?: PluginDataRequirement[];
   prefetchUrl?: string | null;
+  secrets?: PluginSecretDeclaration[];
+  allowedDomains?: string[];  // e.g. ["api.spotify.com", "*.openweathermap.org"]
 }
 
 export type PluginDataRequirement = 'location' | 'weather' | 'calendar';

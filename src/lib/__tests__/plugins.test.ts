@@ -19,16 +19,17 @@ describe('sanitizePluginId', () => {
 
   it('strips dots', () => {
     expect(sanitizePluginId('foo.bar')).toBe('foobar');
-    expect(sanitizePluginId('...')).toBe('');
+  });
+
+  it('throws on input that sanitizes to empty string', () => {
+    expect(() => sanitizePluginId('...')).toThrow('Invalid plugin ID');
+    expect(() => sanitizePluginId('')).toThrow('Invalid plugin ID');
+    expect(() => sanitizePluginId('///')).toThrow('Invalid plugin ID');
   });
 
   it('strips special characters', () => {
     expect(sanitizePluginId('hello world!')).toBe('helloworld');
     expect(sanitizePluginId('plugin@1.0')).toBe('plugin10');
-  });
-
-  it('handles empty string', () => {
-    expect(sanitizePluginId('')).toBe('');
   });
 });
 

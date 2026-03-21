@@ -50,6 +50,15 @@ const PUBLIC_AUTH_ROUTES = [
   '/api/auth/google/callback',
 ];
 
+/**
+ * POST routes accessible without auth — used by display-side plugins.
+ * The plugin proxy validates that the plugin is installed and enabled,
+ * and enforces its own domain allowlist + rate limiting.
+ */
+function isDisplayAccessiblePost(pathname: string): boolean {
+  return pathname.startsWith('/api/plugins/proxy/');
+}
+
 function isPublicAuthRoute(pathname: string): boolean {
   return PUBLIC_AUTH_ROUTES.some((r) => pathname === r);
 }
@@ -78,9 +87,10 @@ function isProtectedRoute(pathname: string, method: string): boolean {
   // Editor pages — always protected
   if (pathname.startsWith('/editor')) return true;
 
-  // API write operations — protected (except public auth routes)
+  // API write operations — protected (except public auth routes and display-accessible POSTs)
   if (pathname.startsWith('/api/') && ['PUT', 'POST', 'DELETE'].includes(method)) {
     if (isPublicAuthRoute(pathname)) return false;
+    if (method === 'POST' && isDisplayAccessiblePost(pathname)) return false;
     return true;
   }
 

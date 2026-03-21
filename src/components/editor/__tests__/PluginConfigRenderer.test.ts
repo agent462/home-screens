@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { inferWidget } from '../PluginConfigRenderer';
-import type { PluginConfigProperty } from '@/types/plugins';
+
 
 describe('inferWidget', () => {
   it('infers toggle for boolean', () => {

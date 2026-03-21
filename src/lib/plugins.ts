@@ -4,29 +4,19 @@ import crypto from 'crypto';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import type { InstalledPluginsFile, InstalledPlugin, PluginManifest, RegistryPlugin, PluginRegistry } from '@/types/plugins';
+import { deleteAllPluginSecrets } from '@/lib/plugin-secrets';
+import { sanitizePluginId, pluginsDir, pluginDir, getPluginManifest } from '@/lib/plugin-utils';
 
+// Re-export for backward compatibility — many files import these from '@/lib/plugins'
+export { sanitizePluginId, getPluginManifest };
 
 const execFileAsync = promisify(execFile);
 
-const PLUGINS_DIR = 'data/plugins';
 const INSTALLED_FILE = 'data/plugins/installed.json';
 const REGISTRY_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-function pluginsDir(): string {
-  return path.join(process.cwd(), PLUGINS_DIR);
-}
-
 function installedPath(): string {
   return path.join(process.cwd(), INSTALLED_FILE);
-}
-
-/** Sanitize plugin ID to prevent directory traversal */
-export function sanitizePluginId(pluginId: string): string {
-  return pluginId.replace(/[^a-z0-9_-]/gi, '');
-}
-
-function pluginDir(pluginId: string): string {
-  return path.join(pluginsDir(), sanitizePluginId(pluginId));
 }
 
 // --- Write serialization (prevents TOCTOU races on installed.json) ---
@@ -72,18 +62,6 @@ function saveInstalledPlugins(data: InstalledPluginsFile): Promise<void> {
     // Invalidate cache
     installedCache = null;
   });
-}
-
-// --- Plugin manifest ---
-
-export async function getPluginManifest(pluginId: string): Promise<PluginManifest | null> {
-  try {
-    const manifestPath = path.join(pluginDir(pluginId), 'manifest.json');
-    const data = await fs.readFile(manifestPath, 'utf-8');
-    return JSON.parse(data) as PluginManifest;
-  } catch {
-    return null;
-  }
 }
 
 // --- Plugin bundle ---
@@ -159,6 +137,9 @@ export async function installPlugin(
 }
 
 export async function uninstallPlugin(pluginId: string): Promise<void> {
+  // Delete plugin secrets before removing the directory (secrets file lives inside it)
+  await deleteAllPluginSecrets(pluginId);
+
   const dir = pluginDir(pluginId);
   await fs.rm(dir, { recursive: true, force: true });
 
@@ -196,6 +177,21 @@ export function validateManifest(manifest: unknown): manifest is PluginManifest 
   if (typeof m.version !== 'string') return false;
   if (typeof m.moduleType !== 'string' || !m.moduleType) return false;
   if (typeof m.category !== 'string' || !m.category) return false;
+  // Validate optional secrets array
+  if (m.secrets !== undefined) {
+    if (!Array.isArray(m.secrets)) return false;
+    for (const s of m.secrets) {
+      if (!s || typeof s !== 'object') return false;
+      if (typeof s.key !== 'string' || !/^[a-z0-9_-]+$/i.test(s.key)) return false;
+      if (typeof s.label !== 'string' || !s.label) return false;
+      if (typeof s.required !== 'boolean') return false;
+    }
+  }
+  // Validate optional allowedDomains array
+  if (m.allowedDomains !== undefined) {
+    if (!Array.isArray(m.allowedDomains)) return false;
+    if (!m.allowedDomains.every((d: unknown) => typeof d === 'string')) return false;
+  }
   return true;
 }
 

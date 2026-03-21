@@ -432,7 +432,7 @@ describe('withAuth', () => {
     const json = await response.json();
 
     expect(mockRequireSession).toHaveBeenCalledWith(request);
-    expect(handler).toHaveBeenCalledWith(request);
+    expect(handler).toHaveBeenCalledWith(request, undefined);
     expect(json).toEqual({ ok: true });
   });
 
@@ -470,7 +470,7 @@ describe('withAuth', () => {
 
     await wrapped(request);
 
-    expect(handler).toHaveBeenCalledWith(request);
+    expect(handler).toHaveBeenCalledWith(request, undefined);
     const passedRequest = handler.mock.calls[0][0] as NextRequest;
     expect(passedRequest.nextUrl.searchParams.get('foo')).toBe('bar');
   });

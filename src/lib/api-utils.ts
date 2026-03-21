@@ -135,14 +135,15 @@ export async function validateTodoistToken(
  *     // …handler logic…
  *   }, 'Failed to …');
  */
-export function withAuth(
-  handler: (request: NextRequest) => Promise<Response>,
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function withAuth<C = any>(
+  handler: (request: NextRequest, context: C) => Promise<Response>,
   errorMsg: string,
 ) {
-  return async (request: NextRequest): Promise<Response> => {
+  return async (request: NextRequest, context?: C): Promise<Response> => {
     try {
       await requireSession(request);
-      return await handler(request);
+      return await handler(request, context as C);
     } catch (error) {
       if (error instanceof Response) return error;
       return errorResponse(error, errorMsg);

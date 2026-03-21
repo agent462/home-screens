@@ -84,6 +84,28 @@ export default function PluginGlobals() {
 
       // Event emitter — plugin → host communication
       emit: pluginEventBus.emit,
+
+      // Server-side proxy — fetch external APIs with injected secrets
+      pluginFetch: async (
+        pluginId: string,
+        options: {
+          url: string;
+          method?: string;
+          headers?: Record<string, string>;
+          payload?: string;
+          secretInjections?: {
+            header?: Record<string, string>;
+            query?: Record<string, string>;
+          };
+          cacheTtlMs?: number;
+        },
+      ): Promise<Response> => {
+        return fetch(`/api/plugins/proxy/${encodeURIComponent(pluginId)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(options),
+        });
+      },
     };
   }, []);
 

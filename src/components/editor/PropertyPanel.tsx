@@ -11,6 +11,7 @@ import type { ModuleInstance } from '@/types/config';
 import { usePluginStore } from '@/stores/plugin-store';
 import { getModuleDefinition } from '@/lib/module-registry';
 import PluginConfigRenderer from './PluginConfigRenderer';
+import PluginSecretsSection from './PluginSecretsSection';
 import AccordionSection from './AccordionSection';
 
 import {
@@ -242,6 +243,15 @@ export default function PropertyPanel() {
         {hasSchemaFallback && (
           <AccordionSection title="Config">
             <PluginConfigRenderer mod={selectedModule} screenId={selectedScreenId} schema={pluginDef!.configSchema!} />
+          </AccordionSection>
+        )}
+
+        {isPlugin && loadedPlugin?.manifest.secrets && loadedPlugin.manifest.secrets.length > 0 && (
+          <AccordionSection title="Secrets" defaultOpen={false}>
+            <PluginSecretsSection
+              pluginId={loadedPlugin.manifest.id}
+              secrets={loadedPlugin.manifest.secrets}
+            />
           </AccordionSection>
         )}
 
