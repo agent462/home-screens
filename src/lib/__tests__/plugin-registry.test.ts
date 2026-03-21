@@ -5,6 +5,8 @@ import {
   getModuleDefinition,
   getAllModuleDefinitions,
   getModulesByCategory,
+  getActiveCategories,
+  MODULE_CATEGORIES,
 } from '@/lib/module-registry';
 import type { PluginManifest } from '@/types/plugins';
 import type { ModuleType } from '@/types/config';
@@ -78,18 +80,13 @@ describe('registerPluginModule', () => {
     expect(weatherModules.some((d) => d.type === pluginType)).toBe(true);
   });
 
-  it('does not crash getModulesByCategory for unknown category', () => {
-    // Force an invalid category to test the guard
-    const badManifest = { ...testManifest, category: 'Nonexistent' as never };
-    registerPluginModule(badManifest);
-    // Should not throw
+  it('creates a custom category group for unknown category', () => {
+    const customManifest = { ...testManifest, category: 'Smart Home' as never };
+    registerPluginModule(customManifest);
     const byCategory = getModulesByCategory();
-    // The plugin should NOT appear in any category group
-    let found = false;
-    for (const defs of byCategory.values()) {
-      if (defs.some((d) => d.type === pluginType)) found = true;
-    }
-    expect(found).toBe(false);
+    // The plugin should appear under its custom category
+    const smartHomeModules = byCategory.get('Smart Home') ?? [];
+    expect(smartHomeModules.some((d) => d.type === pluginType)).toBe(true);
   });
 });
 
@@ -104,5 +101,78 @@ describe('unregisterModule', () => {
   it('is a no-op for non-existent types', () => {
     // Should not throw
     unregisterModule('plugin:nonexistent');
+  });
+});
+
+describe('registerPluginModule — defaultStyle', () => {
+  afterEach(() => {
+    unregisterModule(pluginType);
+  });
+
+  it('passes defaultStyle through to the definition', () => {
+    const manifest = { ...testManifest, defaultStyle: { padding: 0, opacity: 0.8 } };
+    registerPluginModule(manifest);
+    const def = getModuleDefinition(pluginType)!;
+    expect(def.defaultStyle).toEqual({ padding: 0, opacity: 0.8 });
+  });
+
+  it('leaves defaultStyle undefined when manifest omits it', () => {
+    registerPluginModule(testManifest);
+    const def = getModuleDefinition(pluginType)!;
+    expect(def.defaultStyle).toBeUndefined();
+  });
+});
+
+describe('getActiveCategories', () => {
+  afterEach(() => {
+    unregisterModule(pluginType);
+    unregisterModule('plugin:widget-a');
+    unregisterModule('plugin:widget-b');
+  });
+
+  it('returns built-in categories when no plugins registered', () => {
+    const categories = getActiveCategories();
+    expect(categories).toEqual([...MODULE_CATEGORIES]);
+  });
+
+  it('includes custom plugin categories after built-ins, sorted alphabetically', () => {
+    // Register two plugins with different custom categories
+    const manifestA = { ...testManifest, moduleType: 'widget-a', category: 'Zebra' as never };
+    const manifestB = { ...testManifest, id: 'test-b', moduleType: 'widget-b', category: 'Automation' as never };
+    registerPluginModule(manifestA);
+    registerPluginModule(manifestB);
+
+    const categories = getActiveCategories();
+    // Built-in categories come first
+    for (let i = 0; i < MODULE_CATEGORIES.length; i++) {
+      expect(categories[i]).toBe(MODULE_CATEGORIES[i]);
+    }
+    // Custom categories after, sorted
+    const customStart = MODULE_CATEGORIES.length;
+    expect(categories[customStart]).toBe('Automation');
+    expect(categories[customStart + 1]).toBe('Zebra');
+  });
+
+  it('does not duplicate built-in categories used by plugins', () => {
+    registerPluginModule(testManifest); // uses 'Weather & Environment'
+    const categories = getActiveCategories();
+    const weatherCount = categories.filter((c) => c === 'Weather & Environment').length;
+    expect(weatherCount).toBe(1);
+  });
+
+  it('deduplicates when multiple plugins share the same custom category', () => {
+    const manifestA = { ...testManifest, moduleType: 'widget-a', category: 'Smart Home' as never };
+    const manifestB = { ...testManifest, id: 'test-b', moduleType: 'widget-b', category: 'Smart Home' as never };
+    registerPluginModule(manifestA);
+    registerPluginModule(manifestB);
+
+    const categories = getActiveCategories();
+    const smartHomeCount = categories.filter((c) => c === 'Smart Home').length;
+    expect(smartHomeCount).toBe(1);
+
+    // Both plugins should appear in that single category group
+    const byCategory = getModulesByCategory();
+    const smartHomeModules = byCategory.get('Smart Home') ?? [];
+    expect(smartHomeModules).toHaveLength(2);
   });
 });

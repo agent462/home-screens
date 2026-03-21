@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react';
-import type { ModuleCategory } from '@/lib/module-registry';
+import type { ModuleStyle } from '@/types/config';
 
 /** Schema for a plugin's manifest.json */
 export interface PluginManifest {
@@ -11,10 +11,11 @@ export interface PluginManifest {
   license: string;
   minAppVersion: string;
   moduleType: string; // becomes "plugin:<moduleType>" in the app
-  category: ModuleCategory;
+  category: string; // built-in ModuleCategory or any custom string
   icon: string; // lucide icon name
   defaultConfig: Record<string, unknown>;
   defaultSize: { w: number; h: number };
+  defaultStyle?: Partial<ModuleStyle>;
   configSchema?: PluginConfigSchema;
   exports: {
     component: string; // typically "default"
@@ -33,16 +34,30 @@ export interface PluginConfigSchema {
 }
 
 export interface PluginConfigProperty {
-  type: 'string' | 'number' | 'boolean' | 'array';
+  type: 'string' | 'number' | 'boolean' | 'array' | 'object';
   title?: string;
-  description?: string;
+  description?: string;       // rendered as help text below the control
   default?: unknown;
   minimum?: number;
   maximum?: number;
   enum?: (string | number)[];
   enumLabels?: string[];
-  'ui:widget'?: 'slider' | 'toggle' | 'text' | 'select' | 'color' | 'number';
+  'ui:widget'?:
+    | 'slider' | 'toggle' | 'text' | 'select' | 'color' | 'number'  // existing
+    | 'textarea'          // multi-line text input
+    | 'multiselect'       // checkbox group from enum values
+    | 'time';             // HH:MM time picker
   'ui:step'?: number;
+  'ui:group'?: string;        // visual section grouping header
+  'ui:showWhen'?: {           // conditional visibility
+    field: string;            // other config field key
+    equals: string | number | boolean;  // show this field when field === equals
+  };
+  'ui:placeholder'?: string;  // input placeholder text
+  // For type: 'array'
+  items?: PluginConfigProperty;           // schema for each array element
+  // For type: 'object'
+  properties?: Record<string, PluginConfigProperty>;  // nested properties
 }
 
 /** Record for an installed plugin in data/plugins/installed.json */
@@ -88,7 +103,7 @@ export interface RegistryPlugin {
   author: string;
   repo: string;
   license: string;
-  category: ModuleCategory;
+  category: string; // built-in ModuleCategory or any custom string
   tags: string[];
   icon: string;
   verified: boolean;

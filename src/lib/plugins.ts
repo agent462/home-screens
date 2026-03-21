@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import type { InstalledPluginsFile, InstalledPlugin, PluginManifest, RegistryPlugin, PluginRegistry } from '@/types/plugins';
-import { MODULE_CATEGORIES, type ModuleCategory } from './module-registry';
+
 
 const execFileAsync = promisify(execFile);
 
@@ -195,7 +195,7 @@ export function validateManifest(manifest: unknown): manifest is PluginManifest 
   if (typeof m.name !== 'string' || !m.name) return false;
   if (typeof m.version !== 'string') return false;
   if (typeof m.moduleType !== 'string' || !m.moduleType) return false;
-  if (typeof m.category !== 'string' || !MODULE_CATEGORIES.includes(m.category as ModuleCategory)) return false;
+  if (typeof m.category !== 'string' || !m.category) return false;
   return true;
 }
 

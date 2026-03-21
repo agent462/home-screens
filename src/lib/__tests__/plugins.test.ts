@@ -80,11 +80,20 @@ describe('validateManifest', () => {
     expect(validateManifest({ ...validManifest, moduleType: undefined })).toBe(false);
   });
 
-  it('rejects invalid category', () => {
-    expect(validateManifest({ ...validManifest, category: 'Invalid Category' })).toBe(false);
+  it('rejects invalid version', () => {
+    expect(validateManifest({ ...validManifest, version: undefined })).toBe(false);
+    expect(validateManifest({ ...validManifest, version: 123 })).toBe(false);
   });
 
-  it('accepts all valid categories', () => {
+  it('rejects empty category', () => {
+    expect(validateManifest({ ...validManifest, category: '' })).toBe(false);
+  });
+
+  it('rejects missing category', () => {
+    expect(validateManifest({ ...validManifest, category: undefined })).toBe(false);
+  });
+
+  it('accepts all built-in categories', () => {
     const categories = [
       'Time & Date', 'Weather & Environment', 'News & Finance',
       'Knowledge & Fun', 'Personal', 'Media & Display', 'Travel',
@@ -92,5 +101,10 @@ describe('validateManifest', () => {
     for (const category of categories) {
       expect(validateManifest({ ...validManifest, category }), `Failed for: ${category}`).toBe(true);
     }
+  });
+
+  it('accepts custom category strings', () => {
+    expect(validateManifest({ ...validManifest, category: 'Smart Home' })).toBe(true);
+    expect(validateManifest({ ...validManifest, category: 'My Custom Category' })).toBe(true);
   });
 });

@@ -34,7 +34,7 @@ export interface ModuleDefinition {
   type: ModuleType;
   label: string;
   icon: LucideIcon;
-  category: ModuleCategory;
+  category: ModuleCategory | string; // built-in or custom plugin category
   defaultConfig: Record<string, unknown>;
   defaultSize: { w: number; h: number };
   defaultStyle?: Partial<import('@/types/config').ModuleStyle>;
@@ -60,6 +60,7 @@ export function registerPluginModule(manifest: import('@/types/plugins').PluginM
     category: manifest.category,
     defaultConfig: manifest.defaultConfig ?? {},
     defaultSize: manifest.defaultSize ?? { w: 400, h: 300 },
+    defaultStyle: manifest.defaultStyle,
     configSchema: manifest.configSchema,
     dataRequirements: manifest.dataRequirements,
   });
@@ -79,14 +80,30 @@ export function getAllModuleDefinitions(): ModuleDefinition[] {
   return Array.from(registry.values());
 }
 
-export function getModulesByCategory(): Map<ModuleCategory, ModuleDefinition[]> {
-  const grouped = new Map<ModuleCategory, ModuleDefinition[]>();
-  for (const cat of MODULE_CATEGORIES) {
+/** Returns built-in categories plus any unique custom categories from registered plugins, sorted alphabetically after built-ins. */
+export function getActiveCategories(): string[] {
+  const custom = new Set<string>();
+  for (const def of registry.values()) {
+    if (!MODULE_CATEGORIES.includes(def.category as ModuleCategory)) {
+      custom.add(def.category);
+    }
+  }
+  return [...MODULE_CATEGORIES, ...[...custom].sort()];
+}
+
+export function getModulesByCategory(): Map<string, ModuleDefinition[]> {
+  const categories = getActiveCategories();
+  const grouped = new Map<string, ModuleDefinition[]>();
+  for (const cat of categories) {
     grouped.set(cat, []);
   }
   for (const def of registry.values()) {
-    const arr = grouped.get(def.category);
-    if (arr) arr.push(def);
+    let arr = grouped.get(def.category);
+    if (!arr) {
+      arr = [];
+      grouped.set(def.category, arr);
+    }
+    arr.push(def);
   }
   return grouped;
 }

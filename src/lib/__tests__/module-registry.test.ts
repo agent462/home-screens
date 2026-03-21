@@ -52,9 +52,10 @@ describe('Registry completeness', () => {
     }
   });
 
-  it('every module has a category that is one of the 7 valid categories', () => {
-    const validCategories = new Set(MODULE_CATEGORIES);
+  it('every built-in module has a category that is one of the 7 valid categories', () => {
+    const validCategories = new Set<string>(MODULE_CATEGORIES);
     for (const def of getAllModuleDefinitions()) {
+      if (def.type.startsWith('plugin:')) continue; // plugins may use custom categories
       expect(validCategories.has(def.category), `${def.type} has invalid category: ${def.category}`).toBe(true);
     }
   });

@@ -3,9 +3,9 @@
 import { useState, useMemo } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Search, ChevronRight } from 'lucide-react';
+import { Search, ChevronRight, Puzzle } from 'lucide-react';
 import { getModulesByCategory } from '@/lib/module-registry';
-import type { ModuleDefinition, ModuleCategory } from '@/lib/module-registry';
+import type { ModuleDefinition } from '@/lib/module-registry';
 import { useEditorStore } from '@/stores/editor-store';
 import { isUSTimezone } from '@/lib/timezone-us';
 
@@ -14,6 +14,7 @@ function PaletteItem({ definition }: { definition: ModuleDefinition }) {
     id: `palette-${definition.type}`,
     data: { source: 'palette', moduleType: definition.type },
   });
+  const isPlugin = definition.type.startsWith('plugin:');
 
   return (
     <div
@@ -26,6 +27,12 @@ function PaletteItem({ definition }: { definition: ModuleDefinition }) {
     >
       <definition.icon className="w-4 h-4 text-neutral-400 flex-shrink-0" />
       <span className="text-sm text-neutral-200">{definition.label}</span>
+      {isPlugin && (
+        <span className="ml-auto flex items-center gap-1 px-1.5 py-0.5 rounded bg-violet-900/50 border border-violet-700/50" title="Community plugin">
+          <Puzzle className="w-3 h-3 text-violet-400" />
+          <span className="text-[10px] text-violet-400 font-medium">Plugin</span>
+        </span>
+      )}
     </div>
   );
 }
@@ -36,7 +43,7 @@ function CategoryGroup({
   open,
   onToggle,
 }: {
-  category: ModuleCategory;
+  category: string;
   modules: ModuleDefinition[];
   open: boolean;
   onToggle: () => void;
@@ -81,7 +88,7 @@ function CategoryGroup({
 
 export default function ModulePalette() {
   const [search, setSearch] = useState('');
-  const [collapsed, setCollapsed] = useState<Set<ModuleCategory>>(new Set());
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const configTimezone = useEditorStore((s) => s.config?.settings.timezone);
   const isUS = isUSTimezone(configTimezone);
   const grouped = useMemo(() => {
@@ -97,7 +104,7 @@ export default function ModulePalette() {
   const query = search.toLowerCase().trim();
 
   const filteredGroups = useMemo(() => {
-    const result: [ModuleCategory, ModuleDefinition[]][] = [];
+    const result: [string, ModuleDefinition[]][] = [];
     for (const [category, modules] of grouped) {
       const filtered = query
         ? modules.filter(

@@ -2,8 +2,6 @@ import type { ComponentType } from 'react';
 import type { PluginManifest, InstalledPlugin, PluginConfigSectionProps } from '@/types/plugins';
 import { usePluginStore } from '@/stores/plugin-store';
 import { registerPluginModule } from '@/lib/module-registry';
-import { MODULE_CATEGORIES } from '@/lib/module-registry';
-import type { ModuleCategory } from '@/lib/module-registry';
 import { registerFetchKey } from '@/lib/fetch-keys';
 
 /**
@@ -58,8 +56,8 @@ async function loadSinglePlugin(
     if (!manifest.id || !manifest.name || !manifest.moduleType) {
       throw new Error('Invalid manifest: missing required fields');
     }
-    if (!MODULE_CATEGORIES.includes(manifest.category as ModuleCategory)) {
-      throw new Error(`Invalid manifest: unknown category "${manifest.category}"`);
+    if (!manifest.category) {
+      throw new Error('Invalid manifest: missing category');
     }
 
     // 3. Fetch bundle (version-stamped URL for cache busting)
