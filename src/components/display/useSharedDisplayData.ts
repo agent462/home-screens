@@ -1,15 +1,29 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import type { Screen, GlobalSettings } from '@/types/config';
 import { resolveProvider } from './ScreenRenderer';
 import type { SharedDisplayData } from './ScreenRenderer';
 import { getModuleDefinition } from '@/lib/module-registry';
 import { useFetchData } from '@/hooks/useFetchData';
 import { WEATHER_REFRESH_MS, CALENDAR_REFRESH_MS } from '@/lib/constants';
+import { pluginEventBus } from '@/lib/plugin-events';
 
 /** Fetch weather + calendar data once, shared across all screen rotations. */
 export function useSharedDisplayData(screens: Screen[], settings: GlobalSettings): SharedDisplayData {
+  // Bumped by plugin 'refresh' events to force re-fetch
+  const [refreshEpoch, setRefreshEpoch] = useState(0);
+
+  const forceRefresh = useCallback(() => {
+    setRefreshEpoch((e) => e + 1);
+  }, []);
+
+  useEffect(() => {
+    return pluginEventBus.on((event) => {
+      if (event.type === 'refresh') forceRefresh();
+    });
+  }, [forceRefresh]);
+
   const globalProvider = settings.weather.provider;
   const lat = settings.latitude ?? settings.weather.latitude;
   const lon = settings.longitude ?? settings.weather.longitude;
@@ -33,8 +47,12 @@ export function useSharedDisplayData(screens: Screen[], settings: GlobalSettings
     return needed;
   }, [screens, globalProvider]);
 
+  // Append refresh epoch to URLs so useFetchData re-runs on force refresh.
+  // Epoch 0 is omitted to keep URLs clean during normal operation.
+  const cacheBust = refreshEpoch > 0 ? `&_r=${refreshEpoch}` : '';
+
   const weatherUrl = (provider: string) =>
-    neededProviders.has(provider) ? `/api/weather?${baseParams}&provider=${provider}` : '';
+    neededProviders.has(provider) ? `/api/weather?${baseParams}&provider=${provider}${cacheBust}` : '';
 
   const [owmData] = useFetchData(weatherUrl('openweathermap'), WEATHER_REFRESH_MS);
   const [wapiData] = useFetchData(weatherUrl('weatherapi'), WEATHER_REFRESH_MS);
@@ -49,8 +67,8 @@ export function useSharedDisplayData(screens: Screen[], settings: GlobalSettings
   const hasHolidays = !!settings.calendar.holidayCountry;
   const calendarUrl = (calendarIdList.length || hasIcalSources || hasHolidays)
     ? calendarIdList.length
-      ? `/api/calendar?calendarIds=${encodeURIComponent(calendarIdList.join(','))}`
-      : '/api/calendar'
+      ? `/api/calendar?calendarIds=${encodeURIComponent(calendarIdList.join(','))}${cacheBust}`
+      : `/api/calendar${cacheBust ? `?${cacheBust.slice(1)}` : ''}`
     : '';
   const [calendarData] = useFetchData(calendarUrl, CALENDAR_REFRESH_MS);
 

@@ -1,8 +1,5 @@
 'use client';
 
-import { useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronRight } from 'lucide-react';
 import { useEditorStore } from '@/stores/editor-store';
 import { useConfirmStore } from '@/stores/confirm-store';
 import Slider from '@/components/ui/Slider';
@@ -14,6 +11,7 @@ import type { ModuleInstance } from '@/types/config';
 import { usePluginStore } from '@/stores/plugin-store';
 import { getModuleDefinition } from '@/lib/module-registry';
 import PluginConfigRenderer from './PluginConfigRenderer';
+import AccordionSection from './AccordionSection';
 
 import {
   ClockConfigSection,
@@ -55,41 +53,6 @@ import {
 // Shared constants — exported for use by config section components
 export const INPUT_CLASS = 'w-full px-2 py-1 text-xs bg-neutral-800 border border-neutral-600 rounded text-neutral-200';
 export const NESTED_INPUT_CLASS = 'w-full px-2 py-0.5 text-xs bg-neutral-700 border border-neutral-600 rounded text-neutral-200';
-
-function AccordionSection({ title, defaultOpen = true, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div>
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 w-full py-1.5 text-left group"
-      >
-        <ChevronRight
-          className={`w-3 h-3 text-neutral-500 transition-transform duration-200 ${
-            open ? 'rotate-90' : ''
-          }`}
-        />
-        <span className="text-xs font-semibold text-neutral-500 uppercase">{title}</span>
-      </button>
-      <AnimatePresence initial={false}>
-        {open && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2, ease: 'easeInOut' }}
-            className="overflow-hidden"
-          >
-            <div className="space-y-3 pb-2">
-              {children}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
 
 function PositionSection({ mod, screenId }: { mod: ModuleInstance; screenId: string }) {
   const { moveModule, resizeModule } = useEditorStore();

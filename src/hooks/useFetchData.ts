@@ -9,12 +9,12 @@ export function useFetchData<T>(url: string, refreshMs: number): [T | null, stri
 
   useEffect(() => {
     if (!url) { setData(null); setError(null); return; }
-    let mounted = true;
+    const controller = new AbortController();
 
     async function fetchAndCache() {
       try {
-        const res = await fetch(url);
-        if (!mounted) return;
+        const res = await fetch(url, { signal: controller.signal });
+        if (controller.signal.aborted) return;
         if (res.ok) {
           const json = await res.json();
           setData(json);
@@ -31,9 +31,9 @@ export function useFetchData<T>(url: string, refreshMs: number): [T | null, stri
           setError(msg);
         }
       } catch {
-        if (mounted) {
-          setError('Failed to fetch data');
-        }
+        // Don't set error state for intentional aborts (unmount / URL change)
+        if (controller.signal.aborted) return;
+        setError('Failed to fetch data');
       }
     }
 
@@ -45,7 +45,7 @@ export function useFetchData<T>(url: string, refreshMs: number): [T | null, stri
       if (!cached.stale) {
         // Fresh cache — skip initial fetch, just set up polling
         const interval = setInterval(fetchAndCache, refreshMs);
-        return () => { mounted = false; clearInterval(interval); };
+        return () => { controller.abort(); clearInterval(interval); };
       }
       // Stale cache — show stale data, revalidate in background
     }
@@ -53,7 +53,7 @@ export function useFetchData<T>(url: string, refreshMs: number): [T | null, stri
     // Cold start or stale: fetch now
     fetchAndCache();
     const interval = setInterval(fetchAndCache, refreshMs);
-    return () => { mounted = false; clearInterval(interval); };
+    return () => { controller.abort(); clearInterval(interval); };
   }, [url, refreshMs]);
 
   return [data, error];

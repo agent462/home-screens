@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import ConfirmModal from '@/components/ui/ConfirmModal';
+import PluginGlobalsEditor from '@/components/PluginGlobalsEditor';
 
 export const metadata: Metadata = {
   title: 'Home Screen Editor',
@@ -8,6 +9,7 @@ export const metadata: Metadata = {
 export default function EditorLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="bg-neutral-950 text-neutral-100 font-sans antialiased h-screen overflow-hidden">
+      <PluginGlobalsEditor />
       {children}
       <ConfirmModal />
     </div>

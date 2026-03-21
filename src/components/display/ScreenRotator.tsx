@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
 import { flushSync } from 'react-dom';
 import type { Screen, GlobalSettings, Profile } from '@/types/config';
 import ScreenRenderer from './ScreenRenderer';
@@ -17,6 +17,8 @@ import { getTransitionConfig, getViewTransitionKeyframes } from '@/lib/transitio
 import { DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT } from '@/lib/constants';
 import { useIdleCursor } from '@/hooks/useIdleCursor';
 import { usePluginStore } from '@/stores/plugin-store';
+import { pluginEventBus } from '@/lib/plugin-events';
+import { setHostSettings } from '@/lib/plugin-host-settings';
 import type { TransitionEffect } from '@/types/config';
 
 interface ScreenRotatorProps {
@@ -120,7 +122,7 @@ export default function ScreenRotator({ screens: initialScreens, settings: initi
   const screenKey = screens.map((s) => s.id).join(',');
 
   // Compute safeIndex early so display control hook can use it
-  const safeIndex = currentIndex < screens.length ? currentIndex : 0;
+  const safeIndex = (currentIndex >= 0 && currentIndex < screens.length) ? currentIndex : 0;
   const currentScreen = screens[safeIndex];
 
   // Transition config — stored in refs so callbacks don't recreate on config changes
@@ -175,6 +177,33 @@ export default function ScreenRotator({ screens: initialScreens, settings: initi
     prevScreen,
     resetRotation,
   });
+
+  // Subscribe to plugin navigate events
+  useEffect(() => {
+    return pluginEventBus.on((event) => {
+      if (event.type !== 'navigate') return;
+      if (event.direction === 'next') { nextScreen(); resetRotation(); }
+      else if (event.direction === 'prev') { prevScreen(); resetRotation(); }
+      else if (event.direction === 'screen' && event.screenIndex != null
+        && event.screenIndex >= 0 && event.screenIndex < screens.length) goToScreen(event.screenIndex);
+    });
+  }, [nextScreen, prevScreen, goToScreen, resetRotation, screens.length]);
+
+  // Push host settings so plugins can read them via getHostSettings().
+  // useLayoutEffect ensures settings are available before plugins render.
+  useLayoutEffect(() => {
+    const lat = settings.latitude ?? settings.weather?.latitude ?? null;
+    const lon = settings.longitude ?? settings.weather?.longitude ?? null;
+    setHostSettings({
+      timezone: settings.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
+      units: settings.weather?.units ?? 'imperial',
+      latitude: lat,
+      longitude: lon,
+      displayWidth: settings.displayWidth || DEFAULT_DISPLAY_WIDTH,
+      displayHeight: settings.displayHeight || DEFAULT_DISPLAY_HEIGHT,
+      appVersion: process.env.NEXT_PUBLIC_APP_VERSION ?? '',
+    });
+  }, [settings]);
 
   // Prefetch next screen's API data before rotation fires
   usePrefetchNextScreen(screens, screenKey, currentIndex, settings.rotationIntervalMs, displayState);
