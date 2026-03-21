@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Screen, GlobalSettings, ScreenConfiguration, Profile } from '@/types/config';
 import { displayCache } from '@/lib/display-cache';
+import { usePluginStore } from '@/stores/plugin-store';
 
 /** How often the display polls for config changes (ms) */
 const CONFIG_POLL_MS = 3_000;
@@ -17,6 +18,7 @@ export function useLiveConfig(initialScreens: Screen[], initialSettings: GlobalS
   const [profiles, setProfiles] = useState(initialProfiles);
   const configJsonRef = useRef<string>('');
   const buildIdRef = useRef<string>('');
+  const pluginHashRef = useRef<string>('');
 
   useEffect(() => {
     let mounted = true;
@@ -47,6 +49,27 @@ export function useLiveConfig(initialScreens: Screen[], initialSettings: GlobalS
             setSettings(cfg.settings);
             setProfiles(cfg.profiles);
           }
+        }
+        // Check for plugin changes
+        try {
+          const pluginRes = await fetch('/api/plugins/installed');
+          if (pluginRes.ok && mounted) {
+            const pluginData = await pluginRes.json();
+            const newHash = pluginData.pluginHash ?? '';
+            if (pluginHashRef.current && newHash !== pluginHashRef.current) {
+              // Plugin set changed — reload plugins, only commit hash on success
+              try {
+                await usePluginStore.getState().loadPlugins();
+                pluginHashRef.current = newHash;
+              } catch {
+                // Don't advance hash — retry on next poll
+              }
+            } else {
+              pluginHashRef.current = newHash;
+            }
+          }
+        } catch {
+          // ignore plugin check failures
         }
       } catch {
         // keep current config on failure

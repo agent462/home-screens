@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import type { Screen, GlobalSettings } from '@/types/config';
 import { resolveProvider } from './ScreenRenderer';
 import type { SharedDisplayData } from './ScreenRenderer';
+import { getModuleDefinition } from '@/lib/module-registry';
 import { useFetchData } from '@/hooks/useFetchData';
 import { WEATHER_REFRESH_MS, CALENDAR_REFRESH_MS } from '@/lib/constants';
 
@@ -18,7 +19,15 @@ export function useSharedDisplayData(screens: Screen[], settings: GlobalSettings
     const needed = new Set<string>();
     for (const screen of screens) {
       for (const mod of screen.modules) {
-        if (mod.type === 'weather') needed.add(resolveProvider(mod, globalProvider));
+        // Fetch weather for built-in weather modules
+        if (mod.type === 'weather') {
+          needed.add(resolveProvider(mod, globalProvider));
+        }
+        // Also fetch for plugins that declare a weather data requirement
+        const def = getModuleDefinition(mod.type);
+        if (def?.dataRequirements?.includes('weather')) {
+          needed.add(resolveProvider(mod, globalProvider));
+        }
       }
     }
     return needed;

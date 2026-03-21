@@ -1,4 +1,4 @@
-export type ModuleType =
+export type BuiltinModuleType =
   | 'clock'
   | 'calendar'
   | 'weather'
@@ -34,6 +34,10 @@ export type ModuleType =
   | 'iframe'
   | 'flag-status'
   | 'chore-chart';
+
+export type PluginModuleType = `plugin:${string}`;
+
+export type ModuleType = BuiltinModuleType | PluginModuleType;
 
 export interface ModuleStyle {
   opacity: number;

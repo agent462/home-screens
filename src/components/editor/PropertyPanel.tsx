@@ -11,6 +11,9 @@ import Button from '@/components/ui/Button';
 import BackgroundPicker from '@/components/editor/BackgroundPicker';
 import { ScheduleSection } from '@/components/editor/ScheduleSection';
 import type { ModuleInstance } from '@/types/config';
+import { usePluginStore } from '@/stores/plugin-store';
+import { getModuleDefinition } from '@/lib/module-registry';
+import PluginConfigRenderer from './PluginConfigRenderer';
 
 import {
   ClockConfigSection,
@@ -205,7 +208,8 @@ const CONFIG_SECTIONS: Record<string, React.FC<{ mod: ModuleInstance; screenId: 
 };
 
 export default function PropertyPanel() {
-  const { config, selectedScreenId, selectedModuleId, removeModule } = useEditorStore();
+  const { config, selectedScreenId, selectedModuleId, removeModule, updateModule } = useEditorStore();
+  const pluginMap = usePluginStore((s) => s.plugins);
 
   const currentScreen = config?.screens.find((s) => s.id === selectedScreenId);
   const selectedModule = currentScreen?.modules.find((m) => m.id === selectedModuleId);
@@ -219,15 +223,28 @@ export default function PropertyPanel() {
     );
   }
 
-  const ConfigSection = CONFIG_SECTIONS[selectedModule.type];
+  const isPlugin = selectedModule.type.startsWith('plugin:');
+  const pluginDef = isPlugin ? getModuleDefinition(selectedModule.type) : undefined;
+  const loadedPlugin = isPlugin ? pluginMap.get(selectedModule.type) : undefined;
+
+  // Priority: built-in section > plugin custom section > schema renderer > null
+  const BuiltinConfigSection = CONFIG_SECTIONS[selectedModule.type] ?? null;
+  const pluginConfigSection = !BuiltinConfigSection ? loadedPlugin?.configSection : undefined;
+  const hasSchemaFallback = !BuiltinConfigSection && !pluginConfigSection && isPlugin && pluginDef?.configSchema;
+
+  const moduleLabel = pluginDef?.label
+    ?? (selectedModule.type.charAt(0).toUpperCase() + selectedModule.type.slice(1));
 
   return (
     <div className="w-72 flex-shrink-0 bg-neutral-900 border-l border-neutral-700 p-4 overflow-y-auto">
       <div className="space-y-5">
         <div>
           <h3 className="text-sm font-semibold text-neutral-200 mb-3">
-            {selectedModule.type.charAt(0).toUpperCase() + selectedModule.type.slice(1)} Module
+            {moduleLabel} Module
           </h3>
+          {isPlugin && !loadedPlugin && (
+            <p className="text-xs text-amber-400 mb-2">Plugin not installed or failed to load</p>
+          )}
         </div>
 
         <AccordionSection title="Position & Size">
@@ -237,9 +254,31 @@ export default function PropertyPanel() {
           <StyleSection mod={selectedModule} screenId={selectedScreenId} />
         </AccordionSection>
 
-        {ConfigSection && (
+        {BuiltinConfigSection && (
           <AccordionSection title="Config">
-            <ConfigSection mod={selectedModule} screenId={selectedScreenId} />
+            <BuiltinConfigSection mod={selectedModule} screenId={selectedScreenId} />
+          </AccordionSection>
+        )}
+        {pluginConfigSection && (() => {
+          const PluginConfig = pluginConfigSection;
+          return (
+            <AccordionSection title="Config">
+              <PluginConfig
+                config={selectedModule.config}
+                onChange={(updates: Record<string, unknown>) =>
+                  updateModule(selectedScreenId, selectedModule.id, {
+                    config: { ...selectedModule.config, ...updates },
+                  })
+                }
+                moduleId={selectedModule.id}
+                screenId={selectedScreenId}
+              />
+            </AccordionSection>
+          );
+        })()}
+        {hasSchemaFallback && (
+          <AccordionSection title="Config">
+            <PluginConfigRenderer mod={selectedModule} screenId={selectedScreenId} schema={pluginDef!.configSchema!} />
           </AccordionSection>
         )}
 

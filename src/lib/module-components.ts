@@ -1,11 +1,12 @@
 import dynamic from 'next/dynamic';
 import type { ComponentType } from 'react';
-import type { ModuleType } from '@/types/config';
+import type { BuiltinModuleType, ModuleType } from '@/types/config';
+import { usePluginStore } from '@/stores/plugin-store';
 
 // Module components have heterogeneous props (each module has its own config
 // type). We assert the record type because ComponentType is contravariant in
 // props, preventing direct assignment of specific component types.
-export const moduleComponents = {
+const builtinComponents = {
   clock: dynamic(() => import('@/components/modules/clock/ClockModule')),
   calendar: dynamic(() => import('@/components/modules/CalendarModule')),
   weather: dynamic(() => import('@/components/modules/weather/WeatherModule')),
@@ -41,4 +42,17 @@ export const moduleComponents = {
   iframe: dynamic(() => import('@/components/modules/IframeModule')),
   'flag-status': dynamic(() => import('@/components/modules/FlagStatusModule')),
   'chore-chart': dynamic(() => import('@/components/modules/chore-chart/ChoreChartModule')),
-} as unknown as Record<ModuleType, ComponentType<Record<string, unknown>>>;
+} as unknown as Record<BuiltinModuleType, ComponentType<Record<string, unknown>>>;
+
+/** Resolve a module type to its React component. Checks built-in first, then plugins. */
+export function getModuleComponent(type: ModuleType): ComponentType<Record<string, unknown>> | undefined {
+  if (type in builtinComponents) {
+    return builtinComponents[type as BuiltinModuleType];
+  }
+  // Check plugin store for plugin:* types
+  if (type.startsWith('plugin:')) {
+    return usePluginStore.getState().plugins.get(type)?.component;
+  }
+  return undefined;
+}
+

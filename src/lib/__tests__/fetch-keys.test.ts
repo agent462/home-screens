@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import {
   stocksUrl,
   cryptoUrl,
@@ -14,6 +14,7 @@ import {
   dadJokeUrl,
   photoSlideshowUrl,
   FETCH_KEY_REGISTRY,
+  registerFetchKey,
 } from '@/lib/fetch-keys';
 
 // ── URL builders that return null when config is empty ──────────
@@ -125,7 +126,7 @@ describe('FETCH_KEY_REGISTRY', () => {
     const expectedTypes = [
       'stock-ticker', 'crypto', 'news', 'air-quality', 'sports',
       'standings', 'traffic', 'todoist', 'rain-map', 'history',
-      'quote', 'dad-joke', 'photo-slideshow',
+      'quote', 'dad-joke', 'photo-slideshow', 'flag-status',
     ];
     for (const type of expectedTypes) {
       expect(FETCH_KEY_REGISTRY).toHaveProperty(type);
@@ -155,5 +156,31 @@ describe('FETCH_KEY_REGISTRY', () => {
     expect(FETCH_KEY_REGISTRY.quote.buildUrl).toBe(quoteUrl);
     expect(FETCH_KEY_REGISTRY['dad-joke'].buildUrl).toBe(dadJokeUrl);
     expect(FETCH_KEY_REGISTRY['photo-slideshow'].buildUrl).toBe(photoSlideshowUrl);
+  });
+});
+
+// ── registerFetchKey (plugin support) ─────────────────────────────
+
+describe('registerFetchKey', () => {
+  afterEach(() => {
+    // Clean up test registrations
+    delete FETCH_KEY_REGISTRY['plugin:test-widget'];
+  });
+
+  it('adds a new entry to the registry', () => {
+    const builder = () => '/api/plugins/test';
+    registerFetchKey('plugin:test-widget', { buildUrl: builder, ttlMs: 60_000 });
+    expect(FETCH_KEY_REGISTRY['plugin:test-widget']).toBeDefined();
+    expect(FETCH_KEY_REGISTRY['plugin:test-widget'].buildUrl).toBe(builder);
+    expect(FETCH_KEY_REGISTRY['plugin:test-widget'].ttlMs).toBe(60_000);
+  });
+
+  it('overwrites an existing entry with the same key', () => {
+    const builder1 = () => '/api/v1';
+    const builder2 = () => '/api/v2';
+    registerFetchKey('plugin:test-widget', { buildUrl: builder1, ttlMs: 30_000 });
+    registerFetchKey('plugin:test-widget', { buildUrl: builder2, ttlMs: 60_000 });
+    expect(FETCH_KEY_REGISTRY['plugin:test-widget'].buildUrl).toBe(builder2);
+    expect(FETCH_KEY_REGISTRY['plugin:test-widget'].ttlMs).toBe(60_000);
   });
 });

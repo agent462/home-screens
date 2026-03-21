@@ -97,3 +97,16 @@ export const FETCH_KEY_REGISTRY: Record<string, {
   'photo-slideshow': { buildUrl: photoSlideshowUrl, ttlMs: 600_000 }, // no server cache
   'flag-status':     { buildUrl: flagStatusUrl, ttlMs: 1_800_000 },   // server: 30min
 };
+
+/** Allow plugins to register their own fetch key entries for prefetching. */
+export function registerFetchKey(
+  type: string,
+  entry: { buildUrl: (config: AnyConfig) => string | null; ttlMs: number },
+): void {
+  FETCH_KEY_REGISTRY[type] = entry;
+}
+
+/** Remove a dynamically registered fetch key (used when unloading plugins). */
+export function deregisterFetchKey(type: string): void {
+  delete FETCH_KEY_REGISTRY[type];
+}

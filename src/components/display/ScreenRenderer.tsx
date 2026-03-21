@@ -2,9 +2,11 @@
 
 import { useMemo } from 'react';
 import type { Screen, GlobalSettings } from '@/types/config';
-import { moduleComponents } from '@/lib/module-components';
+import { getModuleComponent } from '@/lib/module-components';
+import { getModuleDefinition } from '@/lib/module-registry';
 import { isModuleVisible } from '@/lib/schedule';
 import { useTZClock } from '@/hooks/useTZClock';
+import PluginPlaceholder from '@/components/modules/PluginPlaceholder';
 
 export interface SharedDisplayData {
   owmData: unknown;
@@ -88,22 +90,53 @@ export default function ScreenRenderer({ screen, settings, rotatingBackground, s
       )}
 
       {visibleModules.map((mod) => {
-        const Component = moduleComponents[mod.type];
-        if (!Component) return null;
+        const Component = getModuleComponent(mod.type);
+
+        // Show placeholder for unavailable plugin modules
+        if (!Component) {
+          if (mod.type.startsWith('plugin:')) {
+            return (
+              <div
+                key={mod.id}
+                style={{
+                  position: 'absolute',
+                  left: mod.position.x,
+                  top: mod.position.y,
+                  width: mod.size.w,
+                  height: mod.size.h,
+                  zIndex: mod.zIndex,
+                  overflow: 'hidden',
+                }}
+              >
+                <PluginPlaceholder moduleType={mod.type} />
+              </div>
+            );
+          }
+          return null;
+        }
 
         const extraProps: Record<string, unknown> = {};
         extraProps.timezone = settings.timezone;
 
-        if (['moon-phase', 'sunrise-sunset', 'rain-map', 'affirmations'].includes(mod.type)) {
+        // Inject location for modules that declare the requirement (built-in or plugin)
+        const def = getModuleDefinition(mod.type);
+        const needsLocation = def?.dataRequirements?.includes('location') ?? false;
+        if (needsLocation) {
           extraProps.latitude = settings.latitude ?? settings.weather.latitude;
           extraProps.longitude = settings.longitude ?? settings.weather.longitude;
         }
 
         const weatherData = getWeatherData(mod);
 
-        if (mod.type === 'calendar' && sharedData.calendarData) {
+        // Inject calendar data for calendar module or plugins declaring the requirement
+        const needsCalendar = mod.type === 'calendar' || def?.dataRequirements?.includes('calendar');
+        if (needsCalendar && sharedData.calendarData) {
           extraProps.events = Array.isArray(sharedData.calendarData) ? sharedData.calendarData : (sharedData.calendarData as Record<string, unknown>).events ?? [];
-        } else if (mod.type === 'weather') {
+        }
+
+        // Inject weather data for weather module or plugins declaring the requirement
+        const needsWeather = mod.type === 'weather' || def?.dataRequirements?.includes('weather');
+        if (needsWeather) {
           if (locationMissing) {
             extraProps.locationMissing = true;
           }

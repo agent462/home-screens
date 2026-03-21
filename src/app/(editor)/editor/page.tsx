@@ -13,6 +13,7 @@ import {
 } from '@dnd-kit/core';
 import { Check, AlertCircle } from 'lucide-react';
 import { useEditorStore } from '@/stores/editor-store';
+import { usePluginStore } from '@/stores/plugin-store';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT, DEFAULT_MODULE_SIZES, snapToGrid } from '@/lib/constants';
 import { getModuleDefinition } from '@/lib/module-registry';
@@ -23,6 +24,7 @@ import ModulePalette from '@/components/editor/ModulePalette';
 import EditorCanvas from '@/components/editor/EditorCanvas';
 import PropertyPanel from '@/components/editor/PropertyPanel';
 import HomeScreensLogo from '@/components/brand/HomeScreensLogo';
+import PluginStorePanel from '@/components/editor/PluginStorePanel';
 import Button from '@/components/ui/Button';
 
 export default function EditorPage() {
@@ -37,6 +39,7 @@ export default function EditorPage() {
   const { isDirty, isSaving, saveError, saveConfig } = useAutoSave();
 
   const [activePaletteType, setActivePaletteType] = useState<string | null>(null);
+  const [showPluginStore, setShowPluginStore] = useState(false);
   const router = useRouter();
   const canvasScaleRef = useRef(0.4);
   const canvasElRef = useRef<HTMLDivElement | null>(null);
@@ -45,9 +48,13 @@ export default function EditorPage() {
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   );
 
+  const pluginLoading = usePluginStore((s) => s.loading);
+  const loadPlugins = usePluginStore((s) => s.loadPlugins);
+
   useEffect(() => {
     loadConfig();
-  }, [loadConfig]);
+    loadPlugins();
+  }, [loadConfig, loadPlugins]);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const data = event.active.data.current;
@@ -100,7 +107,7 @@ export default function EditorPage() {
     [selectedScreenId, config, addModule, moveModule],
   );
 
-  if (!config) {
+  if (!config || pluginLoading) {
     return (
       <div className="h-screen flex items-center justify-center text-neutral-500">
         Loading...
@@ -119,6 +126,12 @@ export default function EditorPage() {
             <ScreenTabs />
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => setShowPluginStore(true)}
+            >
+              Plugins
+            </Button>
             <Button
               variant="secondary"
               onClick={async () => {
@@ -174,6 +187,7 @@ export default function EditorPage() {
           );
         })()}
       </DragOverlay>
+      {showPluginStore && <PluginStorePanel onClose={() => setShowPluginStore(false)} />}
     </DndContext>
   );
 }

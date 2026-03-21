@@ -5,8 +5,9 @@ import { useDraggable } from '@dnd-kit/core';
 import { Clock } from 'lucide-react';
 import { GRID_SIZE, snapToGrid } from '@/lib/constants';
 import { getModuleDefinition } from '@/lib/module-registry';
-import { moduleComponents } from '@/lib/module-components';
+import { getModuleComponent } from '@/lib/module-components';
 import { isModuleVisible } from '@/lib/schedule';
+import PluginPlaceholder from '@/components/modules/PluginPlaceholder';
 import { resolveProvider } from '@/components/display/ScreenRenderer';
 import type { ModuleInstance } from '@/types/config';
 import type { PreviewData } from './usePreviewData';
@@ -20,8 +21,13 @@ export interface PreviewSettings {
 }
 
 function ModulePreview({ mod, previewData, settings }: { mod: ModuleInstance; previewData: PreviewData; settings: PreviewSettings | null }) {
-  const Component = moduleComponents[mod.type];
-  if (!Component) return null;
+  const Component = getModuleComponent(mod.type);
+  if (!Component) {
+    if (mod.type.startsWith('plugin:')) {
+      return <PluginPlaceholder moduleType={mod.type} />;
+    }
+    return null;
+  }
 
   const extraProps: Record<string, unknown> = {};
 
@@ -30,8 +36,9 @@ function ModulePreview({ mod, previewData, settings }: { mod: ModuleInstance; pr
     extraProps.timezone = settings.timezone;
   }
 
-  // Pass global location to location-aware modules
-  if (['moon-phase', 'sunrise-sunset', 'rain-map'].includes(mod.type) && settings) {
+  // Pass global location to location-aware modules (registry-driven)
+  const def = getModuleDefinition(mod.type);
+  if (def?.dataRequirements?.includes('location') && settings) {
     extraProps.latitude = settings.latitude;
     extraProps.longitude = settings.longitude;
   }
@@ -41,7 +48,9 @@ function ModulePreview({ mod, previewData, settings }: { mod: ModuleInstance; pr
   const modProvider = resolveProvider(mod, globalProvider);
   const wd = previewData.weatherByProvider[modProvider] ?? previewData.weatherByProvider[globalProvider];
 
-  if (mod.type === 'weather') {
+  // Inject weather data for weather modules or plugins declaring the requirement
+  const needsWeather = mod.type === 'weather' || def?.dataRequirements?.includes('weather');
+  if (needsWeather) {
     const lat = settings?.latitude;
     const lon = settings?.longitude;
     if (lat == null || lon == null || (lat === 0 && lon === 0)) {
@@ -54,7 +63,11 @@ function ModulePreview({ mod, previewData, settings }: { mod: ModuleInstance; pr
       extraProps.alerts = wd.alerts ?? undefined;
     }
     extraProps.units = settings?.units;
-  } else if (mod.type === 'calendar') {
+  }
+
+  // Inject calendar data for calendar modules or plugins declaring the requirement
+  const needsCalendar = mod.type === 'calendar' || def?.dataRequirements?.includes('calendar');
+  if (needsCalendar) {
     extraProps.events = previewData.calendarEvents;
   }
 

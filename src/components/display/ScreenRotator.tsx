@@ -16,6 +16,7 @@ import { resolveProfileScreens } from '@/lib/schedule';
 import { getTransitionConfig, getViewTransitionKeyframes } from '@/lib/transitions';
 import { DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT } from '@/lib/constants';
 import { useIdleCursor } from '@/hooks/useIdleCursor';
+import { usePluginStore } from '@/stores/plugin-store';
 import type { TransitionEffect } from '@/types/config';
 
 interface ScreenRotatorProps {
@@ -75,7 +76,13 @@ function startScreenTransition(
 
 export default function ScreenRotator({ screens: initialScreens, settings: initialSettings, profiles: initialProfiles }: ScreenRotatorProps) {
   const { screens: allScreens, settings, profiles } = useLiveConfig(initialScreens, initialSettings, initialProfiles);
+  const loadPlugins = usePluginStore((s) => s.loadPlugins);
+  // Subscribe to plugin count to trigger re-render when plugins finish loading
+  usePluginStore((s) => s.plugins.size);
   const cursorRef = useIdleCursor(settings.cursorHideSeconds ?? 3);
+
+  // Load plugins on mount
+  useEffect(() => { loadPlugins(); }, [loadPlugins]);
   const [currentIndex, setCurrentIndex] = useState(0);
   // Bumped on manual navigation to reset the auto-rotation timer
   const [rotationEpoch, setRotationEpoch] = useState(0);

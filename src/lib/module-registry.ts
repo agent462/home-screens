@@ -9,6 +9,7 @@ import {
   Calendar, Globe, UtensilsCrossed, Flag, ClipboardList,
 } from 'lucide-react';
 import { DEFAULT_MODULE_SIZES } from './constants';
+import { resolveLucideIcon } from './lucide-resolver';
 
 export type ModuleCategory =
   | 'Time & Date'
@@ -37,12 +38,36 @@ export interface ModuleDefinition {
   defaultConfig: Record<string, unknown>;
   defaultSize: { w: number; h: number };
   defaultStyle?: Partial<import('@/types/config').ModuleStyle>;
+  // Plugin-specific fields
+  configSchema?: import('@/types/plugins').PluginConfigSchema;
+  dataRequirements?: import('@/types/plugins').PluginDataRequirement[];
 }
 
 const registry = new Map<ModuleType, ModuleDefinition>();
 
 function registerModule(definition: ModuleDefinition): void {
   registry.set(definition.type, definition);
+}
+
+/** Register a plugin module from its manifest. Resolves icon string → component via lucide-resolver. */
+export function registerPluginModule(manifest: import('@/types/plugins').PluginManifest): void {
+  const moduleType: ModuleType = `plugin:${manifest.moduleType}`;
+  const icon = resolveLucideIcon(manifest.icon);
+  registry.set(moduleType, {
+    type: moduleType,
+    label: manifest.name,
+    icon,
+    category: manifest.category,
+    defaultConfig: manifest.defaultConfig ?? {},
+    defaultSize: manifest.defaultSize ?? { w: 400, h: 300 },
+    configSchema: manifest.configSchema,
+    dataRequirements: manifest.dataRequirements,
+  });
+}
+
+/** Unregister a module (used when uninstalling plugins). */
+export function unregisterModule(type: ModuleType): void {
+  registry.delete(type);
 }
 
 export function getModuleDefinition(type: ModuleType): ModuleDefinition | undefined {
@@ -60,7 +85,8 @@ export function getModulesByCategory(): Map<ModuleCategory, ModuleDefinition[]> 
     grouped.set(cat, []);
   }
   for (const def of registry.values()) {
-    grouped.get(def.category)!.push(def);
+    const arr = grouped.get(def.category);
+    if (arr) arr.push(def);
   }
   return grouped;
 }
@@ -309,6 +335,7 @@ registerModule({
     showMoonTimes: true,
   },
   defaultSize: DEFAULT_MODULE_SIZES['moon-phase'],
+  dataRequirements: ['location'],
 });
 
 registerModule({
@@ -322,6 +349,7 @@ registerModule({
     showGoldenHour: false,
   },
   defaultSize: DEFAULT_MODULE_SIZES['sunrise-sunset'],
+  dataRequirements: ['location'],
 });
 
 registerModule({
@@ -458,6 +486,7 @@ registerModule({
     mapStyle: 'dark',
   },
   defaultSize: DEFAULT_MODULE_SIZES['rain-map'],
+  dataRequirements: ['location'],
 });
 
 registerModule({
@@ -533,6 +562,7 @@ registerModule({
     accentColor: '#a78bfa',
   },
   defaultSize: DEFAULT_MODULE_SIZES.affirmations,
+  dataRequirements: ['location'],
 });
 
 registerModule({
