@@ -84,11 +84,21 @@ export async function loadDevPlugin(url: string): Promise<void> {
     await migratePluginConfigs(manifest, prev.manifest.version);
   }
 
-  // 5. Register
+  // 5. Register server-side so the proxy can find the manifest and allowedDomains
+  await fetch('/api/plugins/dev', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ manifest }),
+  }).catch(() => {
+    // Non-fatal — proxy features won't work but the plugin will still render
+    console.warn(`[plugin] Failed to register dev plugin "${manifest.id}" server-side — pluginFetch will not work`);
+  });
+
+  // 6. Register client-side
   registerPluginModule(manifest);
   store.registerPlugin(moduleType, component, manifest, configSection);
 
-  // 6. Persist dev mapping in localStorage
+  // 7. Persist dev mapping in localStorage
   devPlugins.set(manifest.id, { url: base, manifest });
   saveDevPlugins(devPlugins);
 }

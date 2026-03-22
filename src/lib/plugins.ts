@@ -169,6 +169,44 @@ export async function setPluginEnabled(pluginId: string, enabled: boolean): Prom
   await saveInstalledPlugins(installed);
 }
 
+// --- Dev plugin registration ---
+
+/**
+ * Register a dev plugin server-side so the proxy can find its manifest.
+ * Writes the manifest to disk and adds/updates an installed.json entry.
+ */
+export async function registerDevPlugin(manifest: PluginManifest): Promise<void> {
+  const safeId = sanitizePluginId(manifest.id);
+  const dir = pluginDir(safeId);
+
+  // Write manifest to disk
+  await fs.mkdir(dir, { recursive: true });
+  await fs.writeFile(
+    path.join(dir, 'manifest.json'),
+    JSON.stringify(manifest, null, 2),
+    'utf-8',
+  );
+
+  // Add/update installed.json entry
+  const installed = await getInstalledPlugins();
+  const existing = installed.plugins.findIndex((p) => p.id === manifest.id);
+
+  const entry: InstalledPlugin = {
+    id: manifest.id,
+    version: manifest.version,
+    installedAt: new Date().toISOString(),
+    enabled: true,
+    moduleType: manifest.moduleType,
+  };
+
+  if (existing >= 0) {
+    installed.plugins[existing] = entry;
+  } else {
+    installed.plugins.push(entry);
+  }
+  await saveInstalledPlugins(installed);
+}
+
 // --- Plugin hash (for display change detection) ---
 
 export async function getPluginHash(): Promise<string> {
