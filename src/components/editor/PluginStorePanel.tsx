@@ -1,17 +1,26 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { X, Trash2, ToggleLeft, ToggleRight, AlertTriangle, CheckCircle } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { X, Trash2, ToggleLeft, ToggleRight, AlertTriangle, CheckCircle, Shield, Code2, Loader2 } from 'lucide-react';
 import { editorFetch } from '@/lib/editor-fetch';
 import { usePluginStore } from '@/stores/plugin-store';
 import Button from '@/components/ui/Button';
-import type { RegistryPlugin, InstalledPlugin, PluginRegistry } from '@/types/plugins';
+import type { RegistryPlugin, InstalledPlugin, PluginRegistry, PluginPermission, PluginSecretDeclaration } from '@/types/plugins';
+import type { DevPlugin } from '@/lib/plugin-loader';
 
 interface PluginStorePanelProps {
   onClose: () => void;
 }
 
-type Tab = 'browse' | 'installed' | 'updates';
+type Tab = 'browse' | 'installed' | 'updates' | 'developer';
+
+/** Human-readable labels for permission declarations */
+const PERMISSION_LABELS: Record<PluginPermission, string> = {
+  network: 'Network access',
+  secrets: 'Secret storage',
+  events: 'Host events',
+  storage: 'Local storage',
+};
 
 export default function PluginStorePanel({ onClose }: PluginStorePanelProps) {
   const [tab, setTab] = useState<Tab>('browse');
@@ -21,20 +30,21 @@ export default function PluginStorePanel({ onClose }: PluginStorePanelProps) {
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [confirmPlugin, setConfirmPlugin] = useState<RegistryPlugin | null>(null);
   const pluginErrors = usePluginStore((s) => s.errors);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const [regRes, instRes] = await Promise.all([
         fetch('/api/plugins/registry').catch(() => null),
-        fetch('/api/plugins/installed'),
+        fetch('/api/plugins/installed').catch(() => null),
       ]);
       if (regRes?.ok) {
         const data: PluginRegistry = await regRes.json();
         setRegistry(data.plugins ?? []);
       }
-      if (instRes.ok) {
+      if (instRes?.ok) {
         const data = await instRes.json();
         setInstalled(data.plugins ?? []);
       }
@@ -43,9 +53,9 @@ export default function PluginStorePanel({ onClose }: PluginStorePanelProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const installedIds = new Set(installed.map((p) => p.id));
 
@@ -71,8 +81,14 @@ export default function PluginStorePanel({ onClose }: PluginStorePanelProps) {
     }
   };
 
-  const handleInstall = (pluginId: string, version: string) =>
-    runAction(pluginId, 'POST', { pluginId, version });
+  const handleInstallRequest = (plugin: RegistryPlugin) => {
+    setConfirmPlugin(plugin);
+  };
+
+  const handleInstallConfirm = async (pluginId: string, version: string) => {
+    await runAction(pluginId, 'POST', { pluginId, version });
+    setConfirmPlugin(null);
+  };
 
   const handleUninstall = (pluginId: string) =>
     runAction(pluginId, 'DELETE', { pluginId });
@@ -108,7 +124,7 @@ export default function PluginStorePanel({ onClose }: PluginStorePanelProps) {
 
         {/* Tabs */}
         <div className="flex gap-1 px-5 pt-3">
-          {(['browse', 'installed', 'updates'] as const).map((t) => (
+          {(['browse', 'installed', 'updates', 'developer'] as const).map((t) => (
             <button
               key={t}
               type="button"
@@ -119,7 +135,7 @@ export default function PluginStorePanel({ onClose }: PluginStorePanelProps) {
                   : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800'
               }`}
             >
-              {t.charAt(0).toUpperCase() + t.slice(1)}
+              {t === 'developer' ? 'Developer' : t.charAt(0).toUpperCase() + t.slice(1)}
               {t === 'updates' && updatable.length > 0 && (
                 <span className="ml-1.5 px-1.5 py-0.5 text-[10px] bg-blue-600 text-white rounded-full">
                   {updatable.length}
@@ -149,7 +165,7 @@ export default function PluginStorePanel({ onClose }: PluginStorePanelProps) {
               installedIds={installedIds}
               search={search}
               onSearchChange={setSearch}
-              onInstall={handleInstall}
+              onInstall={handleInstallRequest}
               actionInProgress={actionInProgress}
             />
           ) : tab === 'installed' ? (
@@ -160,19 +176,35 @@ export default function PluginStorePanel({ onClose }: PluginStorePanelProps) {
               onToggle={handleToggle}
               actionInProgress={actionInProgress}
             />
-          ) : (
+          ) : tab === 'updates' ? (
             <UpdatesTab
               registry={registry}
               updatable={updatable}
-              onInstall={handleInstall}
+              onInstall={(id, version) => runAction(id, 'POST', { pluginId: id, version })}
               actionInProgress={actionInProgress}
             />
+          ) : (
+            <DeveloperTab onError={setActionError} />
           )}
         </div>
       </div>
+
+      {/* Install confirmation modal */}
+      {confirmPlugin && (
+        <InstallConfirmModal
+          plugin={confirmPlugin}
+          onConfirm={handleInstallConfirm}
+          onCancel={() => setConfirmPlugin(null)}
+          actionInProgress={actionInProgress}
+        />
+      )}
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Browse Tab
+// ---------------------------------------------------------------------------
 
 function BrowseTab({
   plugins,
@@ -186,7 +218,7 @@ function BrowseTab({
   installedIds: Set<string>;
   search: string;
   onSearchChange: (s: string) => void;
-  onInstall: (id: string, version: string) => void;
+  onInstall: (plugin: RegistryPlugin) => void;
   actionInProgress: string | null;
 }) {
   return (
@@ -230,7 +262,7 @@ function BrowseTab({
                     variant="secondary"
                     size="sm"
                     disabled={!latest || actionInProgress === plugin.id}
-                    onClick={() => latest && onInstall(plugin.id, latest.version)}
+                    onClick={() => onInstall(plugin)}
                   >
                     {actionInProgress === plugin.id ? 'Installing...' : 'Install'}
                   </Button>
@@ -243,6 +275,10 @@ function BrowseTab({
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Installed Tab
+// ---------------------------------------------------------------------------
 
 function InstalledTab({
   installed,
@@ -308,6 +344,10 @@ function InstalledTab({
   );
 }
 
+// ---------------------------------------------------------------------------
+// Updates Tab
+// ---------------------------------------------------------------------------
+
 function UpdatesTab({
   registry,
   updatable,
@@ -352,6 +392,255 @@ function UpdatesTab({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Developer Tab — load plugins from local dev server
+// ---------------------------------------------------------------------------
+
+function DeveloperTab({ onError }: { onError: (msg: string) => void }) {
+  const [devUrl, setDevUrl] = useState('');
+  const [devLoading, setDevLoading] = useState(false);
+  const [devPlugins, setDevPlugins] = useState<Map<string, DevPlugin>>(new Map());
+
+  // Lazy-import to avoid pulling plugin-loader into the server bundle
+  const refreshDevPlugins = useCallback(async () => {
+    const { listDevPlugins } = await import('@/lib/plugin-loader');
+    setDevPlugins(new Map(listDevPlugins()));
+  }, []);
+
+  useEffect(() => { refreshDevPlugins(); }, [refreshDevPlugins]);
+
+  const handleLoad = async () => {
+    if (!devUrl.trim()) return;
+    setDevLoading(true);
+    try {
+      const { loadDevPlugin, startDevPolling } = await import('@/lib/plugin-loader');
+      await loadDevPlugin(devUrl.trim());
+      // Start polling for changes
+      const { listDevPlugins } = await import('@/lib/plugin-loader');
+      const plugins = listDevPlugins();
+      // Find the plugin we just loaded (most recent with matching URL)
+      for (const [id, dev] of plugins) {
+        if (dev.url === devUrl.trim().replace(/\/+$/, '')) {
+          startDevPolling(id);
+          break;
+        }
+      }
+      setDevUrl('');
+      await refreshDevPlugins();
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Failed to load dev plugin');
+    } finally {
+      setDevLoading(false);
+    }
+  };
+
+  const handleUnload = async (pluginId: string) => {
+    const { unloadDevPlugin, stopDevPolling } = await import('@/lib/plugin-loader');
+    stopDevPolling(pluginId);
+    unloadDevPlugin(pluginId);
+    // Reload all plugins so any installed plugin that was overridden gets restored
+    usePluginStore.getState().loadPlugins();
+    await refreshDevPlugins();
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="block text-xs font-medium text-neutral-300 mb-1.5">Load from URL</label>
+        <p className="text-[11px] text-neutral-500 mb-2">
+          Enter your dev server URL (e.g. http://localhost:5173). The plugin will auto-reload on changes.
+        </p>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={devUrl}
+            onChange={(e) => setDevUrl(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleLoad()}
+            placeholder="http://localhost:5173"
+            className="flex-1 px-3 py-2 text-sm bg-neutral-800 border border-neutral-600 rounded-lg text-neutral-200 placeholder:text-neutral-500"
+          />
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={!devUrl.trim() || devLoading}
+            onClick={handleLoad}
+          >
+            {devLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Load'}
+          </Button>
+        </div>
+      </div>
+
+      {devPlugins.size > 0 && (
+        <div>
+          <h3 className="text-xs font-medium text-neutral-300 mb-2">Dev Plugins</h3>
+          <div className="space-y-2">
+            {[...devPlugins].map(([id, dev]) => (
+              <div key={id} className="flex items-center gap-3 p-3 rounded-lg border border-amber-800/50 bg-amber-950/20">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <Code2 className="w-3.5 h-3.5 text-amber-400" />
+                    <span className="text-sm font-medium text-neutral-100">{dev.manifest.name}</span>
+                    <span className="px-1.5 py-0.5 text-[10px] font-medium bg-amber-800/60 text-amber-300 rounded">Dev</span>
+                    <span className="text-xs text-neutral-500">v{dev.manifest.version}</span>
+                  </div>
+                  <p className="text-[11px] text-neutral-500 mt-0.5 truncate">{dev.url}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleUnload(id)}
+                  className="p-1 text-neutral-400 hover:text-red-400"
+                  title="Unload"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="border-t border-neutral-800 pt-3">
+        <h3 className="text-xs font-medium text-neutral-300 mb-1">Tips</h3>
+        <ul className="text-[11px] text-neutral-500 space-y-1 list-disc list-inside">
+          <li>Dev plugins are stored in localStorage only — they won&apos;t persist across browsers</li>
+          <li>The plugin auto-reloads when the bundle changes (polled every 2s)</li>
+          <li>Source maps are supported — add <code className="text-neutral-400">sourcemap: true</code> to your Vite config</li>
+          <li>Dev plugins override installed versions with the same module type</li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Install Confirmation Modal
+// ---------------------------------------------------------------------------
+
+function InstallConfirmModal({
+  plugin,
+  onConfirm,
+  onCancel,
+  actionInProgress,
+}: {
+  plugin: RegistryPlugin;
+  onConfirm: (id: string, version: string) => void;
+  onCancel: () => void;
+  actionInProgress: string | null;
+}) {
+  const latest = plugin.versions[0];
+  const [manifestPermissions, setManifestPermissions] = useState<PluginPermission[]>(plugin.permissions ?? []);
+  const [manifestSecrets, setManifestSecrets] = useState<PluginSecretDeclaration[]>([]);
+
+  // Fetch the actual manifest to get secrets declarations (not available in registry metadata)
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchManifestDetails() {
+      try {
+        // Try to fetch the manifest if the plugin is already installed (has files on disk)
+        const res = await fetch(`/api/plugins/manifest/${plugin.id}`);
+        if (!res.ok || cancelled) return;
+        const manifest = await res.json();
+        if (cancelled) return;
+        if (manifest.permissions?.length) setManifestPermissions(manifest.permissions);
+        if (manifest.secrets?.length) setManifestSecrets(manifest.secrets);
+      } catch {
+        // Plugin not installed yet — registry permissions are the best we have
+      }
+    }
+    fetchManifestDetails();
+    return () => { cancelled = true; };
+  }, [plugin.id]);
+
+  const isWorking = actionInProgress === plugin.id;
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50">
+      <div className="w-full max-w-md rounded-xl border border-neutral-700 bg-neutral-900 shadow-2xl p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <h3 className="text-base font-semibold text-neutral-100">Install Plugin</h3>
+          {plugin.verified && (
+            <span title="Verified"><CheckCircle className="w-4 h-4 text-blue-400" /></span>
+          )}
+        </div>
+
+        <div className="space-y-3">
+          {/* Plugin info */}
+          <div className="p-3 rounded-lg bg-neutral-800/50 border border-neutral-700">
+            <div className="text-sm font-medium text-neutral-100">{plugin.name}</div>
+            <p className="text-xs text-neutral-400 mt-0.5">{plugin.description}</p>
+            <div className="flex items-center gap-3 mt-2 text-[11px] text-neutral-500">
+              <span>{plugin.author}</span>
+              <span>v{latest?.version}</span>
+              <span>{plugin.license}</span>
+            </div>
+          </div>
+
+          {/* Unverified warning */}
+          {!plugin.verified && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-950/30 border border-amber-800/50">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <div className="text-xs font-medium text-amber-300">Unverified Plugin</div>
+                <p className="text-[11px] text-amber-400/80 mt-0.5">
+                  This plugin has not been reviewed by the Home Screens team. Install at your own discretion.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Permissions */}
+          {manifestPermissions.length > 0 && (
+            <div className="p-3 rounded-lg bg-neutral-800/50 border border-neutral-700">
+              <div className="flex items-center gap-1.5 mb-2">
+                <Shield className="w-3.5 h-3.5 text-neutral-400" />
+                <span className="text-xs font-medium text-neutral-300">Permissions requested</span>
+              </div>
+              <div className="space-y-1">
+                {manifestPermissions.map((perm) => (
+                  <div key={perm} className="flex items-center gap-2 text-xs text-neutral-400">
+                    <span className="w-1 h-1 rounded-full bg-neutral-500" />
+                    {PERMISSION_LABELS[perm] || perm}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Required secrets */}
+          {manifestSecrets.length > 0 && (
+            <div className="p-3 rounded-lg bg-neutral-800/50 border border-neutral-700">
+              <div className="text-xs font-medium text-neutral-300 mb-2">API keys required</div>
+              <div className="space-y-1">
+                {manifestSecrets.map((s) => (
+                  <div key={s.key} className="flex items-center gap-2 text-xs text-neutral-400">
+                    <span className="w-1 h-1 rounded-full bg-neutral-500" />
+                    {s.label}
+                    {s.required && <span className="text-[10px] text-amber-400">(required)</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="flex justify-end gap-2 mt-4">
+          <Button variant="secondary" size="sm" onClick={onCancel} disabled={isWorking}>
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            disabled={!latest || isWorking}
+            onClick={() => latest && onConfirm(plugin.id, latest.version)}
+          >
+            {isWorking ? 'Installing...' : 'Install'}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

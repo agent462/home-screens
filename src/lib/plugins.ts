@@ -126,6 +126,11 @@ export async function installPlugin(
     };
 
     if (existing >= 0) {
+      // Track the old version so the client-side loader can run config migrations
+      const oldVersion = installed.plugins[existing].version;
+      if (oldVersion !== version) {
+        entry.previousVersion = oldVersion;
+      }
       installed.plugins[existing] = entry;
     } else {
       installed.plugins.push(entry);
@@ -145,6 +150,14 @@ export async function uninstallPlugin(pluginId: string): Promise<void> {
 
   const installed = await getInstalledPlugins();
   installed.plugins = installed.plugins.filter((p) => p.id !== pluginId);
+  await saveInstalledPlugins(installed);
+}
+
+export async function clearPreviousVersion(pluginId: string): Promise<void> {
+  const installed = await getInstalledPlugins();
+  const plugin = installed.plugins.find((p) => p.id === pluginId);
+  if (!plugin || !plugin.previousVersion) return;
+  delete plugin.previousVersion;
   await saveInstalledPlugins(installed);
 }
 

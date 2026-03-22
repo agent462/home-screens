@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { installPlugin, uninstallPlugin, setPluginEnabled, fetchRegistry } from '@/lib/plugins';
+import { installPlugin, uninstallPlugin, setPluginEnabled, clearPreviousVersion, fetchRegistry } from '@/lib/plugins';
 import { errorResponse, withAuth } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
@@ -54,16 +54,25 @@ export const DELETE = withAuth(async (request: NextRequest) => {
   }
 }, 'Failed to uninstall plugin');
 
-/** Enable/disable a plugin */
+/** Update a plugin — enable/disable or clear previousVersion after migration */
 export const PATCH = withAuth(async (request: NextRequest) => {
   const body = await request.json();
-  const { pluginId, enabled } = body as { pluginId: string; enabled: boolean };
-  if (!pluginId || typeof enabled !== 'boolean') {
-    return NextResponse.json({ error: 'pluginId and enabled (boolean) are required' }, { status: 400 });
+  const { pluginId, enabled, clearPrevVersion } = body as {
+    pluginId: string;
+    enabled?: boolean;
+    clearPrevVersion?: boolean;
+  };
+  if (!pluginId) {
+    return NextResponse.json({ error: 'pluginId is required' }, { status: 400 });
   }
 
   try {
-    await setPluginEnabled(pluginId, enabled);
+    if (typeof enabled === 'boolean') {
+      await setPluginEnabled(pluginId, enabled);
+    }
+    if (clearPrevVersion) {
+      await clearPreviousVersion(pluginId);
+    }
     return NextResponse.json({ success: true });
   } catch (error) {
     return errorResponse(error, 'Failed to update plugin');

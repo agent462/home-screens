@@ -4,6 +4,299 @@ import { usePluginStore } from '@/stores/plugin-store';
 import { registerPluginModule } from '@/lib/module-registry';
 import { registerFetchKey } from '@/lib/fetch-keys';
 
+// ---------------------------------------------------------------------------
+// Semver comparison — numeric, not lexicographic
+// Note: version.ts has a prerelease-aware compareSemver, but it imports
+// child_process/fs (server-only). This file runs client-side, so we use a
+// local implementation. Plugin versions don't use prerelease identifiers.
+// ---------------------------------------------------------------------------
+
+/** Returns negative if a < b, 0 if equal, positive if a > b */
+export function compareSemver(a: string, b: string): number {
+  const pa = a.split('.').map(Number);
+  const pb = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    const diff = (pa[i] || 0) - (pb[i] || 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+// ---------------------------------------------------------------------------
+// Dev-mode state — local plugin loading from dev server URLs
+// ---------------------------------------------------------------------------
+
+export interface DevPlugin {
+  url: string;
+  manifest: PluginManifest;
+}
+
+/** Dev plugins keyed by pluginId, stored in localStorage only */
+const DEV_PLUGINS_KEY = 'hs:devPlugins';
+
+function getDevPlugins(): Map<string, DevPlugin> {
+  try {
+    const raw = localStorage.getItem(DEV_PLUGINS_KEY);
+    if (!raw) return new Map();
+    return new Map(Object.entries(JSON.parse(raw)));
+  } catch {
+    return new Map();
+  }
+}
+
+function saveDevPlugins(devPlugins: Map<string, DevPlugin>): void {
+  localStorage.setItem(DEV_PLUGINS_KEY, JSON.stringify(Object.fromEntries(devPlugins)));
+}
+
+/**
+ * Load a plugin from a local dev server URL.
+ * Fetches manifest.json and bundle.js from the URL root, registers the plugin,
+ * and stores the mapping in localStorage (not persisted to disk config).
+ */
+export async function loadDevPlugin(url: string): Promise<void> {
+  const store = usePluginStore.getState();
+  // Normalise: strip trailing slash
+  const base = url.replace(/\/+$/, '');
+
+  // 1. Fetch manifest from dev server
+  const manifestRes = await fetch(`${base}/manifest.json`);
+  if (!manifestRes.ok) throw new Error(`Dev manifest fetch failed: ${manifestRes.status}`);
+  const manifest: PluginManifest = await manifestRes.json();
+
+  if (!manifest.id || !manifest.name || !manifest.moduleType) {
+    throw new Error('Dev manifest missing required fields');
+  }
+
+  const moduleType = `plugin:${manifest.moduleType}`;
+
+  // 2. Fetch bundle
+  const bundleRes = await fetch(`${base}/dist/bundle.js`);
+  if (!bundleRes.ok) throw new Error(`Dev bundle fetch failed: ${bundleRes.status}`);
+  const bundleText = await bundleRes.text();
+
+  // 3. Execute bundle
+  const { component, configSection } = executeBundle(bundleText, manifest);
+
+  // 4. Migrate configs if dev plugin version changed
+  const devPlugins = getDevPlugins();
+  const prev = devPlugins.get(manifest.id);
+  if (prev && prev.manifest.version !== manifest.version) {
+    await migratePluginConfigs(manifest, prev.manifest.version);
+  }
+
+  // 5. Register
+  registerPluginModule(manifest);
+  store.registerPlugin(moduleType, component, manifest, configSection);
+
+  // 6. Persist dev mapping in localStorage
+  devPlugins.set(manifest.id, { url: base, manifest });
+  saveDevPlugins(devPlugins);
+}
+
+/**
+ * Unload a dev plugin and remove it from localStorage.
+ */
+export function unloadDevPlugin(pluginId: string): void {
+  const devPlugins = getDevPlugins();
+  const dev = devPlugins.get(pluginId);
+  if (!dev) return;
+
+  const moduleType = `plugin:${dev.manifest.moduleType}`;
+  usePluginStore.getState().unregisterPlugin(moduleType);
+  devPlugins.delete(pluginId);
+  saveDevPlugins(devPlugins);
+}
+
+/**
+ * Get the list of currently loaded dev plugins.
+ */
+export function listDevPlugins(): Map<string, DevPlugin> {
+  return getDevPlugins();
+}
+
+// ---------------------------------------------------------------------------
+// Dev-mode polling — auto-reload on bundle change
+// ---------------------------------------------------------------------------
+
+const pollIntervals = new Map<string, ReturnType<typeof setInterval>>();
+const bundleETags = new Map<string, string>();
+const pollInFlight = new Set<string>();
+
+/**
+ * Start polling a dev plugin's bundle for changes (2s interval).
+ * On change (different ETag or Content-Length), auto-reload the plugin.
+ * An in-flight guard prevents concurrent ticks from double-reloading.
+ */
+export function startDevPolling(pluginId: string): void {
+  stopDevPolling(pluginId); // clear any existing interval
+
+  const interval = setInterval(async () => {
+    // Guard: skip if previous tick is still running
+    if (pollInFlight.has(pluginId)) return;
+    pollInFlight.add(pluginId);
+
+    try {
+      // Re-read from localStorage each tick to pick up URL changes
+      const dev = getDevPlugins().get(pluginId);
+      if (!dev) { stopDevPolling(pluginId); return; }
+
+      const res = await fetch(`${dev.url}/dist/bundle.js`, { method: 'HEAD' });
+      if (!res.ok) return;
+
+      const etag = res.headers.get('etag') || res.headers.get('content-length') || '';
+      const prev = bundleETags.get(pluginId);
+
+      if (prev !== undefined && prev !== etag) {
+        // Bundle changed — reload
+        await loadDevPlugin(dev.url);
+      }
+
+      bundleETags.set(pluginId, etag);
+    } catch {
+      // Dev server may be temporarily down — ignore
+    } finally {
+      pollInFlight.delete(pluginId);
+    }
+  }, 2000);
+
+  pollIntervals.set(pluginId, interval);
+}
+
+export function stopDevPolling(pluginId: string): void {
+  const interval = pollIntervals.get(pluginId);
+  if (interval) {
+    clearInterval(interval);
+    pollIntervals.delete(pluginId);
+  }
+  bundleETags.delete(pluginId);
+}
+
+function stopAllDevPolling(): void {
+  for (const id of pollIntervals.keys()) stopDevPolling(id);
+}
+
+// ---------------------------------------------------------------------------
+// Config migration — deep-merge on version change
+// ---------------------------------------------------------------------------
+
+/** Deep-merge source into target: new keys get source values, existing keys kept */
+export function deepMergeConfig(
+  target: Record<string, unknown>,
+  source: Record<string, unknown>,
+): Record<string, unknown> {
+  const result = { ...target };
+  for (const key of Object.keys(source)) {
+    if (!(key in result)) {
+      result[key] = source[key];
+    } else if (
+      typeof result[key] === 'object' && result[key] !== null && !Array.isArray(result[key]) &&
+      typeof source[key] === 'object' && source[key] !== null && !Array.isArray(source[key])
+    ) {
+      result[key] = deepMergeConfig(
+        result[key] as Record<string, unknown>,
+        source[key] as Record<string, unknown>,
+      );
+    }
+    // else: existing value preserved (including arrays)
+  }
+  return result;
+}
+
+/**
+ * Migrate module configs when a plugin version changes.
+ * Applies configMigrations (renames/defaults) then deep-merges with defaultConfig.
+ */
+/**
+ * Returns true if migration succeeded (or no migration was needed),
+ * false if it failed and should be retried on next load.
+ */
+async function migratePluginConfigs(
+  manifest: PluginManifest,
+  oldVersion: string,
+): Promise<boolean> {
+  const moduleType = `plugin:${manifest.moduleType}`;
+
+  try {
+    // Fetch current config
+    const res = await fetch('/api/config');
+    if (!res.ok) return false;
+    const config = await res.json();
+
+    let changed = false;
+
+    for (const screen of config.screens ?? []) {
+      for (const mod of screen.modules ?? []) {
+        if (mod.type !== moduleType) continue;
+
+        // Snapshot original for change detection
+        const originalJson = JSON.stringify(mod.config);
+        const modConfig = { ...mod.config } as Record<string, unknown>;
+
+        // Apply explicit migrations for intermediate versions (sorted ascending)
+        if (manifest.configMigrations) {
+          const sortedVersions = Object.keys(manifest.configMigrations)
+            .filter((v) => compareSemver(v, oldVersion) > 0 && compareSemver(v, manifest.version) < 0)
+            .sort(compareSemver);
+
+          for (const fromVer of sortedVersions) {
+            const migration = manifest.configMigrations[fromVer];
+            // Apply renames
+            if (migration.renames) {
+              for (const [oldKey, newKey] of Object.entries(migration.renames)) {
+                if (oldKey in modConfig && !(newKey in modConfig)) {
+                  modConfig[newKey] = modConfig[oldKey];
+                  delete modConfig[oldKey];
+                }
+              }
+            }
+            // Apply explicit defaults
+            if (migration.defaults) {
+              for (const [key, value] of Object.entries(migration.defaults)) {
+                if (!(key in modConfig)) {
+                  modConfig[key] = value;
+                }
+              }
+            }
+          }
+        }
+
+        // Deep-merge with new defaultConfig (adds missing keys)
+        const merged = deepMergeConfig(modConfig, manifest.defaultConfig);
+
+        // Always write back — compare against original to detect any change
+        mod.config = merged;
+        if (JSON.stringify(merged) !== originalJson) {
+          changed = true;
+        }
+      }
+    }
+
+    if (changed) {
+      const putRes = await fetch('/api/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config),
+      });
+      if (!putRes.ok) return false;
+    }
+
+    return true;
+  } catch (err) {
+    console.warn(`Config migration for ${manifest.id} failed:`, err);
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Pending migrations — collected during parallel load, executed sequentially
+// ---------------------------------------------------------------------------
+
+interface PendingMigration {
+  manifest: PluginManifest;
+  oldVersion: string;
+  pluginId: string;
+}
+
 /**
  * Load all installed+enabled plugins. Called from the plugin Zustand store.
  *
@@ -12,12 +305,14 @@ import { registerFetchKey } from '@/lib/fetch-keys';
  * 2. GET /api/plugins/bundle/<id>?v=<version> → IIFE bundle text
  * 3. Execute bundle via script injection → read window.__HS_PLUGIN__
  * 4. Register into Zustand store + module registry
+ * 5. After all plugins loaded, run pending config migrations sequentially
  */
 export async function loadAllPlugins(): Promise<void> {
   const store = usePluginStore.getState();
 
   // Clear previous plugin registrations before reloading
   store.clearPlugins();
+  stopAllDevPolling();
 
   // Fetch installed plugins list
   let plugins: InstalledPlugin[];
@@ -30,17 +325,51 @@ export async function loadAllPlugins(): Promise<void> {
     return;
   }
 
-  if (plugins.length === 0) return;
+  // Load installed plugins in parallel, collect pending migrations
+  const pendingMigrations: PendingMigration[] = [];
 
-  // Load each plugin in parallel, errors don't block others
-  await Promise.allSettled(
-    plugins.map((plugin) => loadSinglePlugin(plugin, store)),
-  );
+  if (plugins.length > 0) {
+    await Promise.allSettled(
+      plugins.map((plugin) => loadSinglePlugin(plugin, store, pendingMigrations)),
+    );
+  }
+
+  // Migrations and dev plugins only run in the editor (authenticated context).
+  // The display page is unauthenticated — PUT /api/config would fail with 401.
+  const isEditor = typeof window !== 'undefined' && window.location.pathname.startsWith('/editor');
+  if (!isEditor) return;
+
+  // Run config migrations sequentially to avoid concurrent read-modify-write
+  for (const { manifest, oldVersion, pluginId } of pendingMigrations) {
+    const migrated = await migratePluginConfigs(manifest, oldVersion);
+    // Only clear previousVersion if migration succeeded — otherwise it retries on next load
+    if (migrated) {
+      fetch('/api/plugins/install', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pluginId, clearPrevVersion: true }),
+      }).catch(() => {}); // fire-and-forget
+    }
+  }
+
+  // Load dev plugins from localStorage (these override installed versions)
+  const devPlugins = getDevPlugins();
+  for (const [pluginId, dev] of devPlugins) {
+    try {
+      await loadDevPlugin(dev.url);
+      startDevPolling(pluginId);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`Dev plugin ${pluginId} failed to load:`, message);
+      store.setError(pluginId, { message, phase: 'load' });
+    }
+  }
 }
 
 async function loadSinglePlugin(
   plugin: InstalledPlugin,
   store: ReturnType<typeof usePluginStore.getState>,
+  pendingMigrations: PendingMigration[],
 ): Promise<void> {
   const moduleType = `plugin:${plugin.moduleType}`;
 
@@ -70,11 +399,20 @@ async function loadSinglePlugin(
     // 4. Execute IIFE bundle
     const { component, configSection } = executeBundle(bundleText, manifest);
 
-    // 5. Register into module registry and Zustand store
+    // 5. Queue migration if server reports a version change
+    if (plugin.previousVersion && plugin.previousVersion !== manifest.version) {
+      pendingMigrations.push({
+        manifest,
+        oldVersion: plugin.previousVersion,
+        pluginId: plugin.id,
+      });
+    }
+
+    // 6. Register into module registry and Zustand store
     registerPluginModule(manifest);
     store.registerPlugin(moduleType, component, manifest, configSection);
 
-    // 6. Wire prefetchUrl into the fetch key registry if declared
+    // 7. Wire prefetchUrl into the fetch key registry if declared
     if (manifest.prefetchUrl) {
       const url = manifest.prefetchUrl;
       registerFetchKey(`plugin:${manifest.moduleType}`, {

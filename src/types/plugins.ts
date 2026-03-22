@@ -34,9 +34,15 @@ export interface PluginManifest {
   prefetchUrl?: string | null;
   secrets?: PluginSecretDeclaration[];
   allowedDomains?: string[];  // e.g. ["api.spotify.com", "*.openweathermap.org"]
+  permissions?: PluginPermission[];
+  /** Maps fromVersion → { renames, defaults } for config migration on update */
+  configMigrations?: Record<string, { renames?: Record<string, string>; defaults?: Record<string, unknown> }>;
 }
 
 export type PluginDataRequirement = 'location' | 'weather' | 'calendar';
+
+/** Declared plugin capabilities — transparency for users, not runtime-enforced */
+export type PluginPermission = 'network' | 'secrets' | 'events' | 'storage';
 
 /** JSON Schema with UI widget annotations for declarative config rendering */
 export interface PluginConfigSchema {
@@ -78,6 +84,8 @@ export interface InstalledPlugin {
   installedAt: string;
   enabled: boolean;
   moduleType: string; // raw type from manifest (without "plugin:" prefix)
+  /** Set during update — the version being replaced, cleared after config migration */
+  previousVersion?: string;
 }
 
 export interface InstalledPluginsFile {
@@ -118,6 +126,7 @@ export interface RegistryPlugin {
   tags: string[];
   icon: string;
   verified: boolean;
+  permissions?: PluginPermission[];
   versions: RegistryPluginVersion[];
 }
 
