@@ -45,6 +45,7 @@ data/todoist-token.txt
 data/secrets.json
 data/auth.json
 data/kiosk.conf
+data/plugins/
 
 # user-uploaded backgrounds
 public/backgrounds/*
