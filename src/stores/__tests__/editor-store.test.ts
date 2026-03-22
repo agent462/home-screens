@@ -478,4 +478,298 @@ describe('editor store', () => {
       expect(profiles[1].screenIds).toEqual([]);
     });
   });
+
+  describe('saveConfig', () => {
+    let fetchMock: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+    });
+
+    function mockFetchOk() {
+      fetchMock.mockResolvedValue({ ok: true, status: 200 });
+    }
+
+    function _mockFetchDelayed(_ms: number) {
+      return () => {
+        let resolver: (res: { ok: boolean; status: number }) => void;
+        const promise = new Promise<{ ok: boolean; status: number }>((resolve) => {
+          resolver = resolve;
+        });
+        fetchMock.mockReturnValueOnce(promise);
+        return {
+          resolve: () => resolver({ ok: true, status: 200 }),
+          reject: () => resolver({ ok: false, status: 500 }),
+        };
+      };
+    }
+
+    function setupStoreWithConfig() {
+      const store = useEditorStore;
+      const config = makeConfig();
+      store.setState({ config, isDirty: true, isSaving: false, saveError: null });
+      return store;
+    }
+
+    it('saves successfully and clears isDirty when no changes occur during save', async () => {
+      const store = setupStoreWithConfig();
+      mockFetchOk();
+
+      await store.getState().saveConfig();
+
+      const state = store.getState();
+      expect(state.isDirty).toBe(false);
+      expect(state.isSaving).toBe(false);
+      expect(state.saveError).toBeNull();
+      expect(fetchMock).toHaveBeenCalledOnce();
+      expect(fetchMock).toHaveBeenCalledWith('/api/config', expect.objectContaining({
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+      }));
+    });
+
+    it('sets isSaving to true during save', async () => {
+      const store = setupStoreWithConfig();
+      let capturedIsSaving = false;
+      fetchMock.mockImplementation(() => {
+        capturedIsSaving = store.getState().isSaving;
+        return Promise.resolve({ ok: true, status: 200 });
+      });
+
+      await store.getState().saveConfig();
+
+      expect(capturedIsSaving).toBe(true);
+      expect(store.getState().isSaving).toBe(false);
+    });
+
+    it('keeps isDirty true when config changes during an in-flight save', async () => {
+      const store = setupStoreWithConfig();
+
+      // Set up a fetch that we control the resolution of
+      let resolveFetch!: () => void;
+      fetchMock.mockImplementation(() => new Promise<{ ok: boolean; status: number }>((resolve) => {
+        resolveFetch = () => resolve({ ok: true, status: 200 });
+      }));
+
+      // Start save (don't await yet)
+      const savePromise = store.getState().saveConfig();
+
+      // While save is in flight, mutate the config — this creates a new object reference
+      store.getState().updateSettings({ rotationIntervalMs: 99999 });
+
+      // The config reference is now different from the snapshot taken before the save
+      expect(store.getState().isDirty).toBe(true);
+
+      // Resolve the fetch to complete the save
+      resolveFetch();
+      await savePromise;
+
+      // isDirty must remain true because config changed during the save
+      expect(store.getState().isDirty).toBe(true);
+      expect(store.getState().isSaving).toBe(false);
+      expect(store.getState().saveError).toBeNull();
+    });
+
+    it('concurrent save call is a no-op while another save is in flight', async () => {
+      const store = setupStoreWithConfig();
+
+      let resolveFetch!: () => void;
+      fetchMock.mockImplementation(() => new Promise<{ ok: boolean; status: number }>((resolve) => {
+        resolveFetch = () => resolve({ ok: true, status: 200 });
+      }));
+
+      // Start first save
+      const firstSave = store.getState().saveConfig();
+      expect(store.getState().isSaving).toBe(true);
+
+      // Attempt a second save while first is in flight — should be a no-op
+      const secondSave = store.getState().saveConfig();
+
+      // Only one fetch call should have been made
+      expect(fetchMock).toHaveBeenCalledOnce();
+
+      // Resolve and finish
+      resolveFetch();
+      await firstSave;
+      await secondSave;
+
+      expect(store.getState().isSaving).toBe(false);
+      // Still only one fetch call total
+      expect(fetchMock).toHaveBeenCalledOnce();
+    });
+
+    it('save error keeps isDirty true so retry can happen', async () => {
+      const store = setupStoreWithConfig();
+      fetchMock.mockResolvedValue({ ok: false, status: 500 });
+
+      await expect(store.getState().saveConfig()).rejects.toThrow('Save failed: 500');
+
+      const state = store.getState();
+      // isDirty was never cleared — save error should not lose unsaved changes
+      expect(state.isDirty).toBe(true);
+      expect(state.isSaving).toBe(false);
+      expect(state.saveError).toBe('Failed to save');
+    });
+
+    it('save error from network failure keeps isDirty true', async () => {
+      const store = setupStoreWithConfig();
+      fetchMock.mockRejectedValue(new Error('Network error'));
+
+      await expect(store.getState().saveConfig()).rejects.toThrow('Network error');
+
+      const state = store.getState();
+      expect(state.isDirty).toBe(true);
+      expect(state.isSaving).toBe(false);
+      expect(state.saveError).toBe('Failed to save');
+    });
+
+    it('retry after error works correctly', async () => {
+      const store = setupStoreWithConfig();
+
+      // First save fails
+      fetchMock.mockResolvedValueOnce({ ok: false, status: 500 });
+      await expect(store.getState().saveConfig()).rejects.toThrow();
+      expect(store.getState().isDirty).toBe(true);
+      expect(store.getState().isSaving).toBe(false);
+
+      // Retry succeeds
+      fetchMock.mockResolvedValueOnce({ ok: true, status: 200 });
+      await store.getState().saveConfig();
+
+      expect(store.getState().isDirty).toBe(false);
+      expect(store.getState().isSaving).toBe(false);
+      expect(store.getState().saveError).toBeNull();
+    });
+
+    it('does nothing when config is null', async () => {
+      const store = useEditorStore;
+      store.setState({ config: null, isDirty: false, isSaving: false });
+      mockFetchOk();
+
+      await store.getState().saveConfig();
+
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('multiple rapid mutations followed by a single save sends latest config', async () => {
+      const store = setupStoreWithConfig();
+      mockFetchOk();
+
+      // Perform several rapid mutations
+      store.getState().updateSettings({ rotationIntervalMs: 10000 });
+      store.getState().updateSettings({ rotationIntervalMs: 20000 });
+      store.getState().updateSettings({ rotationIntervalMs: 30000 });
+
+      await store.getState().saveConfig();
+
+      // The body sent should contain the latest value
+      const sentBody = JSON.parse(fetchMock.mock.calls[0][1].body);
+      expect(sentBody.settings.rotationIntervalMs).toBe(30000);
+      expect(store.getState().isDirty).toBe(false);
+    });
+
+    it('save clears a previous saveError on success', async () => {
+      const store = setupStoreWithConfig();
+
+      // First save fails to set saveError
+      fetchMock.mockResolvedValueOnce({ ok: false, status: 500 });
+      await expect(store.getState().saveConfig()).rejects.toThrow();
+      expect(store.getState().saveError).toBe('Failed to save');
+
+      // Second save succeeds — error should be cleared
+      fetchMock.mockResolvedValueOnce({ ok: true, status: 200 });
+      await store.getState().saveConfig();
+      expect(store.getState().saveError).toBeNull();
+    });
+
+    it('sequential save after in-flight save completes picks up new changes', async () => {
+      const store = setupStoreWithConfig();
+
+      let resolveFetch!: () => void;
+      let fetchCallCount = 0;
+      fetchMock.mockImplementation(() => new Promise<{ ok: boolean; status: number }>((resolve) => {
+        fetchCallCount++;
+        resolveFetch = () => resolve({ ok: true, status: 200 });
+      }));
+
+      // Start first save
+      const firstSave = store.getState().saveConfig();
+
+      // Mutate while first save is in flight
+      store.getState().updateSettings({ rotationIntervalMs: 55555 });
+
+      // Complete first save
+      resolveFetch();
+      await firstSave;
+
+      // isDirty should still be true (mutation happened during save)
+      expect(store.getState().isDirty).toBe(true);
+      expect(fetchCallCount).toBe(1);
+
+      // Now second save should send the new config
+      const secondSave = store.getState().saveConfig();
+      resolveFetch();
+      await secondSave;
+
+      expect(fetchCallCount).toBe(2);
+      // Verify the second save sent the updated value
+      const secondBody = JSON.parse(fetchMock.mock.calls[1][1].body);
+      expect(secondBody.settings.rotationIntervalMs).toBe(55555);
+      expect(store.getState().isDirty).toBe(false);
+    });
+
+    it('mutation during save does not corrupt the in-flight snapshot', async () => {
+      const store = setupStoreWithConfig();
+
+      let capturedBody = '';
+      fetchMock.mockImplementation((_url: string, opts: RequestInit) => {
+        capturedBody = opts.body as string;
+        // Mutate config WHILE fetch is being processed (simulating synchronous interleaving)
+        store.getState().addModule('screen-1', 'clock');
+        return Promise.resolve({ ok: true, status: 200 });
+      });
+
+      await store.getState().saveConfig();
+
+      // The body that was sent should match the original snapshot, NOT include the module added during fetch
+      const sentConfig = JSON.parse(capturedBody);
+      expect(sentConfig.screens[0].modules).toHaveLength(0);
+
+      // But the current state should have the new module
+      expect(store.getState().config!.screens[0].modules).toHaveLength(1);
+
+      // And isDirty should be true since config changed during save
+      expect(store.getState().isDirty).toBe(true);
+    });
+
+    it('isSaving guard prevents stale snapshot from overwriting newer data', async () => {
+      const store = setupStoreWithConfig();
+
+      let resolveFetch!: () => void;
+      fetchMock.mockImplementation(() => new Promise<{ ok: boolean; status: number }>((resolve) => {
+        resolveFetch = () => resolve({ ok: true, status: 200 });
+      }));
+
+      // Start first save — captures snapshot of config
+      const firstSave = store.getState().saveConfig();
+
+      // Mutate config multiple times while save is in flight
+      store.getState().updateSettings({ rotationIntervalMs: 11111 });
+      store.getState().updateSettings({ rotationIntervalMs: 22222 });
+
+      // Attempt another save — should be blocked by isSaving guard
+      const blockedSave = store.getState().saveConfig();
+
+      // Complete first save
+      resolveFetch();
+      await firstSave;
+      await blockedSave;
+
+      // Config should retain the latest mutations, not be overwritten
+      expect(store.getState().config!.settings.rotationIntervalMs).toBe(22222);
+      // isDirty should be true since config diverged from what was saved
+      expect(store.getState().isDirty).toBe(true);
+    });
+  });
 });

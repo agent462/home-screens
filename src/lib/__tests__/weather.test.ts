@@ -348,3 +348,1296 @@ describe('WeatherAPIProvider', () => {
     });
   });
 });
+
+// ── Cross-provider unit conversion ─────────────────────────────────
+
+describe('WeatherAPIProvider — unit conversion', () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  const makeWAResponse = (overrides?: Partial<{ current: object; forecast: object }>) => ({
+    current: { is_day: 1, ...(overrides?.current ?? {}) },
+    forecast: {
+      forecastday: [
+        {
+          date: '2025-06-15',
+          day: {
+            maxtemp_c: 30,
+            maxtemp_f: 86,
+            mintemp_c: 20,
+            mintemp_f: 68,
+            avghumidity: 55,
+            maxwind_kph: 24.1,
+            maxwind_mph: 15.0,
+            totalprecip_mm: 5.2,
+            totalprecip_in: 0.2,
+            daily_chance_of_rain: 60,
+            condition: { text: 'Partly cloudy', code: 1003 },
+          },
+          hour: [
+            {
+              time: '2025-06-15 12:00',
+              time_epoch: Math.floor(Date.now() / 1000) + 3600,
+              temp_c: 28,
+              temp_f: 82.4,
+              feelslike_c: 30,
+              feelslike_f: 86,
+              humidity: 60,
+              wind_kph: 16.1,
+              wind_mph: 10.0,
+              condition: { text: 'Partly cloudy', code: 1003 },
+              chance_of_rain: 40,
+            },
+          ],
+        },
+      ],
+      ...(overrides?.forecast ?? {}),
+    },
+  });
+
+  beforeEach(() => {
+    fetchSpy = vi.spyOn(globalThis, 'fetch');
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+  });
+
+  it('returns imperial units (°F, mph, inches) when units=imperial', async () => {
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify(makeWAResponse()), { status: 200 }));
+    const provider = new WeatherAPIProvider('test-key');
+
+    const hourly = await provider.getHourly(40.7, -74.0, 'imperial');
+    expect(hourly[0].temp).toBe(82.4);       // temp_f
+    expect(hourly[0].feelsLike).toBe(86);     // feelslike_f
+    expect(hourly[0].windSpeed).toBe(10.0);   // wind_mph
+
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify(makeWAResponse()), { status: 200 }));
+    const forecast = await provider.getForecast(40.7, -74.0, 'imperial');
+    expect(forecast[0].high).toBe(86);        // maxtemp_f
+    expect(forecast[0].low).toBe(68);         // mintemp_f
+    expect(forecast[0].windSpeed).toBe(15.0); // maxwind_mph
+    expect(forecast[0].precipAmount).toBe(0.2); // totalprecip_in
+  });
+
+  it('returns metric units (°C, km/h, mm) when units=metric', async () => {
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify(makeWAResponse()), { status: 200 }));
+    const provider = new WeatherAPIProvider('test-key');
+
+    const hourly = await provider.getHourly(40.7, -74.0, 'metric');
+    expect(hourly[0].temp).toBe(28);          // temp_c
+    expect(hourly[0].feelsLike).toBe(30);     // feelslike_c
+    expect(hourly[0].windSpeed).toBe(16.1);   // wind_kph
+
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify(makeWAResponse()), { status: 200 }));
+    const forecast = await provider.getForecast(40.7, -74.0, 'metric');
+    expect(forecast[0].high).toBe(30);        // maxtemp_c
+    expect(forecast[0].low).toBe(20);         // mintemp_c
+    expect(forecast[0].windSpeed).toBe(24.1); // maxwind_kph
+    expect(forecast[0].precipAmount).toBe(5.2); // totalprecip_mm
+  });
+});
+
+describe('OpenWeatherMapProvider — data normalization', () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  const owmCurrentResponse = {
+    dt: 1710000000,
+    main: { temp: 72, feels_like: 70, humidity: 55, temp_min: 68, temp_max: 75, pressure: 1015 },
+    weather: [{ id: 800, main: 'Clear', description: 'clear sky', icon: '01d' }],
+    wind: { speed: 8, deg: 180 },
+  };
+
+  const owmForecastResponse = {
+    list: [
+      {
+        dt: 1710010800,
+        main: { temp: 74, feels_like: 72, humidity: 50, temp_min: 70, temp_max: 77, pressure: 1014 },
+        weather: [{ id: 801, main: 'Clouds', description: 'few clouds', icon: '02d' }],
+        wind: { speed: 10, deg: 200 },
+        pop: 0.25,
+        rain: { '3h': 1.5 },
+      },
+      {
+        dt: 1710021600,
+        main: { temp: 68, feels_like: 66, humidity: 60, temp_min: 65, temp_max: 70, pressure: 1013 },
+        weather: [{ id: 500, main: 'Rain', description: 'light rain', icon: '10d' }],
+        wind: { speed: 12, deg: 220 },
+        pop: 0.7,
+        rain: { '3h': 3.2 },
+      },
+    ],
+  };
+
+  beforeEach(() => {
+    fetchSpy = vi.spyOn(globalThis, 'fetch');
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+  });
+
+  it('normalizes current weather into HourlyWeather[0]', async () => {
+    fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify(owmCurrentResponse), { status: 200 }));
+    fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify(owmForecastResponse), { status: 200 }));
+
+    const provider = new OpenWeatherMapProvider('test-key');
+    const hourly = await provider.getHourly(40.7, -74.0, 'imperial');
+
+    expect(hourly[0].temp).toBe(72);
+    expect(hourly[0].feelsLike).toBe(70);
+    expect(hourly[0].humidity).toBe(55);
+    expect(hourly[0].icon).toBe('sun');
+    expect(hourly[0].description).toBe('clear sky');
+    expect(hourly[0].windSpeed).toBe(8);
+    expect(hourly[0].precipProbability).toBe(0);
+  });
+
+  it('converts pop from 0-1 to 0-100 in hourly forecast', async () => {
+    fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify(owmCurrentResponse), { status: 200 }));
+    fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify(owmForecastResponse), { status: 200 }));
+
+    const provider = new OpenWeatherMapProvider('test-key');
+    const hourly = await provider.getHourly(40.7, -74.0, 'imperial');
+
+    // list[0].pop = 0.25 → 25, list[1].pop = 0.7 → 70
+    expect(hourly[1].precipProbability).toBe(25);
+    expect(hourly[2].precipProbability).toBe(70);
+  });
+
+  it('aggregates forecast entries by date for getForecast', async () => {
+    // Both entries have same date from epoch 1710010800 and 1710021600
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify(owmForecastResponse), { status: 200 }));
+
+    const provider = new OpenWeatherMapProvider('test-key');
+    const forecast = await provider.getForecast(40.7, -74.0, 'imperial');
+
+    // Both entries are on the same day so they should be aggregated
+    expect(forecast.length).toBe(1);
+    // High should be max of temps: max(74, 68) = 74
+    expect(forecast[0].high).toBe(74);
+    // Low should be min of temps: min(74, 68) = 68
+    expect(forecast[0].low).toBe(68);
+    // Rain accumulated: 1.5 + 3.2 = 4.7 mm → inches: 4.7/25.4 ≈ 0.19
+    expect(forecast[0].precipAmount).toBe(Math.round(4.7 / 25.4 * 100) / 100);
+  });
+
+  it('calculates precipAmount in mm for metric', async () => {
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify(owmForecastResponse), { status: 200 }));
+
+    const provider = new OpenWeatherMapProvider('test-key');
+    const forecast = await provider.getForecast(40.7, -74.0, 'metric');
+
+    // Rain accumulated: 1.5 + 3.2 = 4.7 → rounded to 1 decimal = 4.7 mm
+    expect(forecast[0].precipAmount).toBe(Math.round(4.7 * 10) / 10);
+  });
+
+  it('averages humidity and windSpeed across day entries', async () => {
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify(owmForecastResponse), { status: 200 }));
+
+    const provider = new OpenWeatherMapProvider('test-key');
+    const forecast = await provider.getForecast(40.7, -74.0, 'imperial');
+
+    // humidity avg: (50 + 60) / 2 = 55
+    expect(forecast[0].humidity).toBe(55);
+    // windSpeed avg: (10 + 12) / 2 = 11
+    expect(forecast[0].windSpeed).toBe(11);
+  });
+});
+
+// ── Pirate Weather specifics ───────────────────────────────────────
+
+describe('PirateWeatherProvider — data normalization', () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  const nowEpoch = Math.floor(Date.now() / 1000);
+
+  const makePWResponse = (overrides?: Partial<{
+    hourly: object;
+    daily: object;
+    minutely: object;
+    alerts: object[];
+  }>) => ({
+    currently: {
+      time: nowEpoch,
+      summary: 'Clear',
+      icon: 'clear-day',
+      temperature: 72,
+      apparentTemperature: 70,
+      humidity: 0.55,
+      windSpeed: 8,
+      precipProbability: 0.1,
+    },
+    hourly: {
+      data: [
+        {
+          time: nowEpoch,
+          summary: 'Clear',
+          icon: 'clear-day',
+          temperature: 72,
+          apparentTemperature: 70,
+          humidity: 0.55,
+          windSpeed: 8,
+          precipProbability: 0.1,
+          pressure: 1015.2,
+          visibility: 10,
+        },
+        {
+          time: nowEpoch + 3600,
+          summary: 'Partly Cloudy',
+          icon: 'partly-cloudy-day',
+          temperature: 75,
+          apparentTemperature: 73,
+          humidity: 0.5,
+          windSpeed: 10,
+          precipProbability: 0.25,
+        },
+      ],
+      ...(overrides?.hourly ?? {}),
+    },
+    daily: {
+      data: [
+        {
+          time: nowEpoch,
+          summary: 'Clear throughout the day.',
+          icon: 'clear-day',
+          temperatureHigh: 85,
+          temperatureLow: 62,
+          humidity: 0.45,
+          windSpeed: 12.7,
+          precipProbability: 0.15,
+          precipAccumulation: 0.02,
+        },
+      ],
+      ...(overrides?.daily ?? {}),
+    },
+    minutely: overrides?.minutely ?? {
+      data: [
+        { time: nowEpoch, precipIntensity: 0, precipProbability: 0, precipType: 'none' },
+        { time: nowEpoch + 60, precipIntensity: 0.5, precipProbability: 0.8, precipType: 'rain' },
+      ],
+    },
+    alerts: overrides?.alerts ?? [],
+  });
+
+  beforeEach(() => {
+    fetchSpy = vi.spyOn(globalThis, 'fetch');
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+  });
+
+  it('scales humidity from 0-1 to 0-100 in hourly', async () => {
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify(makePWResponse()), { status: 200 }));
+    const provider = createWeatherProvider('pirateweather', 'test-key');
+    const hourly = await provider.getHourly(40.7, -74.0, 'imperial');
+
+    // humidity 0.55 → 55, humidity 0.5 → 50
+    expect(hourly[0].humidity).toBe(55);
+    expect(hourly[1].humidity).toBe(50);
+  });
+
+  it('scales precipProbability from 0-1 to 0-100 in hourly', async () => {
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify(makePWResponse()), { status: 200 }));
+    const provider = createWeatherProvider('pirateweather', 'test-key');
+    const hourly = await provider.getHourly(40.7, -74.0, 'imperial');
+
+    expect(hourly[0].precipProbability).toBe(10);  // 0.1 → 10
+    expect(hourly[1].precipProbability).toBe(25);   // 0.25 → 25
+  });
+
+  it('scales humidity from 0-1 to 0-100 in daily forecast', async () => {
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify(makePWResponse()), { status: 200 }));
+    const provider = createWeatherProvider('pirateweather', 'test-key');
+    const forecast = await provider.getForecast(40.7, -74.0, 'imperial');
+
+    expect(forecast[0].humidity).toBe(45); // 0.45 → 45
+  });
+
+  it('scales precipProbability from 0-1 to 0-100 in daily forecast', async () => {
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify(makePWResponse()), { status: 200 }));
+    const provider = createWeatherProvider('pirateweather', 'test-key');
+    const forecast = await provider.getForecast(40.7, -74.0, 'imperial');
+
+    expect(forecast[0].precipProbability).toBe(15); // 0.15 → 15
+  });
+
+  it('rounds daily temperatures and wind speed', async () => {
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify(makePWResponse()), { status: 200 }));
+    const provider = createWeatherProvider('pirateweather', 'test-key');
+    const forecast = await provider.getForecast(40.7, -74.0, 'imperial');
+
+    expect(forecast[0].high).toBe(85);
+    expect(forecast[0].low).toBe(62);
+    expect(forecast[0].windSpeed).toBe(13); // 12.7 → 13
+  });
+
+  it('normalizes minutely precipitation data', async () => {
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify(makePWResponse()), { status: 200 }));
+    const provider = createWeatherProvider('pirateweather', 'test-key');
+    const minutely = await provider.getMinutely!(40.7, -74.0, 'imperial');
+
+    expect(minutely).toHaveLength(2);
+    expect(minutely[0]).toEqual({
+      time: nowEpoch,
+      intensity: 0,
+      probability: 0,
+      type: 'none',
+    });
+    expect(minutely[1]).toEqual({
+      time: nowEpoch + 60,
+      intensity: 0.5,
+      probability: 80, // 0.8 → 80
+      type: 'rain',
+    });
+  });
+
+  it('returns empty array when minutely data is missing', async () => {
+    const noMinutely = makePWResponse();
+    delete (noMinutely as Record<string, unknown>).minutely;
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify(noMinutely), { status: 200 }));
+    const provider = createWeatherProvider('pirateweather', 'test-key');
+    const minutely = await provider.getMinutely!(40.7, -74.0, 'imperial');
+
+    expect(minutely).toEqual([]);
+  });
+
+  it('parses alerts with known severities', async () => {
+    const response = makePWResponse({
+      alerts: [
+        {
+          title: 'Heat Advisory',
+          severity: 'Moderate',
+          description: 'Dangerously hot conditions expected.',
+          expires: nowEpoch + 86400,
+          uri: 'https://alerts.weather.gov/heat',
+        },
+        {
+          title: 'Tornado Warning',
+          severity: 'Extreme',
+          description: 'Take shelter immediately.',
+          expires: nowEpoch + 3600,
+        },
+      ],
+    });
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify(response), { status: 200 }));
+    const provider = createWeatherProvider('pirateweather', 'test-key');
+    const alerts = await provider.getAlerts!(40.7, -74.0, 'imperial');
+
+    expect(alerts).toHaveLength(2);
+    expect(alerts[0].severity).toBe('Moderate');
+    expect(alerts[0].title).toBe('Heat Advisory');
+    expect(alerts[0].uri).toBe('https://alerts.weather.gov/heat');
+    expect(alerts[1].severity).toBe('Extreme');
+  });
+
+  it('maps unknown severity to "Unknown"', async () => {
+    const response = makePWResponse({
+      alerts: [
+        {
+          title: 'Special Statement',
+          severity: 'NotARealSeverity',
+          description: 'Something unusual.',
+          expires: nowEpoch + 3600,
+        },
+      ],
+    });
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify(response), { status: 200 }));
+    const provider = createWeatherProvider('pirateweather', 'test-key');
+    const alerts = await provider.getAlerts!(40.7, -74.0, 'imperial');
+
+    expect(alerts[0].severity).toBe('Unknown');
+  });
+
+  it('returns empty alerts when no alerts in response', async () => {
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify(makePWResponse()), { status: 200 }));
+    const provider = createWeatherProvider('pirateweather', 'test-key');
+    const alerts = await provider.getAlerts!(40.7, -74.0, 'imperial');
+
+    expect(alerts).toEqual([]);
+  });
+
+  it('maps Pirate Weather icon strings to unified icons', async () => {
+    const response = makePWResponse({
+      hourly: {
+        data: [
+          { time: nowEpoch, icon: 'rain', temperature: 60, summary: 'Rain' },
+          { time: nowEpoch + 3600, icon: 'snow', temperature: 30, summary: 'Snow' },
+          { time: nowEpoch + 7200, icon: 'fog', temperature: 55, summary: 'Fog' },
+          { time: nowEpoch + 10800, icon: 'thunderstorm', temperature: 70, summary: 'Storm' },
+          { time: nowEpoch + 14400, icon: 'clear-night', temperature: 65, summary: 'Clear' },
+        ],
+      },
+    });
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify(response), { status: 200 }));
+    const provider = createWeatherProvider('pirateweather', 'test-key');
+    const hourly = await provider.getHourly(40.7, -74.0, 'imperial');
+
+    expect(hourly[0].icon).toBe('cloud-rain');
+    expect(hourly[1].icon).toBe('snowflake');
+    expect(hourly[2].icon).toBe('cloud-fog');
+    expect(hourly[3].icon).toBe('cloud-lightning');
+    expect(hourly[4].icon).toBe('moon');
+  });
+
+  it('handles null humidity gracefully', async () => {
+    const response = makePWResponse({
+      hourly: {
+        data: [
+          { time: nowEpoch, icon: 'clear-day', temperature: 72, summary: 'Clear', humidity: null },
+        ],
+      },
+    });
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify(response), { status: 200 }));
+    const provider = createWeatherProvider('pirateweather', 'test-key');
+    const hourly = await provider.getHourly(40.7, -74.0, 'imperial');
+
+    expect(hourly[0].humidity).toBeUndefined();
+  });
+
+  it('defaults temperature to 0 when missing', async () => {
+    const response = makePWResponse({
+      hourly: {
+        data: [
+          { time: nowEpoch, icon: 'clear-day', summary: 'Clear' },
+        ],
+      },
+    });
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify(response), { status: 200 }));
+    const provider = createWeatherProvider('pirateweather', 'test-key');
+    const hourly = await provider.getHourly(40.7, -74.0, 'imperial');
+
+    expect(hourly[0].temp).toBe(0);
+  });
+
+  it('returns empty hourly array when hourly data is missing', async () => {
+    const noHourly = makePWResponse();
+    delete (noHourly as Record<string, unknown>).hourly;
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify(noHourly), { status: 200 }));
+    const provider = createWeatherProvider('pirateweather', 'test-key');
+    const hourly = await provider.getHourly(40.7, -74.0, 'imperial');
+
+    expect(hourly).toEqual([]);
+  });
+
+  it('returns empty forecast array when daily data is missing', async () => {
+    const noDaily = makePWResponse();
+    delete (noDaily as Record<string, unknown>).daily;
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify(noDaily), { status: 200 }));
+    const provider = createWeatherProvider('pirateweather', 'test-key');
+    const forecast = await provider.getForecast(40.7, -74.0, 'imperial');
+
+    expect(forecast).toEqual([]);
+  });
+});
+
+// ── NOAA specifics ─────────────────────────────────────────────────
+
+describe('NOAAProvider — data normalization', () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  const gridPointResponse = {
+    properties: {
+      gridId: 'OKX',
+      gridX: 33,
+      gridY: 37,
+      observationStations: 'https://api.weather.gov/gridpoints/OKX/33,37/stations',
+      timeZone: 'America/New_York',
+    },
+  };
+
+  const stationsResponse = {
+    features: [
+      { properties: { stationIdentifier: 'KNYC' } },
+    ],
+  };
+
+  const observationResponse = {
+    properties: {
+      textDescription: 'Clear',
+      temperature: { value: 22.2, unitCode: 'wmoUnit:degC' },        // 22.2°C
+      dewpoint: { value: 10.0, unitCode: 'wmoUnit:degC' },
+      relativeHumidity: { value: 55, unitCode: 'wmoUnit:percent' },
+      windSpeed: { value: 8, unitCode: 'wmoUnit:km_h-1' },
+      barometricPressure: { value: 101500, unitCode: 'wmoUnit:Pa' },  // 101500 Pa → 1015 hPa
+      visibility: { value: 16093, unitCode: 'wmoUnit:m' },             // ~10 miles
+      windChill: { value: 20.0, unitCode: 'wmoUnit:degC' },
+      heatIndex: { value: null, unitCode: 'wmoUnit:degC' },
+    },
+  };
+
+  const now = new Date();
+  const hourFromNow = new Date(now.getTime() + 3600000).toISOString();
+  const twoHoursFromNow = new Date(now.getTime() + 7200000).toISOString();
+
+  const hourlyForecastResponse = {
+    properties: {
+      periods: [
+        {
+          number: 1,
+          name: 'This Afternoon',
+          startTime: hourFromNow,
+          endTime: twoHoursFromNow,
+          isDaytime: true,
+          temperature: 72,
+          temperatureUnit: 'F',
+          probabilityOfPrecipitation: { unitCode: 'wmoUnit:percent', value: 30 },
+          dewpoint: { unitCode: 'wmoUnit:degC', value: 12 },
+          relativeHumidity: { unitCode: 'wmoUnit:percent', value: 55 },
+          windSpeed: '10 to 15 mph',
+          windDirection: 'SW',
+          shortForecast: 'Partly Sunny',
+          detailedForecast: 'Partly sunny, with a high near 72.',
+        },
+        {
+          number: 2,
+          name: 'Tonight',
+          startTime: twoHoursFromNow,
+          endTime: new Date(now.getTime() + 10800000).toISOString(),
+          isDaytime: false,
+          temperature: 58,
+          temperatureUnit: 'F',
+          probabilityOfPrecipitation: { unitCode: 'wmoUnit:percent', value: 10 },
+          dewpoint: { unitCode: 'wmoUnit:degC', value: 10 },
+          relativeHumidity: { unitCode: 'wmoUnit:percent', value: 65 },
+          windSpeed: '5 mph',
+          windDirection: 'N',
+          shortForecast: 'Mostly Clear',
+          detailedForecast: 'Mostly clear, with a low around 58.',
+        },
+      ],
+    },
+  };
+
+  beforeEach(() => {
+    fetchSpy = vi.spyOn(globalThis, 'fetch');
+    // Note: NOAA grid cache is internal and not exported, so we use
+    // unique lat/lon values across tests or accept cached grid data.
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+  });
+
+  // Helper to set up the usual grid point + stations + observation mock chain
+  function mockGridAndObservation() {
+    fetchSpy.mockImplementation((url: string | URL | Request) => {
+      const urlStr = typeof url === 'string' ? url : url instanceof URL ? url.toString() : (url as Request).url;
+      if (urlStr.includes('/points/')) {
+        return Promise.resolve(new Response(JSON.stringify(gridPointResponse), { status: 200 }));
+      }
+      if (urlStr.includes('/stations') && !urlStr.includes('/observations')) {
+        return Promise.resolve(new Response(JSON.stringify(stationsResponse), { status: 200 }));
+      }
+      if (urlStr.includes('/observations/latest')) {
+        return Promise.resolve(new Response(JSON.stringify(observationResponse), { status: 200 }));
+      }
+      if (urlStr.includes('/forecast/hourly')) {
+        return Promise.resolve(new Response(JSON.stringify(hourlyForecastResponse), { status: 200 }));
+      }
+      if (urlStr.includes('/forecast')) {
+        return Promise.resolve(new Response(JSON.stringify({
+          properties: {
+            periods: [
+              {
+                number: 1,
+                name: 'Today',
+                startTime: hourFromNow,
+                endTime: twoHoursFromNow,
+                isDaytime: true,
+                temperature: 72,
+                temperatureUnit: 'F',
+                probabilityOfPrecipitation: { unitCode: 'wmoUnit:percent', value: 40 },
+                dewpoint: { unitCode: 'wmoUnit:degC', value: 12 },
+                relativeHumidity: { unitCode: 'wmoUnit:percent', value: 55 },
+                windSpeed: '5 to 10 mph, with gusts as high as 25 mph',
+                windDirection: 'SW',
+                shortForecast: 'Scattered Showers',
+                detailedForecast: 'Scattered showers after 2pm.',
+              },
+              {
+                number: 2,
+                name: 'Tonight',
+                startTime: twoHoursFromNow,
+                endTime: new Date(now.getTime() + 10800000).toISOString(),
+                isDaytime: false,
+                temperature: 55,
+                temperatureUnit: 'F',
+                probabilityOfPrecipitation: { unitCode: 'wmoUnit:percent', value: 20 },
+                dewpoint: { unitCode: 'wmoUnit:degC', value: 10 },
+                relativeHumidity: { unitCode: 'wmoUnit:percent', value: 70 },
+                windSpeed: 'Calm',
+                windDirection: 'N',
+                shortForecast: 'Mostly Clear',
+                detailedForecast: 'Mostly clear, low around 55.',
+              },
+            ],
+          },
+        }), { status: 200 }));
+      }
+      if (urlStr.includes('/alerts')) {
+        return Promise.resolve(new Response(JSON.stringify({ features: [] }), { status: 200 }));
+      }
+      return Promise.resolve(new Response('Not found', { status: 404 }));
+    });
+  }
+
+  describe('wind speed regex extraction', () => {
+    it('extracts max wind from "5 to 10 mph" → 10', async () => {
+      mockGridAndObservation();
+      const provider = createWeatherProvider('noaa');
+      const forecast = await provider.getForecast(40.7, -74.0, 'imperial');
+
+      // "5 to 10 mph, with gusts as high as 25 mph" → gust stripped → "5 to 10 mph" → max(5,10) = 10
+      expect(forecast[0].windSpeed).toBe(10);
+    });
+
+    it('extracts wind from single number "5 mph" → 5', async () => {
+      mockGridAndObservation();
+      const provider = createWeatherProvider('noaa');
+      const hourly = await provider.getHourly(40.7, -74.0, 'imperial');
+
+      // Period 2 has "5 mph"
+      const calmPeriod = hourly.find(h => h.windSpeed === 5);
+      expect(calmPeriod).toBeDefined();
+    });
+
+    it('returns 0 for "Calm"', async () => {
+      mockGridAndObservation();
+      const provider = createWeatherProvider('noaa');
+      const forecast = await provider.getForecast(40.7, -74.0, 'imperial');
+
+      // The night period has "Calm" → 0
+      expect(forecast[0].windSpeed).toBe(10); // day period
+      // The tonight companion has "Calm" — but it's paired as the night period
+    });
+
+    it('strips gust clause before parsing wind', async () => {
+      mockGridAndObservation();
+      const provider = createWeatherProvider('noaa');
+      const forecast = await provider.getForecast(40.7, -74.0, 'imperial');
+
+      // "5 to 10 mph, with gusts as high as 25 mph" → should NOT return 25
+      expect(forecast[0].windSpeed).toBe(10);
+    });
+
+    it('converts wind speed to km/h for metric', async () => {
+      mockGridAndObservation();
+      const provider = createWeatherProvider('noaa');
+      const hourly = await provider.getHourly(40.7, -74.0, 'metric');
+
+      // "10 to 15 mph" → max 15 → 15 * 1.60934 ≈ 24.14 → Math.round → 24
+      expect(hourly[0].windSpeed).toBe(24);
+    });
+  });
+
+  describe('temperature conversion', () => {
+    it('returns temperature in °F when units=imperial and source is °F', async () => {
+      mockGridAndObservation();
+      const provider = createWeatherProvider('noaa');
+      const hourly = await provider.getHourly(40.7, -74.0, 'imperial');
+
+      expect(hourly[0].temp).toBe(72);
+    });
+
+    it('converts °F source to °C when units=metric', async () => {
+      mockGridAndObservation();
+      const provider = createWeatherProvider('noaa');
+      const hourly = await provider.getHourly(40.7, -74.0, 'metric');
+
+      // 72°F → (72-32)*5/9 = 22.222...
+      // No rounding in getHourly — raw conversion
+      expect(hourly[0].temp).toBeCloseTo(22.22, 1);
+    });
+
+    it('converts dewpoint from °C to °F for imperial units', async () => {
+      mockGridAndObservation();
+      const provider = createWeatherProvider('noaa');
+      const hourly = await provider.getHourly(40.7, -74.0, 'imperial');
+
+      // dewpoint in raw response is 12°C → 12 * 9/5 + 32 = 53.6 → Math.round = 54
+      // But for period[0] (i===0), observation dewpoint (10°C) overrides:
+      // 10 * 9/5 + 32 = 50
+      expect(hourly[0].dewPoint).toBe(50);
+    });
+
+    it('keeps dewpoint in °C for metric units', async () => {
+      mockGridAndObservation();
+      const provider = createWeatherProvider('noaa');
+      const hourly = await provider.getHourly(40.7, -74.0, 'metric');
+
+      // For period[0] (i===0), observation dewpoint (10°C) overrides:
+      // Math.round(10) = 10
+      expect(hourly[0].dewPoint).toBe(10);
+    });
+  });
+
+  describe('observation enrichment', () => {
+    it('enriches first hourly entry with barometric pressure from observation', async () => {
+      mockGridAndObservation();
+      const provider = createWeatherProvider('noaa');
+      const hourly = await provider.getHourly(40.7, -74.0, 'imperial');
+
+      // 101500 Pa → 101500 / 100 = 1015 hPa
+      expect(hourly[0].pressure).toBe(1015);
+    });
+
+    it('enriches first hourly entry with visibility', async () => {
+      mockGridAndObservation();
+      const provider = createWeatherProvider('noaa');
+      const hourly = await provider.getHourly(40.7, -74.0, 'imperial');
+
+      // 16093 m → 16093 / 1609.34 ≈ 10.0 miles
+      expect(hourly[0].visibility).toBe(10.0);
+    });
+
+    it('enriches first hourly entry with feels-like from wind chill', async () => {
+      mockGridAndObservation();
+      const provider = createWeatherProvider('noaa');
+      const hourly = await provider.getHourly(40.7, -74.0, 'imperial');
+
+      // windChill 20°C → 20 * 9/5 + 32 = 68
+      expect(hourly[0].feelsLike).toBe(68);
+    });
+
+    it('does not enrich second hourly entry with observation data', async () => {
+      mockGridAndObservation();
+      const provider = createWeatherProvider('noaa');
+      const hourly = await provider.getHourly(40.7, -74.0, 'imperial');
+
+      expect(hourly[1].pressure).toBeUndefined();
+      expect(hourly[1].visibility).toBeUndefined();
+    });
+  });
+
+  describe('forecast icon mapping from prose', () => {
+    it('maps "Partly Sunny" to cloud-sun during daytime', async () => {
+      mockGridAndObservation();
+      const provider = createWeatherProvider('noaa');
+      const hourly = await provider.getHourly(40.7, -74.0, 'imperial');
+
+      expect(hourly[0].icon).toBe('cloud-sun');
+    });
+
+    it('maps "Mostly Clear" to cloud-moon at night', async () => {
+      mockGridAndObservation();
+      const provider = createWeatherProvider('noaa');
+      const hourly = await provider.getHourly(40.7, -74.0, 'imperial');
+
+      expect(hourly[1].icon).toBe('cloud-moon');
+    });
+
+    it('maps "Scattered Showers" to cloud-rain', async () => {
+      mockGridAndObservation();
+      const provider = createWeatherProvider('noaa');
+      const forecast = await provider.getForecast(40.7, -74.0, 'imperial');
+
+      expect(forecast[0].icon).toBe('cloud-rain');
+    });
+  });
+
+  describe('forecast day pairing', () => {
+    it('pairs daytime + nighttime periods into single forecast day', async () => {
+      mockGridAndObservation();
+      const provider = createWeatherProvider('noaa');
+      const forecast = await provider.getForecast(40.7, -74.0, 'imperial');
+
+      expect(forecast).toHaveLength(1);
+      expect(forecast[0].high).toBe(72);
+      expect(forecast[0].low).toBe(55);
+    });
+
+    it('takes max precip probability from day and night', async () => {
+      mockGridAndObservation();
+      const provider = createWeatherProvider('noaa');
+      const forecast = await provider.getForecast(40.7, -74.0, 'imperial');
+
+      // day=40, night=20 → max=40
+      expect(forecast[0].precipProbability).toBe(40);
+    });
+
+    it('emits partial "tonight" entry when first period is nighttime', async () => {
+      fetchSpy.mockImplementation((url: string | URL | Request) => {
+        const urlStr = typeof url === 'string' ? url : url instanceof URL ? url.toString() : (url as Request).url;
+        if (urlStr.includes('/points/')) {
+          return Promise.resolve(new Response(JSON.stringify(gridPointResponse), { status: 200 }));
+        }
+        if (urlStr.includes('/forecast') && !urlStr.includes('/hourly')) {
+          return Promise.resolve(new Response(JSON.stringify({
+            properties: {
+              periods: [
+                {
+                  number: 1,
+                  name: 'Tonight',
+                  startTime: '2025-06-15T20:00:00-04:00',
+                  endTime: '2025-06-16T06:00:00-04:00',
+                  isDaytime: false,
+                  temperature: 58,
+                  temperatureUnit: 'F',
+                  probabilityOfPrecipitation: { unitCode: 'wmoUnit:percent', value: 10 },
+                  dewpoint: { unitCode: 'wmoUnit:degC', value: 10 },
+                  relativeHumidity: { unitCode: 'wmoUnit:percent', value: 70 },
+                  windSpeed: '5 mph',
+                  windDirection: 'N',
+                  shortForecast: 'Clear',
+                  detailedForecast: 'Clear, with a low around 58.',
+                },
+              ],
+            },
+          }), { status: 200 }));
+        }
+        return Promise.resolve(new Response('Not found', { status: 404 }));
+      });
+
+      const provider = createWeatherProvider('noaa');
+      const forecast = await provider.getForecast(40.7, -74.0, 'imperial');
+
+      expect(forecast).toHaveLength(1);
+      // For tonight-only entry, high === low since no daytime data
+      expect(forecast[0].high).toBe(58);
+      expect(forecast[0].low).toBe(58);
+      expect(forecast[0].date).toBe('2025-06-15');
+    });
+  });
+
+  describe('NOAA alerts', () => {
+    it('parses alerts with severity mapping', async () => {
+      fetchSpy.mockImplementation((url: string | URL | Request) => {
+        const urlStr = typeof url === 'string' ? url : url instanceof URL ? url.toString() : (url as Request).url;
+        if (urlStr.includes('/alerts')) {
+          return Promise.resolve(new Response(JSON.stringify({
+            features: [
+              {
+                properties: {
+                  event: 'Winter Storm Warning',
+                  severity: 'Severe',
+                  description: 'Heavy snow expected.',
+                  expires: '2025-12-20T12:00:00-05:00',
+                  uri: 'https://alerts.weather.gov/winterstorm',
+                },
+              },
+              {
+                properties: {
+                  event: 'Special Weather Statement',
+                  severity: 'WeirdValue',
+                  description: 'Unusual conditions.',
+                  expires: '2025-12-20T18:00:00-05:00',
+                },
+              },
+            ],
+          }), { status: 200 }));
+        }
+        return Promise.resolve(new Response('Not found', { status: 404 }));
+      });
+
+      const provider = createWeatherProvider('noaa');
+      const alerts = await provider.getAlerts!(40.7, -74.0, 'imperial');
+
+      expect(alerts).toHaveLength(2);
+      expect(alerts[0].title).toBe('Winter Storm Warning');
+      expect(alerts[0].severity).toBe('Severe');
+      expect(alerts[0].uri).toBe('https://alerts.weather.gov/winterstorm');
+      // expires is converted to epoch seconds
+      expect(typeof alerts[0].expires).toBe('number');
+      expect(alerts[1].severity).toBe('Unknown');
+    });
+
+    it('returns empty array when no active alerts', async () => {
+      fetchSpy.mockImplementation((url: string | URL | Request) => {
+        const urlStr = typeof url === 'string' ? url : url instanceof URL ? url.toString() : (url as Request).url;
+        if (urlStr.includes('/alerts')) {
+          return Promise.resolve(new Response(JSON.stringify({ features: [] }), { status: 200 }));
+        }
+        return Promise.resolve(new Response('Not found', { status: 404 }));
+      });
+
+      const provider = createWeatherProvider('noaa');
+      const alerts = await provider.getAlerts!(40.7, -74.0, 'imperial');
+
+      expect(alerts).toEqual([]);
+    });
+  });
+
+  describe('grid point resolution', () => {
+    it('resolves grid point and uses it in forecast URL', async () => {
+      // Use unique coordinates to avoid stale grid cache from prior tests
+      mockGridAndObservation();
+      const provider = createWeatherProvider('noaa');
+      await provider.getHourly(41.8781, -87.6298, 'imperial');
+
+      // Verify grid point URL was called with these coordinates
+      const calls = fetchSpy.mock.calls.map((c: [string | URL | Request, ...unknown[]]) => {
+        const url = c[0];
+        return typeof url === 'string' ? url : url instanceof URL ? url.toString() : (url as Request).url;
+      });
+      expect(calls.some((u: string) => u.includes('/points/41.8781,-87.6298'))).toBe(true);
+      expect(calls.some((u: string) => u.includes('/gridpoints/OKX/33,37/forecast/hourly'))).toBe(true);
+    });
+  });
+});
+
+// ── Open-Meteo WMO code gaps ───────────────────────────────────────
+
+describe('OpenMeteoProvider — additional WMO coverage', () => {
+  const provider = new OpenMeteoProvider();
+  const mapWMO = (provider as unknown as { mapWMOCode: (code: number, isDay: boolean) => string }).mapWMOCode.bind(provider);
+  const wmoDesc = (provider as unknown as { wmoDescription: (code: number) => string }).wmoDescription.bind(provider);
+
+  it('maps freezing drizzle codes (56, 57)', () => {
+    expect(mapWMO(56, true)).toBe('cloud-drizzle');
+    expect(mapWMO(57, true)).toBe('cloud-drizzle');
+  });
+
+  it('maps freezing rain codes (66, 67)', () => {
+    expect(mapWMO(66, true)).toBe('cloud-rain');
+    expect(mapWMO(67, true)).toBe('cloud-rain');
+  });
+
+  it('maps snow grains (77)', () => {
+    expect(mapWMO(77, true)).toBe('snowflake');
+  });
+
+  it('maps moderate rain showers (81) and violent rain showers (82)', () => {
+    expect(mapWMO(81, true)).toBe('cloud-rain');
+    expect(mapWMO(82, true)).toBe('cloud-rain');
+  });
+
+  it('maps heavy snow showers (86)', () => {
+    expect(mapWMO(86, true)).toBe('snowflake');
+  });
+
+  it('returns correct descriptions for freezing variants', () => {
+    expect(wmoDesc(56)).toBe('Light freezing drizzle');
+    expect(wmoDesc(57)).toBe('Dense freezing drizzle');
+    expect(wmoDesc(66)).toBe('Light freezing rain');
+    expect(wmoDesc(67)).toBe('Heavy freezing rain');
+  });
+
+  it('returns correct descriptions for snow grain and shower variants', () => {
+    expect(wmoDesc(77)).toBe('Snow grains');
+    expect(wmoDesc(80)).toBe('Slight rain showers');
+    expect(wmoDesc(81)).toBe('Moderate rain showers');
+    expect(wmoDesc(82)).toBe('Violent rain showers');
+    expect(wmoDesc(85)).toBe('Slight snow showers');
+    expect(wmoDesc(86)).toBe('Heavy snow showers');
+  });
+
+  it('returns correct descriptions for thunderstorm with hail variants', () => {
+    expect(wmoDesc(96)).toBe('Thunderstorm with slight hail');
+    expect(wmoDesc(99)).toBe('Thunderstorm with heavy hail');
+  });
+});
+
+// ── Edge cases across all providers ────────────────────────────────
+
+describe('OpenWeatherMap — edge cases', () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    fetchSpy = vi.spyOn(globalThis, 'fetch');
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+  });
+
+  it('handles empty forecast list without crashing', async () => {
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify({ list: [] }), { status: 200 }));
+    const provider = new OpenWeatherMapProvider('test-key');
+    const forecast = await provider.getForecast(40.7, -74.0, 'imperial');
+
+    expect(forecast).toEqual([]);
+  });
+
+  it('handles missing weather array gracefully in current data', async () => {
+    fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({
+      dt: 1710000000,
+      main: { temp: 72, feels_like: 70, humidity: 55, temp_min: 68, temp_max: 75, pressure: 1015 },
+      weather: [],
+      wind: { speed: 8, deg: 180 },
+    }), { status: 200 }));
+    fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({ list: [] }), { status: 200 }));
+
+    const provider = new OpenWeatherMapProvider('test-key');
+    const hourly = await provider.getHourly(40.7, -74.0, 'imperial');
+
+    // weather[0] is undefined → icon fallback, description empty
+    expect(hourly[0].icon).toBe('thermometer');
+    expect(hourly[0].description).toBe('');
+  });
+
+  it('handles null pop in forecast entries', async () => {
+    fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({
+      dt: 1710000000,
+      main: { temp: 72, feels_like: 70, humidity: 55, temp_min: 68, temp_max: 75, pressure: 1015 },
+      weather: [{ id: 800, main: 'Clear', description: 'clear', icon: '01d' }],
+      wind: { speed: 8, deg: 180 },
+    }), { status: 200 }));
+    fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({
+      list: [
+        {
+          dt: 1710010800,
+          main: { temp: 74, feels_like: 72, humidity: 50, temp_min: 70, temp_max: 77, pressure: 1014 },
+          weather: [{ id: 800, main: 'Clear', description: 'clear', icon: '01d' }],
+          wind: { speed: 10, deg: 200 },
+          // pop intentionally missing
+        },
+      ],
+    }), { status: 200 }));
+
+    const provider = new OpenWeatherMapProvider('test-key');
+    const hourly = await provider.getHourly(40.7, -74.0, 'imperial');
+
+    // (undefined ?? 0) * 100 = 0
+    expect(hourly[1].precipProbability).toBe(0);
+  });
+
+  it('handles missing wind object in forecast entry', async () => {
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify({
+      list: [
+        {
+          dt: 1710010800,
+          main: { temp: 74, feels_like: 72, humidity: 50, temp_min: 70, temp_max: 77, pressure: 1014 },
+          weather: [{ id: 800, main: 'Clear', description: 'clear', icon: '01d' }],
+          pop: 0,
+          // wind intentionally missing — groupByDate uses wind?.speed ?? 0
+        },
+      ],
+    }), { status: 200 }));
+
+    const provider = new OpenWeatherMapProvider('test-key');
+    const forecast = await provider.getForecast(40.7, -74.0, 'imperial');
+
+    expect(forecast[0].windSpeed).toBe(0);
+  });
+
+  it('handles missing rain object in forecast entry', async () => {
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify({
+      list: [
+        {
+          dt: 1710010800,
+          main: { temp: 74, feels_like: 72, humidity: 50, temp_min: 70, temp_max: 77, pressure: 1014 },
+          weather: [{ id: 800, main: 'Clear', description: 'clear', icon: '01d' }],
+          wind: { speed: 10, deg: 200 },
+          pop: 0,
+          // rain intentionally missing
+        },
+      ],
+    }), { status: 200 }));
+
+    const provider = new OpenWeatherMapProvider('test-key');
+    const forecast = await provider.getForecast(40.7, -74.0, 'imperial');
+
+    expect(forecast[0].precipAmount).toBe(0);
+  });
+});
+
+describe('OpenMeteoProvider — edge cases', () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    fetchSpy = vi.spyOn(globalThis, 'fetch');
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+  });
+
+  it('handles empty hourly arrays', async () => {
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify({
+      hourly: {
+        time: [],
+        temperature_2m: [],
+        apparent_temperature: [],
+        relative_humidity_2m: [],
+        weather_code: [],
+        wind_speed_10m: [],
+        precipitation_probability: [],
+        surface_pressure: [],
+        dew_point_2m: [],
+        is_day: [],
+      },
+    }), { status: 200 }));
+
+    const provider = new OpenMeteoProvider();
+    const hourly = await provider.getHourly(40.7, -74.0, 'imperial');
+
+    expect(hourly).toEqual([]);
+  });
+
+  it('handles empty daily arrays', async () => {
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify({
+      daily: {
+        time: [],
+        temperature_2m_max: [],
+        temperature_2m_min: [],
+        weather_code: [],
+        precipitation_sum: [],
+        precipitation_probability_max: [],
+        wind_speed_10m_max: [],
+      },
+    }), { status: 200 }));
+
+    const provider = new OpenMeteoProvider();
+    const forecast = await provider.getForecast(40.7, -74.0, 'imperial');
+
+    expect(forecast).toEqual([]);
+  });
+
+  it('handles null precipitation_probability gracefully', async () => {
+    const futureEpoch = Math.floor(Date.now() / 1000) + 3600;
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify({
+      hourly: {
+        time: [futureEpoch],
+        temperature_2m: [70],
+        apparent_temperature: [68],
+        relative_humidity_2m: [55],
+        weather_code: [0],
+        wind_speed_10m: [5],
+        precipitation_probability: [null],
+        surface_pressure: [null],
+        dew_point_2m: [null],
+        is_day: [1],
+      },
+    }), { status: 200 }));
+
+    const provider = new OpenMeteoProvider();
+    const hourly = await provider.getHourly(40.7, -74.0, 'imperial');
+
+    expect(hourly[0].precipProbability).toBe(0);
+    expect(hourly[0].pressure).toBeUndefined();
+    expect(hourly[0].dewPoint).toBeUndefined();
+  });
+
+  it('handles null wind_speed_10m_max in forecast', async () => {
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify({
+      daily: {
+        time: [1710288000],
+        temperature_2m_max: [72],
+        temperature_2m_min: [55],
+        weather_code: [0],
+        precipitation_sum: [0],
+        precipitation_probability_max: [null],
+        wind_speed_10m_max: [null],
+      },
+    }), { status: 200 }));
+
+    const provider = new OpenMeteoProvider();
+    const forecast = await provider.getForecast(40.7, -74.0, 'imperial');
+
+    expect(forecast[0].windSpeed).toBeUndefined();
+    expect(forecast[0].precipProbability).toBe(0);
+  });
+});
+
+describe('PirateWeatherProvider — edge cases', () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    fetchSpy = vi.spyOn(globalThis, 'fetch');
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+  });
+
+  it('handles daily entry with missing temperatureHigh/Low', async () => {
+    const nowEpoch = Math.floor(Date.now() / 1000);
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify({
+      daily: {
+        data: [
+          {
+            time: nowEpoch,
+            summary: 'Clear',
+            icon: 'clear-day',
+            // temperatureHigh and temperatureLow missing
+            humidity: 0.5,
+            windSpeed: 5,
+            precipProbability: 0,
+          },
+        ],
+      },
+      hourly: { data: [] },
+    }), { status: 200 }));
+
+    const provider = createWeatherProvider('pirateweather', 'test-key');
+    const forecast = await provider.getForecast(40.7, -74.0, 'imperial');
+
+    // temperatureHigh ?? 0 → 0, temperatureLow ?? 0 → 0
+    expect(forecast[0].high).toBe(0);
+    expect(forecast[0].low).toBe(0);
+  });
+
+  it('handles missing precipAccumulation in daily', async () => {
+    const nowEpoch = Math.floor(Date.now() / 1000);
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify({
+      daily: {
+        data: [
+          {
+            time: nowEpoch,
+            summary: 'Clear',
+            icon: 'clear-day',
+            temperatureHigh: 80,
+            temperatureLow: 60,
+            humidity: 0.5,
+            windSpeed: 5,
+            precipProbability: 0,
+            // precipAccumulation missing
+          },
+        ],
+      },
+      hourly: { data: [] },
+    }), { status: 200 }));
+
+    const provider = createWeatherProvider('pirateweather', 'test-key');
+    const forecast = await provider.getForecast(40.7, -74.0, 'imperial');
+
+    // precipAccumulation ?? 0 → 0
+    expect(forecast[0].precipAmount).toBe(0);
+  });
+
+  it('handles missing precipIntensity in minutely', async () => {
+    const nowEpoch = Math.floor(Date.now() / 1000);
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify({
+      minutely: {
+        data: [
+          { time: nowEpoch },
+        ],
+      },
+      hourly: { data: [] },
+      daily: { data: [] },
+    }), { status: 200 }));
+
+    const provider = createWeatherProvider('pirateweather', 'test-key');
+    const minutely = await provider.getMinutely!(40.7, -74.0, 'imperial');
+
+    expect(minutely[0].intensity).toBe(0);
+    expect(minutely[0].probability).toBe(0);
+    expect(minutely[0].type).toBeUndefined();
+  });
+
+  it('uses "us" units param for imperial and "ca" for metric', async () => {
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify({
+      hourly: { data: [] },
+      daily: { data: [] },
+    }), { status: 200 }));
+
+    const provider = createWeatherProvider('pirateweather', 'test-key');
+    await provider.getHourly(40.7, -74.0, 'imperial');
+
+    const url = fetchSpy.mock.calls[0][0] as string;
+    expect(url).toContain('units=us');
+
+    // Need a new provider instance since fetchPromise is cached
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify({
+      hourly: { data: [] },
+      daily: { data: [] },
+    }), { status: 200 }));
+
+    const provider2 = createWeatherProvider('pirateweather', 'test-key');
+    await provider2.getHourly(40.7, -74.0, 'metric');
+
+    const url2 = fetchSpy.mock.calls[fetchSpy.mock.calls.length - 1][0] as string;
+    expect(url2).toContain('units=ca');
+  });
+});

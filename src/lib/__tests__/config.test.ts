@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import fsModule from 'fs';
 import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
@@ -112,5 +113,317 @@ describe('writeConfig', () => {
     const result = await readConfig();
 
     expect(result).toEqual(config);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Helper: build a minimal valid ScreenConfiguration
+// ---------------------------------------------------------------------------
+function makeConfig(id: string) {
+  return {
+    version: 1,
+    settings: {
+      rotationIntervalMs: 30000,
+      displayWidth: 1080,
+      displayHeight: 1920,
+      latitude: 0,
+      longitude: 0,
+      weather: { provider: 'weatherapi' as const, apiKey: '', latitude: 0, longitude: 0, units: 'imperial' as const },
+      calendar: { googleCalendarId: '', googleCalendarIds: [], icalSources: [], maxEvents: 10, daysAhead: 7 },
+    },
+    screens: [{ id, name: id, backgroundImage: '', modules: [] }],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Write queue behavior
+// ---------------------------------------------------------------------------
+describe('writeConfig — write queue serialization', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('two concurrent writeConfig() calls are serialized (second waits for first)', async () => {
+    const order: string[] = [];
+
+    // Use a deferred promise to control when the first writeFile resolves
+    let releaseFirst!: () => void;
+    const firstGate = new Promise<void>((resolve) => { releaseFirst = resolve; });
+
+    const origWriteFile = fsModule.promises.writeFile.bind(fsModule.promises);
+    let callCount = 0;
+
+    vi.spyOn(fsModule.promises, 'writeFile').mockImplementation(async (...args: Parameters<typeof fsModule.promises.writeFile>) => {
+      callCount++;
+      if (callCount === 1) {
+        order.push('first-start');
+        await firstGate;
+        const result = await origWriteFile(...args);
+        order.push('first-end');
+        return result;
+      }
+      order.push('second-start');
+      const result = await origWriteFile(...args);
+      order.push('second-end');
+      return result;
+    });
+
+    const p1 = writeConfig(makeConfig('first'));
+    const p2 = writeConfig(makeConfig('second'));
+
+    // Let the event loop tick — first write should have started, second should not
+    await new Promise((r) => setTimeout(r, 10));
+    expect(order).toContain('first-start');
+    expect(order).not.toContain('second-start');
+
+    // Release the first write
+    releaseFirst();
+    await p1;
+    await p2;
+
+    // The second write must have started only after the first completed
+    expect(order.indexOf('first-end')).toBeLessThan(order.indexOf('second-start'));
+  });
+
+  it('if first write fails, second write still executes', async () => {
+    const origWriteFile = fsModule.promises.writeFile.bind(fsModule.promises);
+    let callCount = 0;
+
+    vi.spyOn(fsModule.promises, 'writeFile').mockImplementation(async (...args: Parameters<typeof fsModule.promises.writeFile>) => {
+      callCount++;
+      if (callCount === 1) {
+        throw new Error('Simulated disk failure');
+      }
+      return origWriteFile(...args);
+    });
+
+    const p1 = writeConfig(makeConfig('first'));
+    const p2 = writeConfig(makeConfig('second'));
+
+    await expect(p1).rejects.toThrow('Simulated disk failure');
+    await expect(p2).resolves.toBeUndefined();
+
+    // The second write should have persisted successfully
+    const filePath = path.join(tmpDir, 'data', 'config.json');
+    const raw = await fs.readFile(filePath, 'utf-8');
+    const parsed = JSON.parse(raw);
+    expect(parsed.screens[0].id).toBe('second');
+  });
+
+  it('write queue does not lose writes under rapid successive calls', async () => {
+    const configs = Array.from({ length: 10 }, (_, i) => makeConfig(`rapid-${i}`));
+    const promises = configs.map((c) => writeConfig(c));
+    await Promise.all(promises);
+
+    // The last write wins on disk
+    const filePath = path.join(tmpDir, 'data', 'config.json');
+    const raw = await fs.readFile(filePath, 'utf-8');
+    const parsed = JSON.parse(raw);
+    expect(parsed.screens[0].id).toBe('rapid-9');
+
+    // No leftover .tmp files
+    const files = await fs.readdir(path.join(tmpDir, 'data'));
+    expect(files).not.toContain('config.json.tmp');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Migration race conditions
+// ---------------------------------------------------------------------------
+describe('readConfig — migration race conditions', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('multiple concurrent readConfig() calls during migration trigger at most one write', async () => {
+    // Seed a config with version 0 so migration will fire
+    const configDir = path.join(tmpDir, 'data');
+    await fs.mkdir(configDir, { recursive: true });
+    const outdated = {
+      version: 0,
+      settings: { rotationIntervalMs: 5000, weather: {}, calendar: {} },
+      screens: [{ id: 'old', name: 'Old', backgroundImage: '', modules: [] }],
+    };
+    await fs.writeFile(path.join(configDir, 'config.json'), JSON.stringify(outdated));
+
+    // Track how many times writeFile is called (one call per writeConfig invocation)
+    const origWriteFile = fsModule.promises.writeFile.bind(fsModule.promises);
+    let writeFileCount = 0;
+    vi.spyOn(fsModule.promises, 'writeFile').mockImplementation(async (...args: Parameters<typeof fsModule.promises.writeFile>) => {
+      writeFileCount++;
+      return origWriteFile(...args);
+    });
+
+    // Fire several concurrent reads — all should see the outdated config and want to migrate
+    const results = await Promise.all([readConfig(), readConfig(), readConfig()]);
+
+    // All reads should return a valid migrated config (version >= 1)
+    for (const cfg of results) {
+      expect(cfg.version).toBeGreaterThanOrEqual(1);
+      expect(cfg.screens[0].id).toBe('old');
+    }
+
+    // The migration guard should have limited the fire-and-forget writes to at most one
+    // Give the fire-and-forget write time to complete
+    await new Promise((r) => setTimeout(r, 50));
+    expect(writeFileCount).toBeLessThanOrEqual(1);
+  });
+
+  it('migration failure does not corrupt the config state', async () => {
+    // Seed a config with version 0
+    const configDir = path.join(tmpDir, 'data');
+    await fs.mkdir(configDir, { recursive: true });
+    const outdated = {
+      version: 0,
+      settings: { rotationIntervalMs: 5000, weather: { provider: 'weatherapi' }, calendar: {} },
+      screens: [{ id: 'stable', name: 'Stable', backgroundImage: '', modules: [] }],
+    };
+    await fs.writeFile(path.join(configDir, 'config.json'), JSON.stringify(outdated));
+
+    // Make the migration write fail
+    vi.spyOn(fsModule.promises, 'writeFile').mockImplementationOnce(async () => {
+      throw new Error('Disk full');
+    });
+
+    const config = await readConfig();
+
+    // Should still return the migrated config (migration succeeded in memory,
+    // only the persist-to-disk part failed)
+    expect(config.version).toBeGreaterThanOrEqual(1);
+    expect(config.screens[0].id).toBe('stable');
+
+    // Restore mocks and verify the original file on disk is untouched
+    vi.restoreAllMocks();
+    const raw = await fs.readFile(path.join(configDir, 'config.json'), 'utf-8');
+    const onDisk = JSON.parse(raw);
+    expect(onDisk.version).toBe(0); // Original file preserved
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Atomic write edge cases
+// ---------------------------------------------------------------------------
+describe('writeConfig — atomic write edge cases', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('if fs.rename() fails, future writes still succeed', async () => {
+    // First write succeeds normally to set up the data directory
+    await writeConfig(makeConfig('setup'));
+
+    // Now make rename fail once
+    vi.spyOn(fsModule.promises, 'rename').mockImplementationOnce(async () => {
+      throw new Error('Rename failed: cross-device link');
+    });
+
+    const failedWrite = writeConfig(makeConfig('rename-fail'));
+    await expect(failedWrite).rejects.toThrow('Rename failed');
+
+    // Restore rename and verify a subsequent write works
+    vi.restoreAllMocks();
+    await writeConfig(makeConfig('after-rename-fail'));
+
+    const filePath = path.join(tmpDir, 'data', 'config.json');
+    const raw = await fs.readFile(filePath, 'utf-8');
+    const parsed = JSON.parse(raw);
+    expect(parsed.screens[0].id).toBe('after-rename-fail');
+  });
+
+  it('partial write failure (writeFile fails) does not leave corrupt config', async () => {
+    // Write a known-good config first
+    await writeConfig(makeConfig('good'));
+
+    // Make the next writeFile fail mid-write (tmp file should not replace real config)
+    vi.spyOn(fsModule.promises, 'writeFile').mockImplementationOnce(async () => {
+      throw new Error('Disk write error');
+    });
+
+    const failedWrite = writeConfig(makeConfig('bad'));
+    await expect(failedWrite).rejects.toThrow('Disk write error');
+
+    // The original config file should be intact
+    const filePath = path.join(tmpDir, 'data', 'config.json');
+    const raw = await fs.readFile(filePath, 'utf-8');
+    const parsed = JSON.parse(raw);
+    expect(parsed.screens[0].id).toBe('good');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Error recovery
+// ---------------------------------------------------------------------------
+describe('writeConfig / readConfig — error recovery', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('writeConfig() after a failed write still works', async () => {
+    // Make the first write fail
+    vi.spyOn(fsModule.promises, 'mkdir').mockImplementationOnce(async () => {
+      throw new Error('Permission denied');
+    });
+
+    const p1 = writeConfig(makeConfig('fail'));
+    await expect(p1).rejects.toThrow('Permission denied');
+
+    // Restore and try again — the write queue should not be stuck
+    vi.restoreAllMocks();
+    await writeConfig(makeConfig('recovery'));
+
+    const filePath = path.join(tmpDir, 'data', 'config.json');
+    const raw = await fs.readFile(filePath, 'utf-8');
+    const parsed = JSON.parse(raw);
+    expect(parsed.screens[0].id).toBe('recovery');
+  });
+
+  it('readConfig() returns valid config even if last write was partial', async () => {
+    // Write a good config
+    await writeConfig(makeConfig('baseline'));
+
+    // Simulate a partial write: writeFile succeeds (creates .tmp) but rename fails
+    vi.spyOn(fsModule.promises, 'rename').mockImplementationOnce(async () => {
+      throw new Error('Rename failed');
+    });
+
+    await expect(writeConfig(makeConfig('partial'))).rejects.toThrow('Rename failed');
+
+    // readConfig should still return the last good config
+    vi.restoreAllMocks();
+    const config = await readConfig();
+    expect(config.screens[0].id).toBe('baseline');
+  });
+
+  it('three sequential failures followed by a success — queue is not permanently broken', async () => {
+    const origWriteFile = fsModule.promises.writeFile.bind(fsModule.promises);
+    let callCount = 0;
+
+    vi.spyOn(fsModule.promises, 'writeFile').mockImplementation(async (...args: Parameters<typeof fsModule.promises.writeFile>) => {
+      callCount++;
+      if (callCount <= 3) {
+        throw new Error(`Failure #${callCount}`);
+      }
+      return origWriteFile(...args);
+    });
+
+    const failures = [
+      writeConfig(makeConfig('f1')),
+      writeConfig(makeConfig('f2')),
+      writeConfig(makeConfig('f3')),
+    ];
+    const success = writeConfig(makeConfig('success'));
+
+    // First three should fail
+    for (const p of failures) {
+      await expect(p).rejects.toThrow(/Failure/);
+    }
+
+    // Fourth should succeed
+    await expect(success).resolves.toBeUndefined();
+
+    const filePath = path.join(tmpDir, 'data', 'config.json');
+    const raw = await fs.readFile(filePath, 'utf-8');
+    const parsed = JSON.parse(raw);
+    expect(parsed.screens[0].id).toBe('success');
   });
 });
