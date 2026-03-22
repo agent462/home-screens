@@ -7,6 +7,7 @@ import { Search, ChevronRight, Puzzle } from 'lucide-react';
 import { getModulesByCategory } from '@/lib/module-registry';
 import type { ModuleDefinition } from '@/lib/module-registry';
 import { useEditorStore } from '@/stores/editor-store';
+import { usePluginStore } from '@/stores/plugin-store';
 import { isUSTimezone } from '@/lib/timezone-us';
 
 function PaletteItem({ definition }: { definition: ModuleDefinition }) {
@@ -91,6 +92,8 @@ export default function ModulePalette() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const configTimezone = useEditorStore((s) => s.config?.settings.timezone);
   const isUS = isUSTimezone(configTimezone);
+  // Subscribe to plugin store size so the palette re-renders when plugins load/unload
+  const pluginCount = usePluginStore((s) => s.plugins.size);
   const grouped = useMemo(() => {
     const all = getModulesByCategory();
     if (isUS) return all;
@@ -99,7 +102,7 @@ export default function ModulePalette() {
       all.set(cat, modules.filter((m) => m.type !== 'flag-status'));
     }
     return all;
-  }, [isUS]);
+  }, [isUS, pluginCount]);
 
   const query = search.toLowerCase().trim();
 

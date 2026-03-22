@@ -338,9 +338,14 @@ export async function loadAllPlugins(): Promise<void> {
   // Load installed plugins in parallel, collect pending migrations
   const pendingMigrations: PendingMigration[] = [];
 
-  if (plugins.length > 0) {
+  // Skip installed plugins that have a dev override — dev plugins load from
+  // the dev server and don't need a bundle on disk
+  const devPluginIds = new Set(getDevPlugins().keys());
+  const installedOnly = plugins.filter((p) => !devPluginIds.has(p.id));
+
+  if (installedOnly.length > 0) {
     await Promise.allSettled(
-      plugins.map((plugin) => loadSinglePlugin(plugin, store, pendingMigrations)),
+      installedOnly.map((plugin) => loadSinglePlugin(plugin, store, pendingMigrations)),
     );
   }
 
@@ -452,7 +457,7 @@ function executeBundle(
   const win = window as any;
 
   // Clean up any previous plugin global
-  delete win.__HS_PLUGIN__;
+  win.__HS_PLUGIN__ = undefined;
 
   try {
     // Create and inject script element (inline scripts execute synchronously)
@@ -490,6 +495,6 @@ function executeBundle(
   } catch (err) {
     throw new Error(`Bundle execution failed: ${err instanceof Error ? err.message : String(err)}`);
   } finally {
-    delete win.__HS_PLUGIN__;
+    win.__HS_PLUGIN__ = undefined;
   }
 }
