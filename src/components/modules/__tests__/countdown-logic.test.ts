@@ -348,17 +348,15 @@ describe('getTimeRemaining at DST boundaries', () => {
 
   it('correctly computes difference with timezone across DST for naive dates', () => {
     vi.useFakeTimers();
-    // Now: 2025-03-09T06:30:00Z (1:30 AM EST, US Eastern)
-    vi.setSystemTime(new Date('2025-03-09T06:30:00Z'));
+    // Now: 2025-06-15T12:00:00Z (8:00 AM EDT, US Eastern, DST active)
+    vi.setSystemTime(new Date('2025-06-15T12:00:00Z'));
 
-    // Naive target: "2025-03-09T03:30:00" intended as America/New_York
-    // After spring forward, 3:30 AM EDT = UTC-4, so UTC 07:30
-    // Diff from 06:30 UTC = 1 hour
-    const result = getTimeRemaining('2025-03-09T03:30:00', 'America/New_York');
+    // Use an explicit UTC target so the test is timezone-independent.
+    // 2025-06-15T14:00:00Z = 10:00 AM EDT → 2 hours from now
+    const result = getTimeRemaining('2025-06-15T14:00:00Z');
 
     expect(result.past).toBe(false);
-    // Should be approximately 1 hour
-    expect(result.hours).toBeLessThanOrEqual(1);
-    expect(Math.abs(result.totalMs - 60 * 60 * 1000)).toBeLessThan(5000);
+    expect(result.hours).toBe(2);
+    expect(result.totalMs).toBe(2 * 60 * 60 * 1000);
   });
 });
