@@ -1,0 +1,30 @@
+<svg width="282" height="84" viewBox="0 0 282 84" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="282" height="84" rx="18" fill="#111214"/>
+  <rect x="0.75" y="0.75" width="280.5" height="82.5" rx="17.25" stroke="#24272B"/>
+
+  <rect x="18" y="16" width="52" height="52" rx="16" fill="url(#tile)" stroke="#0891B2" stroke-opacity="0.45" stroke-width="1.5"/>
+  <svg x="27" y="24" width="34" height="34" viewBox="0 0 48 48" fill="none">
+    <path
+      d="M9 21.5L24 10L39 21.5"
+      stroke="#A5F3FC"
+      stroke-width="3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <rect x="11.5" y="20.5" width="25" height="16" rx="5" fill="#082F49" stroke="#67E8F9" stroke-width="2.5"/>
+    <rect x="17" y="25" width="14" height="2.5" rx="1.25" fill="#A5F3FC" fill-opacity="0.95"/>
+    <rect x="17" y="29.5" width="9" height="2.5" rx="1.25" fill="#CFFAFE" fill-opacity="0.85"/>
+    <path d="M29 36.5V31.5H33V36.5" stroke="#E0F2FE" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+
+  <text x="84" y="42.5" fill="#67E8F9" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" letter-spacing="0.14em" dominant-baseline="middle">HOME</text>
+  <text x="163" y="42.5" fill="#F5F5F5" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="22" font-weight="700" letter-spacing="0.04em" dominant-baseline="middle">Screens</text>
+
+  <defs>
+    <linearGradient id="tile" x1="18" y1="16" x2="70" y2="68" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0F172A"/>
+      <stop offset="0.5" stop-color="#10253D"/>
+      <stop offset="1" stop-color="#143A58"/>
+    </linearGradient>
+  </defs>
+</svg>
