@@ -184,6 +184,7 @@ export interface GlobalSettings {
   transitionDuration?: number;
   updateChannel?: 'stable' | 'dev';
   alerts?: AlertSettings;
+  telemetryEnabled?: boolean;
 }
 
 export interface Profile {

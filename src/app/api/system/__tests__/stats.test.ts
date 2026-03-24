@@ -14,6 +14,10 @@ vi.mock('@/lib/secrets', () => ({
   getSecretStatus: vi.fn(),
 }));
 
+vi.mock('@/lib/telemetry', () => ({
+  readTelemetryData: vi.fn(),
+}));
+
 // Mock fs — vi.hoisted ensures the object exists when the hoisted vi.mock factory runs
 const mockFs = vi.hoisted(() => ({
   statfs: vi.fn(),
@@ -30,6 +34,7 @@ import { GET } from '@/app/api/system/stats/route';
 import { requireSession } from '@/lib/auth';
 import { readConfig } from '@/lib/config';
 import { getSecretStatus } from '@/lib/secrets';
+import { readTelemetryData } from '@/lib/telemetry';
 
 function makeRequest(): NextRequest {
   return new NextRequest('http://localhost/api/system/stats', { method: 'GET' });
@@ -63,6 +68,9 @@ beforeEach(() => {
     google_client_secret: false,
     github_token: false,
   });
+
+  // Default: no telemetry data
+  vi.mocked(readTelemetryData).mockResolvedValue(null);
 
   // Default: fs operations return safe defaults
   mockFs.statfs.mockResolvedValue({ bsize: 4096, blocks: 1000000, bavail: 500000 });
@@ -256,5 +264,53 @@ describe('GET /api/system/stats - os and memory', () => {
     }));
     expect(data.memory.total).toBeGreaterThan(0);
     expect(data.memory.used).toBe(data.memory.total - data.memory.free);
+  });
+});
+
+// ------- Telemetry -------
+
+describe('GET /api/system/stats - telemetry', () => {
+  it('returns telemetry data when available (install ID masked)', async () => {
+    vi.mocked(readTelemetryData).mockResolvedValue({
+      installId: 'abcd1234-5678-4abc-9def-123456789abc',
+      firstSeenAt: '2026-01-01T00:00:00.000Z',
+      lastBeaconAt: '2026-03-22T00:00:00.000Z',
+    });
+
+    const res = await GET(makeRequest());
+    const data = await res.json();
+
+    expect(data.telemetry).toEqual({
+      installId: 'abcd1234...',
+      lastBeaconAt: '2026-03-22T00:00:00.000Z',
+      enabled: true,
+    });
+  });
+
+  it('returns null fields when no telemetry file exists', async () => {
+    vi.mocked(readTelemetryData).mockResolvedValue(null);
+
+    const res = await GET(makeRequest());
+    const data = await res.json();
+
+    expect(data.telemetry).toEqual({
+      installId: null,
+      lastBeaconAt: null,
+      enabled: true,
+    });
+  });
+
+  it('reflects telemetryEnabled=false from config', async () => {
+    vi.mocked(readConfig).mockResolvedValue({
+      version: 1,
+      settings: { rotationIntervalMs: 30000, weather: {}, calendar: {}, telemetryEnabled: false },
+      screens: [],
+      profiles: [],
+    } as never);
+
+    const res = await GET(makeRequest());
+    const data = await res.json();
+
+    expect(data.telemetry.enabled).toBe(false);
   });
 });

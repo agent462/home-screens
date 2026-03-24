@@ -5,6 +5,7 @@ import path from 'path';
 import { withAuth } from '@/lib/api-utils';
 import { readConfig } from '@/lib/config';
 import { getSecretStatus } from '@/lib/secrets';
+import { readTelemetryData } from '@/lib/telemetry';
 import { BACKGROUNDS_DIR } from '@/lib/constants';
 
 export const dynamic = 'force-dynamic';
@@ -52,6 +53,7 @@ export const GET = withAuth(async () => {
     diskStats,
     config,
     secretStatus,
+    telemetryData,
   ] = await Promise.all([
     fileSize(path.join(dataDir, 'config.json')),
     dirSize(path.join(dataDir, 'backups')),
@@ -59,6 +61,7 @@ export const GET = withAuth(async () => {
     getDiskStats(cwd),
     readConfig().catch(() => null),
     getSecretStatus().catch(() => ({} as Record<string, boolean>)),
+    readTelemetryData().catch(() => null),
   ]);
 
   // Count modules across all screens
@@ -110,6 +113,13 @@ export const GET = withAuth(async () => {
       profiles: config?.profiles?.length ?? 0,
       configuredSecrets,
       configSize,
+    },
+    telemetry: {
+      installId: telemetryData?.installId
+        ? telemetryData.installId.slice(0, 8) + '...'
+        : null,
+      lastBeaconAt: telemetryData?.lastBeaconAt ?? null,
+      enabled: config?.settings?.telemetryEnabled !== false,
     },
   });
 }, 'Failed to gather system stats');

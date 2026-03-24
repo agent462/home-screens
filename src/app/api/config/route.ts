@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readConfig, writeConfig } from '@/lib/config';
 import { syncKioskConf, applyDisplaySettings } from '@/lib/kiosk';
 import { errorResponse, withAuth } from '@/lib/api-utils';
+import { maybeSendBeacon } from '@/lib/telemetry';
 import type { ScreenConfiguration } from '@/types/config';
 
 export const dynamic = 'force-dynamic';
@@ -9,6 +10,7 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   try {
     const config = await readConfig();
+    maybeSendBeacon(config).catch(() => {}); // fire-and-forget daily telemetry
     return NextResponse.json(config);
   } catch (error) {
     return errorResponse(error, 'Failed to read config');

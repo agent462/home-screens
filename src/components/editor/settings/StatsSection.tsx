@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useEditorStore } from '@/stores/editor-store';
 import { editorFetch } from '@/lib/editor-fetch';
 import Button from '@/components/ui/Button';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { CacheStats } from '@/lib/display-cache';
 import type { DisplayStatus } from '@/lib/display-commands';
 
@@ -41,6 +43,11 @@ interface SystemStats {
     profiles: number;
     configuredSecrets: string[];
     configSize: number;
+  };
+  telemetry?: {
+    installId: string | null;
+    lastBeaconAt: string | null;
+    enabled: boolean;
   };
 }
 
@@ -133,6 +140,8 @@ export default function StatsSection() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCacheDetails, setShowCacheDetails] = useState(false);
+  const [showTelemetryDetails, setShowTelemetryDetails] = useState(false);
+  const { config, updateSettings, saveConfig, isSaving } = useEditorStore();
 
   const fetchStats = useCallback(async () => {
     try {
@@ -461,6 +470,99 @@ export default function StatsSection() {
           <p className="text-xs text-neutral-500">
             {memPercent.toFixed(1)}% used &middot; {formatBytes(stats.memory.free)} free
           </p>
+        </div>
+      </section>
+
+      {/* ─── Anonymous Telemetry ─────────────── */}
+      <section>
+        <h3 className="text-sm font-medium text-neutral-300 mb-3 uppercase tracking-wider">
+          Anonymous Telemetry
+        </h3>
+        <div className="space-y-3">
+          <p className="text-xs text-neutral-400 leading-relaxed">
+            Home Screens collects anonymous usage statistics to help prioritize features
+            and understand how the app is used. No personal data, IP addresses, or content
+            is ever collected.
+          </p>
+
+          {(() => {
+            const telemetryOn = config?.settings.telemetryEnabled !== false;
+            return (
+              <div className="flex items-center justify-between">
+                <label htmlFor="telemetry-toggle" className="text-sm text-neutral-300">
+                  Send anonymous usage data
+                </label>
+                <button
+                  id="telemetry-toggle"
+                  role="switch"
+                  aria-checked={telemetryOn}
+                  disabled={isSaving}
+                  onClick={async () => {
+                    updateSettings({ telemetryEnabled: !telemetryOn });
+                    await saveConfig();
+                  }}
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50 ${
+                    telemetryOn ? 'bg-blue-600' : 'bg-neutral-600'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                      telemetryOn ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                    }`}
+                  />
+                </button>
+              </div>
+            );
+          })()}
+
+          {stats.telemetry && (
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+              {stats.telemetry.installId && (
+                <>
+                  <div className="text-neutral-500">Install ID</div>
+                  <div className="text-neutral-400 font-mono text-[11px] truncate">
+                    {stats.telemetry.installId}
+                  </div>
+                </>
+              )}
+              <div className="text-neutral-500">Last beacon</div>
+              <div className="text-neutral-400">
+                {stats.telemetry.lastBeaconAt
+                  ? new Date(stats.telemetry.lastBeaconAt).toLocaleString()
+                  : 'Never'}
+              </div>
+            </div>
+          )}
+
+          <button
+            onClick={() => setShowTelemetryDetails(!showTelemetryDetails)}
+            className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"
+          >
+            {showTelemetryDetails ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            What we collect
+          </button>
+
+          {showTelemetryDetails && (
+            <div className="rounded-md bg-neutral-800/50 border border-neutral-700 p-3 text-xs text-neutral-400 space-y-2">
+              <p className="text-neutral-300 font-medium">Data sent once daily:</p>
+              <ul className="list-disc list-inside space-y-0.5">
+                <li>Anonymous install ID (random UUID)</li>
+                <li>App version and platform (OS, architecture)</li>
+                <li>Display resolution and orientation</li>
+                <li>Number of screens, modules, and profiles</li>
+                <li>Module types in use (e.g. clock, weather)</li>
+                <li>Weather provider and transition effect</li>
+                <li>Whether sleep, alerts, and auth are enabled</li>
+                <li>Whether calendar integrations are configured</li>
+                <li>Number of installed plugins</li>
+              </ul>
+              <p className="text-neutral-500 mt-2">
+                We never collect: IP addresses, location, calendar events, API keys,
+                module content, hostnames, or any personally identifiable information. 
+                All of the code is Open Source and can be verified.
+              </p>
+            </div>
+          )}
         </div>
       </section>
     </div>
