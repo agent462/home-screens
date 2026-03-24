@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { cachedProxyRoute, fetchWithTimeout } from '@/lib/api-utils';
+import { cachedProxyRoute, fetchWithTimeout, parseCommaList } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,11 +35,11 @@ const { GET, cache } = cachedProxyRoute<Record<string, unknown>>({
   ttlMs: 30 * 1000,
   cacheKey: (req) => {
     const symbolsParam = req.nextUrl.searchParams.get('symbols') || 'AAPL';
-    return symbolsParam.split(',').map((s) => s.trim()).filter(Boolean).join(',');
+    return parseCommaList(symbolsParam).join(',');
   },
   execute: async (req) => {
     const symbolsParam = req.nextUrl.searchParams.get('symbols') || 'AAPL';
-    const symbols = symbolsParam.split(',').map((s) => s.trim()).filter(Boolean);
+    const symbols = parseCommaList(symbolsParam);
 
     const results = await Promise.allSettled(symbols.map(fetchStock));
     const stocks = results

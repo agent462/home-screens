@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { runRollback, isUpgradeRunning } from '@/lib/upgrade';
-import { withAuth } from '@/lib/api-utils';
+import { withAuth, parseTagParam } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,21 +12,8 @@ export const POST = withAuth(async (request) => {
     );
   }
 
-  let body: { tag?: string };
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
-
-  const tag = body.tag;
-  if (!tag || typeof tag !== 'string') {
-    return NextResponse.json({ error: 'Missing "tag" in request body' }, { status: 400 });
-  }
-
-  if (!/^v?\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$/.test(tag)) {
-    return NextResponse.json({ error: 'Invalid tag format' }, { status: 400 });
-  }
+  const tag = await parseTagParam(request);
+  if (tag instanceof NextResponse) return tag;
 
   runRollback(tag).catch(() => {
     // Error is captured in progress state

@@ -11,7 +11,7 @@ import {
 import { DEFAULT_MODULE_SIZES } from './constants';
 import { resolveLucideIcon } from './lucide-resolver';
 
-export type ModuleCategory =
+type ModuleCategory =
   | 'Time & Date'
   | 'Weather & Environment'
   | 'News & Finance'

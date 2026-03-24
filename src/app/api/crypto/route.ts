@@ -1,10 +1,9 @@
-import { cachedProxyRoute } from '@/lib/api-utils';
+import { cachedProxyRoute, parseCommaList } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
 
 function parseIds(request: { nextUrl: { searchParams: URLSearchParams } }) {
-  return (request.nextUrl.searchParams.get('ids') || 'bitcoin,ethereum')
-    .split(',').map((s) => s.trim()).filter(Boolean).join(',');
+  return parseCommaList(request.nextUrl.searchParams.get('ids') || 'bitcoin,ethereum').join(',');
 }
 
 const { GET, cache } = cachedProxyRoute({

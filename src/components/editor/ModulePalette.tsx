@@ -95,6 +95,9 @@ export default function ModulePalette() {
   // Subscribe to plugin store size so the palette re-renders when plugins load/unload
   const pluginCount = usePluginStore((s) => s.plugins.size);
   const grouped = useMemo(() => {
+    // pluginCount is used as a dependency to invalidate this memo when plugins
+    // load/unload, since getModulesByCategory() reads from the mutable registry.
+    void pluginCount;
     const all = getModulesByCategory();
     if (isUS) return all;
     // Filter out US-only modules when not in a US timezone

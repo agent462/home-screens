@@ -122,14 +122,14 @@ beforeEach(() => {
 // ─── GET ───
 
 describe('GET /api/todoist', () => {
-  it('returns 401 when no todoist_token is configured', async () => {
+  it('returns 400 when no todoist_token is configured', async () => {
     vi.mocked(getSecret).mockResolvedValue(null);
 
     const res = await GET();
     const json = await res.json();
 
-    expect(res.status).toBe(401);
-    expect(json.error).toMatch(/No Todoist API token configured/);
+    expect(res.status).toBe(400);
+    expect(json.error).toMatch(/No Todoist API key configured/);
   });
 
   it('returns enriched tasks with project name, color, and section name', async () => {

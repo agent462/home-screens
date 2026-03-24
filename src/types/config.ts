@@ -35,7 +35,7 @@ export type BuiltinModuleType =
   | 'flag-status'
   | 'chore-chart';
 
-export type PluginModuleType = `plugin:${string}`;
+type PluginModuleType = `plugin:${string}`;
 
 export type ModuleType = BuiltinModuleType | PluginModuleType;
 

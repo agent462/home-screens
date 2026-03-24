@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readConfig } from '@/lib/config';
 import { requireSession } from '@/lib/auth';
+import { getSecret, type SecretKey } from '@/lib/secrets';
 
 /**
  * Standardized error response for API routes.
@@ -205,4 +206,51 @@ export function cachedProxyRoute<T>(config: CachedProxyRouteConfig<T>) {
   };
 
   return { GET, cache };
+}
+
+/**
+ * Reads a secret and returns it, or returns a 400 NextResponse if not configured.
+ * Usage: `const key = await requireSecret('openweathermap_key', 'OpenWeatherMap'); if (key instanceof NextResponse) return key;`
+ */
+export async function requireSecret(
+  key: SecretKey,
+  serviceName: string,
+): Promise<string | NextResponse> {
+  const value = await getSecret(key);
+  if (!value) {
+    return NextResponse.json(
+      { error: `No ${serviceName} API key configured. Add it in Settings > Integrations.` },
+      { status: 400 },
+    );
+  }
+  return value;
+}
+
+/** Split a comma-separated query parameter into a trimmed, non-empty array of strings. */
+export function parseCommaList(param: string | null): string[] {
+  if (!param) return [];
+  return param.split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+/**
+ * Parse and validate a version tag from a JSON request body.
+ * Returns the tag string on success, or a NextResponse error on failure.
+ */
+export async function parseTagParam(
+  request: NextRequest,
+): Promise<string | NextResponse> {
+  let body: { tag?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+  const tag = body.tag;
+  if (!tag || typeof tag !== 'string') {
+    return NextResponse.json({ error: 'Missing "tag" in request body' }, { status: 400 });
+  }
+  if (!/^v?\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$/.test(tag)) {
+    return NextResponse.json({ error: 'Invalid tag format' }, { status: 400 });
+  }
+  return tag;
 }

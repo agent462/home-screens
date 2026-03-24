@@ -1,5 +1,5 @@
-import { cachedProxyRoute, fetchWithTimeout } from '@/lib/api-utils';
-import { LEAGUE_MAP } from '@/lib/espn';
+import { cachedProxyRoute, fetchWithTimeout, parseCommaList } from '@/lib/api-utils';
+import { LEAGUE_MAP, parseESPNTeam } from '@/lib/espn';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,17 +57,20 @@ async function fetchLeague(league: string): Promise<GameResult[]> {
     const status = event.status as Record<string, unknown> | undefined;
     const statusType = status?.type as Record<string, unknown> | undefined;
 
+    const ht = parseESPNTeam(homeTeam);
+    const at = parseESPNTeam(awayTeam);
+
     return {
       id: event.id as string,
       league: league.toUpperCase(),
-      homeTeam: (homeTeam?.displayName as string) ?? 'TBD',
-      awayTeam: (awayTeam?.displayName as string) ?? 'TBD',
-      homeTeamAbbr: (homeTeam?.abbreviation as string) ?? '',
-      awayTeamAbbr: (awayTeam?.abbreviation as string) ?? '',
-      homeTeamLogo: (homeTeam?.logo as string) ?? '',
-      awayTeamLogo: (awayTeam?.logo as string) ?? '',
-      homeTeamColor: (homeTeam?.color as string) ?? '666666',
-      awayTeamColor: (awayTeam?.color as string) ?? '666666',
+      homeTeam: ht.name,
+      awayTeam: at.name,
+      homeTeamAbbr: ht.abbr,
+      awayTeamAbbr: at.abbr,
+      homeTeamLogo: ht.logo,
+      awayTeamLogo: at.logo,
+      homeTeamColor: ht.color,
+      awayTeamColor: at.color,
       homeScore: Number(home?.score ?? 0),
       awayScore: Number(away?.score ?? 0),
       homeRecord: (homeRecords?.[0]?.summary as string) ?? '',
@@ -86,11 +89,11 @@ const { GET, cache } = cachedProxyRoute<{ games: GameResult[] }>({
   ttlMs: 60 * 1000, // 1 minute
   cacheKey: (req) => {
     const leaguesParam = req.nextUrl.searchParams.get('leagues') || 'nfl,nba';
-    return leaguesParam.split(',').map((l) => l.trim()).filter(Boolean).sort().join(',');
+    return parseCommaList(leaguesParam).sort().join(',');
   },
   execute: async (req) => {
     const leaguesParam = req.nextUrl.searchParams.get('leagues') || 'nfl,nba';
-    const leagues = leaguesParam.split(',').map((l) => l.trim()).filter(Boolean);
+    const leagues = parseCommaList(leaguesParam);
 
     const results = await Promise.all(leagues.map(fetchLeague));
     const games = results.flat();

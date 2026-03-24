@@ -3,24 +3,7 @@ import type { PluginManifest, InstalledPlugin, PluginConfigSectionProps } from '
 import { usePluginStore } from '@/stores/plugin-store';
 import { registerPluginModule } from '@/lib/module-registry';
 import { registerFetchKey } from '@/lib/fetch-keys';
-
-// ---------------------------------------------------------------------------
-// Semver comparison — numeric, not lexicographic
-// Note: version.ts has a prerelease-aware compareSemver, but it imports
-// child_process/fs (server-only). This file runs client-side, so we use a
-// local implementation. Plugin versions don't use prerelease identifiers.
-// ---------------------------------------------------------------------------
-
-/** Returns negative if a < b, 0 if equal, positive if a > b */
-export function compareSemver(a: string, b: string): number {
-  const pa = a.split('.').map(Number);
-  const pb = b.split('.').map(Number);
-  for (let i = 0; i < 3; i++) {
-    const diff = (pa[i] || 0) - (pb[i] || 0);
-    if (diff !== 0) return diff;
-  }
-  return 0;
-}
+import { compareSemver } from '@/lib/semver';
 
 // ---------------------------------------------------------------------------
 // Dev-mode state — local plugin loading from dev server URLs
@@ -498,3 +481,6 @@ function executeBundle(
     win.__HS_PLUGIN__ = undefined;
   }
 }
+
+// Re-export from @/lib/semver for backward compatibility
+export { compareSemver } from '@/lib/semver';

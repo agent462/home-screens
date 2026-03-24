@@ -12,9 +12,11 @@ vi.mock('@/lib/auth', () => ({
   requireSession: vi.fn(),
 }));
 
-vi.mock('@/lib/api-utils', () => {
+vi.mock('@/lib/api-utils', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api-utils')>();
   const fetchWithTimeout = vi.fn((...args: unknown[]) => (globalThis.fetch as (...a: unknown[]) => unknown)(...args));
   return {
+    ...actual,
     errorResponse: vi.fn((_err: unknown, msg: string, status = 500) => {
       return Response.json({ error: msg }, { status });
     }),

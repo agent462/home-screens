@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Installed plugin build artifacts (minified bundles, not source)
+    "data/plugins/**",
   ]),
   {
     rules: {

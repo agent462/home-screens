@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
 import type { ChoreCompletion } from '@/types/config';
+import { errorResponse, withAuth } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,61 +69,51 @@ export async function GET() {
     }
 
     return NextResponse.json({ completions: cleaned });
-  } catch {
-    return NextResponse.json(
-      { error: 'Failed to read chore completions' },
-      { status: 500 },
-    );
+  } catch (error) {
+    return errorResponse(error, 'Failed to read chore completions');
   }
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { choreId, memberId, date } = body as {
-      choreId: string;
-      memberId: string;
-      date: string;
-    };
+export const POST = withAuth(async (request: NextRequest) => {
+  const body = await request.json();
+  const { choreId, memberId, date } = body as {
+    choreId: string;
+    memberId: string;
+    date: string;
+  };
 
-    if (!choreId || !memberId || !date) {
-      return NextResponse.json(
-        { error: 'Missing choreId, memberId, or date' },
-        { status: 400 },
-      );
-    }
-
-    if (!DATE_RE.test(date)) {
-      return NextResponse.json(
-        { error: 'Invalid date format — expected YYYY-MM-DD' },
-        { status: 400 },
-      );
-    }
-
-    const result = await enqueueOp(async (data) => {
-      const existing = data.completions.findIndex(
-        (c) => c.choreId === choreId && c.memberId === memberId && c.date === date,
-      );
-
-      if (existing >= 0) {
-        data.completions.splice(existing, 1);
-      } else {
-        data.completions.push({
-          choreId,
-          memberId,
-          date,
-          completedAt: new Date().toISOString(),
-        });
-      }
-
-      return data;
-    });
-
-    return NextResponse.json({ completions: result.completions });
-  } catch {
+  if (!choreId || !memberId || !date) {
     return NextResponse.json(
-      { error: 'Failed to update chore completions' },
-      { status: 500 },
+      { error: 'Missing choreId, memberId, or date' },
+      { status: 400 },
     );
   }
-}
+
+  if (!DATE_RE.test(date)) {
+    return NextResponse.json(
+      { error: 'Invalid date format — expected YYYY-MM-DD' },
+      { status: 400 },
+    );
+  }
+
+  const result = await enqueueOp(async (data) => {
+    const existing = data.completions.findIndex(
+      (c) => c.choreId === choreId && c.memberId === memberId && c.date === date,
+    );
+
+    if (existing >= 0) {
+      data.completions.splice(existing, 1);
+    } else {
+      data.completions.push({
+        choreId,
+        memberId,
+        date,
+        completedAt: new Date().toISOString(),
+      });
+    }
+
+    return data;
+  });
+
+  return NextResponse.json({ completions: result.completions });
+}, 'Failed to update chore completions');

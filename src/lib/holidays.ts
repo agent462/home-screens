@@ -26,7 +26,7 @@ export async function fetchAvailableCountries(): Promise<{ countryCode: string; 
   return data;
 }
 
-export async function fetchHolidays(countryCode: string, year: number): Promise<NagerHoliday[]> {
+async function fetchHolidays(countryCode: string, year: number): Promise<NagerHoliday[]> {
   const key = `${countryCode}:${year}`;
   const cached = holidaysCache.get(key);
   if (cached) return cached;

@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSecret } from '@/lib/secrets';
-import { createTTLCache, getLocationFromConfig, fetchWithTimeout, errorResponse } from '@/lib/api-utils';
+import { createTTLCache, getLocationFromConfig, fetchWithTimeout, errorResponse, requireSecret } from '@/lib/api-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,8 +9,6 @@ export const cache = createTTLCache<Record<string, unknown>>(5 * 60 * 1000); // 
 export async function GET() {
   try {
     const location = await getLocationFromConfig();
-    const apiKey = await getSecret('openweathermap_key');
-
     if (!location) {
       return NextResponse.json(
         { error: 'Missing latitude/longitude in weather settings' },
@@ -19,14 +16,10 @@ export async function GET() {
       );
     }
 
-    const { lat, lon } = location;
+    const apiKey = await requireSecret('openweathermap_key', 'OpenWeatherMap');
+    if (apiKey instanceof NextResponse) return apiKey;
 
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: 'Missing OpenWeatherMap API key — add it in Settings > Integrations' },
-        { status: 400 },
-      );
-    }
+    const { lat, lon } = location;
 
     const cacheKey = `${lat}:${lon}`;
     const cached = cache.get(cacheKey);

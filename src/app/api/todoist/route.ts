@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { errorResponse, createTTLCache, fetchWithTimeout, validateTodoistToken } from '@/lib/api-utils';
-import { requireSession } from '@/lib/auth';
-import { getSecret, setSecret } from '@/lib/secrets';
+import { errorResponse, withAuth, createTTLCache, fetchWithTimeout, validateTodoistToken, requireSecret } from '@/lib/api-utils';
+import { setSecret } from '@/lib/secrets';
 
 export const dynamic = 'force-dynamic';
 
@@ -87,31 +86,25 @@ async function fetchTodoistList(endpoint: string, token: string): Promise<Record
 
 // ─── PUT: Save token server-side ───
 
-export async function PUT(request: NextRequest) {
-  try {
-    await requireSession(request);
-    const body = await request.json();
-    const token = typeof body.token === 'string' ? body.token.trim() : '';
+export const PUT = withAuth(async (request: NextRequest) => {
+  const body = await request.json();
+  const token = typeof body.token === 'string' ? body.token.trim() : '';
 
-    if (!token) {
-      return NextResponse.json({ error: 'No token provided' }, { status: 400 });
-    }
-
-    // Validate the token by making a quick API call
-    const result = await validateTodoistToken(token);
-    if (!result.valid) {
-      return NextResponse.json({ error: 'Invalid token — Todoist returned ' + result.status }, { status: 401 });
-    }
-
-    await setSecret('todoist_token', token);
-    cache.clear(); // invalidate cached tasks from previous token
-
-    return NextResponse.json({ ok: true });
-  } catch (error) {
-    if (error instanceof Response) return error;
-    return errorResponse(error, 'Failed to save Todoist token');
+  if (!token) {
+    return NextResponse.json({ error: 'No token provided' }, { status: 400 });
   }
-}
+
+  // Validate the token by making a quick API call
+  const result = await validateTodoistToken(token);
+  if (!result.valid) {
+    return NextResponse.json({ error: 'Invalid token — Todoist returned ' + result.status }, { status: 401 });
+  }
+
+  await setSecret('todoist_token', token);
+  cache.clear(); // invalidate cached tasks from previous token
+
+  return NextResponse.json({ ok: true });
+}, 'Failed to save Todoist token');
 
 // ─── GET: Fetch tasks ───
 
@@ -120,14 +113,8 @@ export const cache = createTTLCache<unknown>(60 * 1000); // 1 minute
 
 export async function GET() {
   try {
-    const token = await getSecret('todoist_token');
-
-    if (!token) {
-      return NextResponse.json(
-        { error: 'No Todoist API token configured. Add it in Settings > Integrations.' },
-        { status: 401 },
-      );
-    }
+    const token = await requireSecret('todoist_token', 'Todoist');
+    if (token instanceof NextResponse) return token;
 
     const cached = cache.get('todoist');
     if (cached) return NextResponse.json(cached);
