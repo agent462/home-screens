@@ -24,6 +24,7 @@
 .DS_Store
 *.pem
 .c*
+tailwind/*
 
 # debug
 npm-debug.log*
