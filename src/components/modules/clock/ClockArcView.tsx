@@ -1,6 +1,6 @@
 'use client';
 
-import { useId } from 'react';
+import { useId, useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import type { ClockViewProps } from './types';
 
@@ -8,6 +8,8 @@ export default function ClockArcView({ config, now, scaledFontSize, containerRef
   const id = useId();
   const arcGradientId = `arc-gradient-${id}`;
   const sunGlowId = `sun-glow-${id}`;
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const hours = now.getHours();
   const minutes = now.getMinutes();
   const seconds = now.getSeconds();
@@ -67,7 +69,7 @@ export default function ClockArcView({ config, now, scaledFontSize, containerRef
       className="w-full h-full flex flex-col items-center justify-center"
     >
       <div style={{ width: svgWidth }}>
-        <svg
+        {mounted && <svg
           width={svgWidth}
           height={svgHeight}
           viewBox={`0 0 ${svgWidth} ${svgHeight}`}
@@ -179,7 +181,7 @@ export default function ClockArcView({ config, now, scaledFontSize, containerRef
               {isBeforeDawn ? 'before dawn' : isAfterDusk ? 'after dusk' : ''}
             </text>
           )}
-        </svg>
+        </svg>}
 
         {/* Digital time */}
         <div
