@@ -9,6 +9,7 @@ import type { ModuleInstance } from '@/types/config';
 import { usePreviewData } from './usePreviewData';
 import DraggableModule from './DraggableModule';
 import type { PreviewSettings } from './DraggableModule';
+import { PageBackgroundProvider, usePageBackground } from '@/contexts/PageBackgroundContext';
 
 function GridOverlay({ scale }: { scale: number }) {
   const scaledGrid = GRID_SIZE * scale;
@@ -190,41 +191,53 @@ export default function EditorCanvas({ onScaleChange, canvasRef }: { onScaleChan
         }}
         onClick={() => selectModule(null)}
       >
-        {(activeBackground || currentScreen.backgroundImage) && (
-          <img
-            src={activeBackground || currentScreen.backgroundImage}
-            alt=""
-            className="absolute inset-0 w-full h-full object-cover"
+        <PageBackgroundProvider>
+          <CanvasBackground
+            screenBackground={activeBackground || currentScreen.backgroundImage}
           />
-        )}
-        <GridOverlay scale={scale} />
-        {currentScreen.modules.map((mod) => (
-          <DraggableModule
-            key={mod.id}
-            mod={mod}
-            scale={scale}
-            isSelected={mod.id === selectedModuleId}
-            onSelect={() => selectModule(mod.id)}
-            onResize={(size) => resizeModule(selectedScreenId!, mod.id, size)}
-            previewData={previewData}
-            settings={previewSettings}
-            now={now}
-          />
-        ))}
-        {dragState && (() => {
-          const mod = currentScreen.modules.find((m) => m.id === dragState.moduleId);
-          return mod ? (
-            <DragGhost
+          <GridOverlay scale={scale} />
+          {currentScreen.modules.map((mod) => (
+            <DraggableModule
+              key={mod.id}
               mod={mod}
               scale={scale}
-              deltaX={dragState.deltaX}
-              deltaY={dragState.deltaY}
-              displayWidth={displayWidth}
-              displayHeight={displayHeight}
+              isSelected={mod.id === selectedModuleId}
+              onSelect={() => selectModule(mod.id)}
+              onResize={(size) => resizeModule(selectedScreenId!, mod.id, size)}
+              previewData={previewData}
+              settings={previewSettings}
+              now={now}
             />
-          ) : null;
-        })()}
+          ))}
+          {dragState && (() => {
+            const mod = currentScreen.modules.find((m) => m.id === dragState.moduleId);
+            return mod ? (
+              <DragGhost
+                mod={mod}
+                scale={scale}
+                deltaX={dragState.deltaX}
+                deltaY={dragState.deltaY}
+                displayWidth={displayWidth}
+                displayHeight={displayHeight}
+              />
+            ) : null;
+          })()}
+        </PageBackgroundProvider>
       </div>
     </div>
+  );
+}
+
+/** Reads the PageBackgroundContext override and renders the appropriate background */
+function CanvasBackground({ screenBackground }: { screenBackground: string | undefined }) {
+  const { overrideBackground } = usePageBackground();
+  const bg = overrideBackground || screenBackground;
+  if (!bg) return null;
+  return (
+    <img
+      src={bg}
+      alt=""
+      className="absolute inset-0 w-full h-full object-cover"
+    />
   );
 }

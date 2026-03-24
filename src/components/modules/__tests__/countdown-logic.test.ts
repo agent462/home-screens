@@ -1,47 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { parseDateInTZ } from '@/lib/timezone';
-
-// ---------------------------------------------------------------------------
-// Replicate the pure logic from CountdownModule.tsx so we can unit-test it.
-// These are exact copies of the non-exported helpers.
-// ---------------------------------------------------------------------------
-
-function getTimeRemaining(targetDate: string, timezone?: string) {
-  const diff = parseDateInTZ(targetDate, timezone).getTime() - Date.now();
-  const absDiff = Math.abs(diff);
-  const past = diff < 0;
-
-  const days = Math.floor(absDiff / (1000 * 60 * 60 * 24));
-  const hours = Math.floor((absDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-  const minutes = Math.floor((absDiff % (1000 * 60 * 60)) / (1000 * 60));
-  const seconds = Math.floor((absDiff % (1000 * 60)) / 1000);
-
-  return { days, hours, minutes, seconds, past, totalMs: diff };
-}
-
-function pad(n: number) {
-  return String(n).padStart(2, '0');
-}
-
-interface CountdownEvent {
-  id: string;
-  name: string;
-  date: string;
-}
-
-/** Replicate the sorting/filtering logic from CountdownModule render. */
-function processEvents(events: CountdownEvent[], showPastEvents: boolean, timezone?: string) {
-  return events
-    .map((event) => ({
-      ...event,
-      time: getTimeRemaining(event.date, timezone),
-    }))
-    .filter((event) => showPastEvents || !event.time.past)
-    .sort((a, b) => {
-      if (a.time.past !== b.time.past) return a.time.past ? 1 : -1;
-      return a.time.totalMs - b.time.totalMs;
-    });
-}
+import { getTimeRemaining, pad, processEvents, resolveEventDate } from '../countdown/countdown-utils';
+import type { CountdownEvent } from '@/types/config';
 
 // ── getTimeRemaining ──────────────────────────────────────────────────
 
@@ -182,6 +141,91 @@ describe('pad', () => {
   });
 });
 
+// ── resolveEventDate ─────────────────────────────────────────────────
+
+describe('resolveEventDate', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('returns date unchanged for non-recurring events', () => {
+    const event: CountdownEvent = { id: '1', name: 'Test', date: '2024-06-15T10:00' };
+    expect(resolveEventDate(event)).toBe('2024-06-15T10:00');
+  });
+
+  it('returns date unchanged for recurring event with future date this year', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2025-01-15T00:00:00Z'));
+
+    const event: CountdownEvent = {
+      id: '1', name: 'Christmas', date: '2025-12-25T00:00',
+      recurring: 'yearly', source: 'holiday',
+    };
+    const resolved = resolveEventDate(event);
+    expect(resolved).toBe('2025-12-25T00:00');
+  });
+
+  it('advances to next year when date has passed this year', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2025-07-01T00:00:00Z'));
+
+    const event: CountdownEvent = {
+      id: '1', name: 'New Year', date: '2025-01-01T00:00',
+      recurring: 'yearly', source: 'holiday',
+    };
+    const resolved = resolveEventDate(event);
+    expect(resolved).toBe('2026-01-01T00:00');
+  });
+
+  it('returns current year when date is today', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2025-06-15T08:00:00Z'));
+
+    const event: CountdownEvent = {
+      id: '1', name: 'Today', date: '2025-06-15T12:00',
+      recurring: 'yearly', source: 'holiday',
+    };
+    const resolved = resolveEventDate(event);
+    // 12:00 hasn't passed yet at 08:00, should stay in 2025
+    expect(resolved).toBe('2025-06-15T12:00');
+  });
+
+  it('handles stored date from a previous year', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-01T00:00:00Z'));
+
+    const event: CountdownEvent = {
+      id: '1', name: 'Independence Day', date: '2025-07-04T00:00',
+      recurring: 'yearly', source: 'holiday',
+    };
+    const resolved = resolveEventDate(event);
+    // July 4 hasn't passed yet in 2026
+    expect(resolved).toBe('2026-07-04T00:00');
+  });
+
+  it('extracts correct month/day when timezone differs from OS', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2025-03-01T00:00:00Z'));
+
+    const event: CountdownEvent = {
+      id: '1', name: 'July 4th', date: '2025-07-04T00:00',
+      recurring: 'yearly', source: 'holiday',
+    };
+    // Should resolve to July 4, not July 3 (which would happen if
+    // date parts were extracted in server-local time from a TZ-adjusted Date)
+    const resolved = resolveEventDate(event, 'Asia/Tokyo');
+    expect(resolved).toContain('07-04');
+  });
+
+  it('handles invalid date string gracefully', () => {
+    const event: CountdownEvent = {
+      id: '1', name: 'Bad', date: 'not-a-date',
+      recurring: 'yearly', source: 'holiday',
+    };
+    expect(resolveEventDate(event)).toBe('not-a-date');
+  });
+});
+
 // ── Sorting and filtering events ─────────────────────────────────────
 
 describe('processEvents (sorting & filtering)', () => {
@@ -308,6 +352,68 @@ describe('processEvents (sorting & filtering)', () => {
     // cause unpredictable sort ordering. The key assertion: no exception thrown.
     const result = processEvents(events, true);
     expect(result).toHaveLength(3);
+  });
+});
+
+// ── Recurring events in processEvents ────────────────────────────────
+
+describe('processEvents with recurring events', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('recurring event with past stored date resolves to future', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2025-07-01T00:00:00Z'));
+
+    const events: CountdownEvent[] = [
+      {
+        id: '1', name: 'New Year', date: '2025-01-01T00:00',
+        recurring: 'yearly', source: 'holiday',
+      },
+    ];
+
+    const result = processEvents(events, false);
+    // Should resolve to 2026-01-01, which is future
+    expect(result).toHaveLength(1);
+    expect(result[0].time.past).toBe(false);
+  });
+
+  it('recurring event still appears with showPastEvents false', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2025-12-26T00:00:00Z'));
+
+    const events: CountdownEvent[] = [
+      {
+        id: '1', name: 'Christmas', date: '2025-12-25T00:00',
+        recurring: 'yearly', source: 'holiday',
+      },
+    ];
+
+    const result = processEvents(events, false);
+    // Christmas 2025 is past, but recurring resolves to 2026-12-25 which is future
+    expect(result).toHaveLength(1);
+    expect(result[0].time.past).toBe(false);
+  });
+
+  it('mixes recurring and non-recurring events correctly', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2025-07-01T00:00:00Z'));
+
+    const events: CountdownEvent[] = [
+      {
+        id: '1', name: 'Birthday', date: '2025-03-15T00:00',
+        recurring: 'yearly',
+      },
+      { id: '2', name: 'Concert', date: '2025-08-20T00:00' },
+    ];
+
+    const result = processEvents(events, false);
+    // Birthday resolves to 2026-03-15 (future), Concert is 2025-08-20 (future)
+    expect(result).toHaveLength(2);
+    // Concert is sooner (Aug 2025 vs Mar 2026)
+    expect(result[0].name).toBe('Concert');
+    expect(result[1].name).toBe('Birthday');
   });
 });
 

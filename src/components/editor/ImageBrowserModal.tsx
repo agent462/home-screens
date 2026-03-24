@@ -1,8 +1,30 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Button from '@/components/ui/Button';
 import { useImageLibrary, type DirectoryInfo } from '@/hooks/useImageLibrary';
+import { editorFetch } from '@/lib/editor-fetch';
+import ImageSearchBrowser, { type BrowsePhoto, type SearchResult } from './ImageSearchBrowser';
+
+interface UnsplashPhoto {
+  id: string;
+  description: string;
+  thumb: string;
+  regular: string;
+  authorName: string;
+  downloadUrl: string;
+}
+
+const UNSPLASH_CATEGORIES = [
+  { label: 'Nature', query: 'nature landscape' },
+  { label: 'Mountains', query: 'mountains scenic' },
+  { label: 'Ocean', query: 'ocean sea coast' },
+  { label: 'Holidays', query: 'holiday celebration' },
+  { label: 'Birthday', query: 'birthday party' },
+  { label: 'Flowers', query: 'flowers botanical' },
+  { label: 'Seasons', query: 'seasons autumn winter' },
+  { label: 'Abstract', query: 'abstract gradient dark' },
+];
 
 interface ImageBrowserModalProps {
   mode: 'pick-image' | 'manage-directory';
@@ -20,6 +42,8 @@ export default function ImageBrowserModal({
   onClose,
 }: ImageBrowserModalProps) {
   const lib = useImageLibrary({ initialDirectory });
+  const [tab, setTab] = useState<'local' | 'unsplash'>('local');
+  const [hasUnsplashKey, setHasUnsplashKey] = useState(false);
 
   // Close on Escape
   useEffect(() => {
@@ -30,6 +54,21 @@ export default function ImageBrowserModal({
     return () => window.removeEventListener('keydown', handler);
   }, [onClose]);
 
+  // Check if Unsplash key is configured (only in pick-image mode)
+  useEffect(() => {
+    if (mode !== 'pick-image') return;
+    async function checkKey() {
+      try {
+        const res = await editorFetch('/api/secrets');
+        if (res.ok) {
+          const data: Record<string, boolean> = await res.json();
+          setHasUnsplashKey(!!data.unsplash_access_key);
+        }
+      } catch { /* ignore */ }
+    }
+    checkKey();
+  }, [mode]);
+
   const handleConfirm = () => {
     if (mode === 'pick-image' && lib.selectedImage) {
       onSelectImage?.(lib.selectedImage);
@@ -38,6 +77,53 @@ export default function ImageBrowserModal({
     }
     onClose();
   };
+
+  // --- Unsplash search & save ---
+  const photoCacheRef = useRef(new Map<string, UnsplashPhoto>());
+
+  const handleUnsplashSearch = useCallback(async (query: string, pageNum: number): Promise<SearchResult> => {
+    const res = await editorFetch(
+      `/api/unsplash?query=${encodeURIComponent(query)}&page=${pageNum}&per_page=16&orientation=portrait`
+    );
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to search Unsplash');
+
+    const unsplashPhotos: UnsplashPhoto[] = data.photos ?? [];
+    const newCache = new Map<string, UnsplashPhoto>();
+    const browsePhotos: BrowsePhoto[] = unsplashPhotos.map((p) => {
+      newCache.set(p.id, p);
+      return {
+        id: p.id,
+        thumb: p.thumb,
+        alt: p.description,
+        overlayLabel: p.authorName,
+      };
+    });
+    photoCacheRef.current = newCache;
+    return { photos: browsePhotos, totalPages: data.totalPages ?? 1 };
+  }, []);
+
+  const handleUnsplashUsePhoto = useCallback(async (photo: BrowsePhoto) => {
+    const original = photoCacheRef.current.get(photo.id);
+    if (!original) return;
+
+    // Download image locally via POST /api/unsplash
+    const res = await editorFetch('/api/unsplash', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        imageUrl: original.regular,
+        downloadUrl: original.downloadUrl,
+        filename: `unsplash-${original.id}`,
+      }),
+    });
+    if (!res.ok) throw new Error('Failed to save image');
+    const data = await res.json();
+    if (data.path) {
+      onSelectImage?.(data.path);
+      onClose();
+    }
+  }, [onSelectImage, onClose]);
 
   const currentDirInfo = lib.directories.find((d) => d.path === lib.selectedDir);
 
@@ -53,6 +139,8 @@ export default function ImageBrowserModal({
   const isConfirmDisabled =
     mode === 'pick-image' ? !lib.selectedImage : false;
 
+  const showTabs = mode === 'pick-image' && hasUnsplashKey;
+
   return (
     <div className="fixed inset-0 z-[65] flex items-center justify-center p-4">
       {/* Backdrop */}
@@ -65,9 +153,31 @@ export default function ImageBrowserModal({
       <div className="relative bg-neutral-900 border border-neutral-700 rounded-xl w-full max-w-3xl h-[85vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-700">
-          <h2 className="text-sm font-semibold text-neutral-100">
-            Image Library
-          </h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-sm font-semibold text-neutral-100">
+              Image Library
+            </h2>
+            {showTabs && (
+              <div className="flex gap-0.5 bg-neutral-800 rounded-md p-0.5">
+                <button
+                  onClick={() => setTab('local')}
+                  className={`text-xs px-2.5 py-1 rounded ${
+                    tab === 'local' ? 'bg-neutral-700 text-neutral-100' : 'text-neutral-400 hover:text-neutral-300'
+                  }`}
+                >
+                  Local
+                </button>
+                <button
+                  onClick={() => setTab('unsplash')}
+                  className={`text-xs px-2.5 py-1 rounded ${
+                    tab === 'unsplash' ? 'bg-neutral-700 text-neutral-100' : 'text-neutral-400 hover:text-neutral-300'
+                  }`}
+                >
+                  Unsplash
+                </button>
+              </div>
+            )}
+          </div>
           <button
             onClick={onClose}
             className="text-neutral-400 hover:text-neutral-200 text-lg leading-none"
@@ -77,60 +187,75 @@ export default function ImageBrowserModal({
         </div>
 
         {/* Body */}
-        <div className="flex flex-1 min-h-0">
-          {/* Sidebar — Directory Tree */}
-          <DirectorySidebar
-            directories={lib.directories}
-            rootDirs={rootDirs}
-            selectedDir={lib.selectedDir}
-            onSelectDir={lib.setSelectedDir}
-            getSubDirs={getSubDirs}
-            loadingDirs={lib.loadingDirs}
-            showNewFolder={lib.showNewFolder}
-            setShowNewFolder={lib.setShowNewFolder}
-            newFolderName={lib.newFolderName}
-            setNewFolderName={lib.setNewFolderName}
-            onCreateFolder={lib.handleCreateFolder}
-            newFolderInputRef={lib.newFolderInputRef}
-          />
+        {tab === 'local' ? (
+          <div className="flex flex-1 min-h-0">
+            {/* Sidebar — Directory Tree */}
+            <DirectorySidebar
+              directories={lib.directories}
+              rootDirs={rootDirs}
+              selectedDir={lib.selectedDir}
+              onSelectDir={lib.setSelectedDir}
+              getSubDirs={getSubDirs}
+              loadingDirs={lib.loadingDirs}
+              showNewFolder={lib.showNewFolder}
+              setShowNewFolder={lib.setShowNewFolder}
+              newFolderName={lib.newFolderName}
+              setNewFolderName={lib.setNewFolderName}
+              onCreateFolder={lib.handleCreateFolder}
+              newFolderInputRef={lib.newFolderInputRef}
+            />
 
-          {/* Main area — Image Grid */}
-          <ImageGrid
-            images={lib.images}
-            selectedImage={lib.selectedImage}
-            onSelectImage={(img) => {
-              if (mode === 'pick-image') {
-                lib.setSelectedImage(lib.selectedImage === img ? null : img);
-              }
-            }}
-            loadingImages={lib.loadingImages}
-            deletingImage={lib.deletingImage}
-            onDeleteImage={lib.handleDeleteImage}
-            currentDirName={currentDirInfo?.name || 'All Photos'}
-            selectedDir={lib.selectedDir}
-            uploading={lib.uploading}
-            uploadProgress={lib.uploadProgress}
-            onUpload={lib.handleUpload}
-            onDeleteFolder={lib.handleDeleteFolder}
-            fileInputRef={lib.fileInputRef}
-            error={lib.error}
-          />
-        </div>
+            {/* Main area — Image Grid */}
+            <ImageGrid
+              images={lib.images}
+              selectedImage={lib.selectedImage}
+              onSelectImage={(img) => {
+                if (mode === 'pick-image') {
+                  lib.setSelectedImage(lib.selectedImage === img ? null : img);
+                }
+              }}
+              loadingImages={lib.loadingImages}
+              deletingImage={lib.deletingImage}
+              onDeleteImage={lib.handleDeleteImage}
+              currentDirName={currentDirInfo?.name || 'All Photos'}
+              selectedDir={lib.selectedDir}
+              uploading={lib.uploading}
+              uploadProgress={lib.uploadProgress}
+              onUpload={lib.handleUpload}
+              onDeleteFolder={lib.handleDeleteFolder}
+              fileInputRef={lib.fileInputRef}
+              error={lib.error}
+            />
+          </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            <ImageSearchBrowser
+              categories={UNSPLASH_CATEGORIES}
+              onSearch={handleUnsplashSearch}
+              onUsePhoto={handleUnsplashUsePhoto}
+              attribution="Photos by Unsplash — saved to your local library"
+              searchPlaceholder="Search Unsplash..."
+              columns={4}
+            />
+          </div>
+        )}
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-neutral-700">
-          <Button size="sm" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            size="sm"
-            variant="primary"
-            onClick={handleConfirm}
-            disabled={isConfirmDisabled}
-          >
-            {mode === 'pick-image' ? 'Select Image' : 'Use This Folder'}
-          </Button>
-        </div>
+        {/* Footer — only show for local tab */}
+        {tab === 'local' && (
+          <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-neutral-700">
+            <Button size="sm" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={handleConfirm}
+              disabled={isConfirmDisabled}
+            >
+              {mode === 'pick-image' ? 'Select Image' : 'Use This Folder'}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

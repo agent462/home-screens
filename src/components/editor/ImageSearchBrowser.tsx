@@ -37,6 +37,8 @@ interface ImageSearchBrowserProps {
   beforeGrid?: React.ReactNode;
   /** External trigger to re-run the current search (increment to trigger) */
   refreshKey?: number;
+  /** Grid columns (default 2). Use 4 for wider containers. */
+  columns?: 2 | 3 | 4;
 }
 
 export default function ImageSearchBrowser({
@@ -49,6 +51,7 @@ export default function ImageSearchBrowser({
   hideSearch = false,
   beforeGrid,
   refreshKey = 0,
+  columns = 2,
 }: ImageSearchBrowserProps) {
   const [photos, setPhotos] = useState<BrowsePhoto[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -146,7 +149,9 @@ export default function ImageSearchBrowser({
       {isLoading ? (
         <div className="text-xs text-neutral-500 py-4 text-center">Loading...</div>
       ) : (
-        <div className="grid grid-cols-2 gap-1.5 max-h-[300px] overflow-y-auto">
+        <div className={`grid gap-1.5 overflow-y-auto ${
+          columns === 4 ? 'grid-cols-4' : columns === 3 ? 'grid-cols-3' : 'grid-cols-2 max-h-[300px]'
+        }`}>
           {photos.map((photo) => (
             <button
               key={photo.id}

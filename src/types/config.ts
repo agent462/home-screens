@@ -281,16 +281,23 @@ export interface WeatherConfig {
 
 
 // Countdown config
+export type CountdownView = 'all' | 'next';
+
 export interface CountdownEvent {
   id: string;
   name: string;
   date: string; // ISO date string
+  recurring?: 'yearly';
+  source?: 'custom' | 'holiday';
+  backgroundImage?: string;
 }
 
 export interface CountdownConfig {
   events: CountdownEvent[];
   showPastEvents: boolean;
   scale: number; // 0.5 – 4, default 1
+  view: CountdownView;
+  holidayCountry?: string;
 }
 
 // Dad joke config

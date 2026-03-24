@@ -181,6 +181,7 @@ registerModule({
     events: [],
     showPastEvents: false,
     scale: 1,
+    view: 'all',
   },
   defaultSize: DEFAULT_MODULE_SIZES.countdown,
 });

@@ -7,6 +7,7 @@ import { getModuleDefinition } from '@/lib/module-registry';
 import { isModuleVisible } from '@/lib/schedule';
 import { useTZClock } from '@/hooks/useTZClock';
 import PluginPlaceholder from '@/components/modules/PluginPlaceholder';
+import { PageBackgroundProvider, usePageBackground } from '@/contexts/PageBackgroundContext';
 
 export interface SharedDisplayData {
   owmData: unknown;
@@ -35,8 +36,17 @@ export function resolveProvider(mod: { type: string; config: Record<string, unkn
   return globalProvider;
 }
 
-export default function ScreenRenderer({ screen, settings, rotatingBackground, sharedData, displayW, displayH, scale }: ScreenRendererProps) {
+export default function ScreenRenderer(props: ScreenRendererProps) {
+  return (
+    <PageBackgroundProvider>
+      <ScreenRendererInner {...props} />
+    </PageBackgroundProvider>
+  );
+}
+
+function ScreenRendererInner({ screen, settings, rotatingBackground, sharedData, displayW, displayH, scale }: ScreenRendererProps) {
   const globalProvider = settings.weather.provider;
+  const { overrideBackground } = usePageBackground();
 
   // Minute-resolution timezone-aware clock for module scheduling
   const now = useTZClock(settings.timezone);
@@ -47,7 +57,9 @@ export default function ScreenRenderer({ screen, settings, rotatingBackground, s
   );
 
   const rotation = screen.backgroundRotation;
-  const backgroundImage = rotation?.enabled ? (rotatingBackground || screen.backgroundImage) : screen.backgroundImage;
+  const screenBackground = rotation?.enabled ? (rotatingBackground || screen.backgroundImage) : screen.backgroundImage;
+  // Module-requested override takes priority over screen background
+  const backgroundImage = overrideBackground || screenBackground;
 
   const lat = settings.latitude ?? settings.weather.latitude;
   const lon = settings.longitude ?? settings.weather.longitude;

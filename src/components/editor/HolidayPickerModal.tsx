@@ -1,0 +1,235 @@
+'use client';
+
+import { useState, useEffect, useCallback, useRef } from 'react';
+import Button from '@/components/ui/Button';
+import { editorFetch } from '@/lib/editor-fetch';
+import { getSupplementalHolidays } from '@/lib/supplemental-holidays';
+import type { CountdownEvent } from '@/types/config';
+
+interface HolidayInfo {
+  id: string;
+  title: string;
+  start: string; // YYYY-MM-DD
+}
+
+interface Country {
+  countryCode: string;
+  name: string;
+}
+
+interface HolidayPickerModalProps {
+  initialCountry?: string;
+  existingEvents: CountdownEvent[];
+  onConfirm: (events: CountdownEvent[], country: string) => void;
+  onClose: () => void;
+}
+
+export default function HolidayPickerModal({
+  initialCountry,
+  existingEvents,
+  onConfirm,
+  onClose,
+}: HolidayPickerModalProps) {
+  const [countries, setCountries] = useState<Country[]>([]);
+  const [country, setCountry] = useState(initialCountry ?? '');
+  const [holidays, setHolidays] = useState<HolidayInfo[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Close on Escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  // Fetch available countries on mount
+  useEffect(() => {
+    async function load() {
+      try {
+        const res = await editorFetch('/api/holidays?countries');
+        if (res.ok) {
+          setCountries(await res.json());
+        } else {
+          setError('Failed to load countries');
+        }
+      } catch {
+        setError('Failed to load countries');
+      }
+    }
+    load();
+  }, []);
+
+  // Fetch holidays when country changes (with stale-response guard)
+  const tokenRef = useRef(0);
+  const fetchHolidays = useCallback(async (code: string) => {
+    const token = ++tokenRef.current;
+    if (!code) { setHolidays([]); setSelectedIds(new Set()); setError(null); return; }
+    setLoading(true);
+    setError(null);
+    try {
+      const year = new Date().getFullYear();
+      // Fetch current year and next year
+      const [res1, res2] = await Promise.all([
+        editorFetch(`/api/holidays?country=${code}&year=${year}`),
+        editorFetch(`/api/holidays?country=${code}&year=${year + 1}`),
+      ]);
+      if (token !== tokenRef.current) return; // stale response, discard
+
+      const h1: HolidayInfo[] = res1.ok ? await res1.json() : [];
+      const h2: HolidayInfo[] = res2.ok ? await res2.json() : [];
+
+      // Merge supplemental holidays (Easter, Valentine's, etc.)
+      const supplemental = getSupplementalHolidays(code, [year, year + 1]);
+
+      // Deduplicate by title (same holiday across years) — keep the next upcoming
+      const seen = new Map<string, HolidayInfo>();
+      for (const h of [...h1, ...h2, ...supplemental]) {
+        if (h.start >= new Date().toISOString().slice(0, 10) && !seen.has(h.title)) {
+          seen.set(h.title, h);
+        }
+      }
+      const unique = Array.from(seen.values()).sort((a, b) => a.start.localeCompare(b.start));
+      setHolidays(unique);
+
+      // Pre-check holidays already in events list
+      const existingNames = new Set(
+        existingEvents
+          .filter((e) => e.source === 'holiday')
+          .map((e) => e.name)
+      );
+      const preSelected = new Set<string>();
+      for (const h of unique) {
+        if (existingNames.has(h.title)) preSelected.add(h.id);
+      }
+      setSelectedIds(preSelected);
+    } catch {
+      if (token === tokenRef.current) setError('Failed to load holidays');
+    } finally {
+      if (token === tokenRef.current) setLoading(false);
+    }
+  }, [existingEvents]);
+
+  useEffect(() => {
+    fetchHolidays(country);
+  }, [country, fetchHolidays]);
+
+  const toggleHoliday = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (selectedIds.size === holidays.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(holidays.map((h) => h.id)));
+    }
+  };
+
+  const handleConfirm = () => {
+    const selected = holidays.filter((h) => selectedIds.has(h.id));
+    const events: CountdownEvent[] = selected.map((h) => ({
+      id: `holiday-${country}-${h.title.toLowerCase().replace(/\s+/g, '-')}`,
+      name: h.title,
+      date: `${h.start}T00:00`,
+      recurring: 'yearly' as const,
+      source: 'holiday' as const,
+    }));
+    onConfirm(events, country);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[65] flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+
+      {/* Modal */}
+      <div className="relative bg-neutral-900 border border-neutral-700 rounded-xl w-full max-w-md flex flex-col" style={{ maxHeight: '80vh' }}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-700">
+          <h2 className="text-sm font-semibold text-neutral-100">Add Holidays</h2>
+          <button onClick={onClose} className="text-neutral-400 hover:text-neutral-200 text-lg leading-none">
+            &times;
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {/* Country selector */}
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-neutral-400">Country</span>
+            <select
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+              className="bg-neutral-800 border border-neutral-600 rounded px-2 py-1.5 text-sm text-neutral-100"
+            >
+              <option value="">Select a country...</option>
+              {countries.map((c) => (
+                <option key={c.countryCode} value={c.countryCode}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {loading && <p className="text-xs text-neutral-500">Loading holidays...</p>}
+
+          {!loading && holidays.length > 0 && (
+            <>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-neutral-400">
+                  {selectedIds.size} of {holidays.length} selected
+                </span>
+                <button onClick={toggleAll} className="text-xs text-blue-400 hover:text-blue-300">
+                  {selectedIds.size === holidays.length ? 'Deselect All' : 'Select All'}
+                </button>
+              </div>
+              <div className="space-y-1">
+                {holidays.map((h) => (
+                  <label
+                    key={h.id}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-neutral-800 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(h.id)}
+                      onChange={() => toggleHoliday(h.id)}
+                      className="accent-blue-500"
+                    />
+                    <span className="text-sm text-neutral-200 flex-1">{h.title}</span>
+                    <span className="text-xs text-neutral-500">{h.start}</span>
+                  </label>
+                ))}
+              </div>
+            </>
+          )}
+
+          {error && (
+            <p className="text-xs text-red-400">{error}</p>
+          )}
+
+          {!loading && !error && country && holidays.length === 0 && (
+            <p className="text-xs text-neutral-500">No upcoming holidays found.</p>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-neutral-700">
+          <Button size="sm" variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button size="sm" onClick={handleConfirm} disabled={selectedIds.size === 0}>
+            Add {selectedIds.size > 0 ? `${selectedIds.size} Holidays` : 'Holidays'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
