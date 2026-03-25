@@ -121,7 +121,7 @@ case "${action}" in
       exit 1
     fi
 
-    repo="${2:-agent462/home-screens}"
+    repo="${2:-home-screens/home-screens}"
     asset_name="home-screens-${tag}.tar.gz"
     download_url="https://github.com/${repo}/releases/download/${tag}/${asset_name}"
 

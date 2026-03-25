@@ -13,7 +13,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IMAGE_CREATION_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-REPO="agent462/home-screens"
+REPO="home-screens/home-screens"
 INSTALL_BASE="/opt/home-screens"
 APP_DIR="${INSTALL_BASE}/current"
 HS_BRANCH="${HS_BRANCH:-}"

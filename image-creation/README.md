@@ -18,7 +18,7 @@ This directory contains scripts for building a custom Raspberry Pi image pre-loa
 ssh pi@raspberrypi.local
 
 # Clone the repo (or just the image-creation directory)
-git clone https://github.com/agent462/home-screens.git
+git clone https://github.com/home-screens/home-screens.git
 cd home-screens/image-creation
 
 # Development build (keeps build tools, good for testing)

@@ -4,7 +4,7 @@ import path from 'path';
 import { getSecret } from './secrets';
 import { compareSemver, isPrerelease } from '@/lib/semver';
 
-export const GITHUB_REPO = 'agent462/home-screens';
+export const GITHUB_REPO = 'home-screens/home-screens';
 
 export interface VersionInfo {
   current: string;

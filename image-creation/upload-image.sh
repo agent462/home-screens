@@ -8,7 +8,7 @@
 
 set -e
 
-REPO="agent462/home-screens"
+REPO="home-screens/home-screens"
 TAG="$1"
 IMAGE_FILE="$2"
 

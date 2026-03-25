@@ -31,7 +31,7 @@ vi.mock('@/lib/migrations', () => ({
 const mockHasReleaseTarball = vi.fn();
 vi.mock('@/lib/version', () => ({
   hasReleaseTarball: (...args: unknown[]) => mockHasReleaseTarball(...args),
-  GITHUB_REPO: 'agent462/home-screens',
+  GITHUB_REPO: 'home-screens/home-screens',
 }));
 
 // Mock fs (dynamic import in upgrade.ts uses `await import('fs')`)
@@ -556,7 +556,7 @@ describe('runUpgrade — tarball path', () => {
     );
     expect(downloadCall).toBeDefined();
     expect((downloadCall![1] as string[])[2]).toBe('v2.0.0');
-    expect((downloadCall![1] as string[])[3]).toBe('agent462/home-screens');
+    expect((downloadCall![1] as string[])[3]).toBe('home-screens/home-screens');
   });
 
   it('cleans up staging directory on pipeline failure', async () => {

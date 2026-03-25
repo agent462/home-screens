@@ -5,14 +5,14 @@ set -euo pipefail
 # Downloads a pre-built release from GitHub and configures the kiosk.
 #
 # Usage:
-#   git clone https://github.com/agent462/home-screens.git
+#   git clone https://github.com/home-screens/home-screens.git
 #   ~/home-screens/scripts/install.sh                        # Pi OS Lite (default)
 #   ~/home-screens/scripts/install.sh --desktop              # Pi OS with Desktop
 #   ~/home-screens/scripts/install.sh --version v1.2.0       # Install a specific release
 
 INSTALL_BASE="/opt/home-screens"
 APP_DIR="${INSTALL_BASE}/current"
-REPO="agent462/home-screens"
+REPO="home-screens/home-screens"
 NODE_MAJOR=22
 
 # --- Shared functions ---

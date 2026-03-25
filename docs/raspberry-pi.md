@@ -16,7 +16,7 @@ Home Screens is designed to run as a dedicated kiosk display on a Raspberry Pi. 
 Clone the repo and run the install script:
 
 ```bash
-git clone https://github.com/agent462/home-screens.git
+git clone https://github.com/home-screens/home-screens.git
 ~/home-screens/scripts/install.sh
 ```
 
@@ -25,7 +25,7 @@ git clone https://github.com/agent462/home-screens.git
 If you're running the full Desktop image, pass the `--desktop` flag:
 
 ```bash
-git clone https://github.com/agent462/home-screens.git
+git clone https://github.com/home-screens/home-screens.git
 ~/home-screens/scripts/install.sh --desktop
 ```
 

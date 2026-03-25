@@ -40,7 +40,7 @@ Home Screens is built for [Raspberry Pi OS Lite 64-bit (Trixie)](https://www.ras
 Clone the repo and run the install script:
 
 ```bash
-git clone https://github.com/agent462/home-screens.git
+git clone https://github.com/home-screens/home-screens.git
 
 # Raspberry Pi OS Lite (default)
 ~/home-screens/scripts/install.sh

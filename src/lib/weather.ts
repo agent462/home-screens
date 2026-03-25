@@ -554,7 +554,7 @@ interface NOAAAlertFeature {
 // ── NOAA/NWS provider ────────────────────────────────────────────────
 
 class NOAAProvider implements WeatherProvider {
-  private static USER_AGENT = '(home-screens, github.com/bryantee/home-screens)';
+  private static USER_AGENT = '(home-screens, github.com/home-screens/home-screens)';
   private static gridCache = new Map<string, { data: NOAAPointProperties; ts: number }>();
   private static GRID_TTL = 24 * 60 * 60 * 1000; // 24 hours
   private static MAX_CACHE = 20;

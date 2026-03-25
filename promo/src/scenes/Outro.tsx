@@ -128,7 +128,7 @@ export const Outro: React.FC = () => {
           letterSpacing: "0.03em",
         }}
       >
-        github.com/agent462/home-screens
+        github.com/home-screens/home-screens
       </div>
 
       {/* Tagline */}
